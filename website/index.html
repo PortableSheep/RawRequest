@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>RawRequest – Lightweight .http Runner for API Development</title>
+    <meta name="description" content="RawRequest is a fast, native .http file runner. Chain requests, cancel long runs, run load tests, and keep your API workflow in your editor. Free and open source." />
+    <meta name="keywords" content="http client, api testing, postman alternative, rest client, http runner, api development" />
+    
+    <!-- OpenGraph -->
+    <meta property="og:title" content="RawRequest – Ship APIs Faster" />
+    <meta property="og:description" content="Lightweight .http runner with chained requests, live cancellation, and load testing. Free and open source." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://rawrequest.app" />
+    
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="RawRequest – Ship APIs Faster" />
+    <meta name="twitter:description" content="Lightweight .http runner with chained requests, live cancellation, and load testing." />
+    
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="site-header">
+        <div class="logo">
+          <span class="logo-mark">RR</span>
+          <span class="logo-text">RawRequest</span>
+        </div>
+        <nav>
+          <a href="#features">Features</a>
+          <a href="#workflow">Workflow</a>
+          <a href="#install">Install</a>
+          <a href="#compare">Compare</a>
+        </nav>
+        <a class="btn btn-secondary" href="https://github.com/portablesheep/RawRequest/releases">Download</a>
+      </header>
+
+      <main>
+        <section class="hero panel" id="top">
+          <div class="hero-copy" data-animate>
+            <p class="badge">Free & Open Source</p>
+            <h1>Ship API calls at the speed of thought.</h1>
+            <p class="lede">
+              RawRequest is the lightweight .http runner built for engineers who live in their editor.
+              Queue requests, chain responses, cancel long runs, and keep your focus on the keyboard.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-primary" href="https://github.com/portablesheep/RawRequest/releases">Download for macOS</a>
+              <a class="btn btn-ghost" href="https://github.com/portablesheep/RawRequest">View on GitHub</a>
+            </div>
+            <div class="hero-metrics">
+              <div>
+                <span class="metric">< 50 MB</span>
+                <span class="label">Install size</span>
+              </div>
+              <div>
+                <span class="metric">Native</span>
+                <span class="label">macOS app</span>
+              </div>
+              <div>
+                <span class="metric">Zero</span>
+                <span class="label">Cloud dependencies</span>
+              </div>
+            </div>
+          </div>
+          <div class="hero-visual" data-animate>
+            <div class="status-banner">
+              <span class="dot"></span>
+              Cancelling request chain...
+            </div>
+            <div class="request-window">
+              <div class="window-header">
+                <span>payments.http</span>
+                <span class="method">POST</span>
+              </div>
+              <pre><code>// Create subscription
+POST https://api.rawrequest.app/v1/subscriptions
+Authorization: Bearer {{token}}
+
+{
+  "plan": "pro",
+  "customerId": "cust_4f92k",
+  "trial": 14
+}</code></pre>
+              <div class="window-footer">
+                <div>
+                  <span class="pill success"></span>
+                  Status 201 Created · 84 ms
+                </div>
+                <button class="btn btn-pill">Cancel chain</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="feature-grid panel" id="features">
+          <header data-animate>
+            <p class="eyebrow">Why RawRequest</p>
+            <h2>Everything you need, nothing you don't.</h2>
+            <p>From chained variables to load tests, RawRequest keeps the powerful bits and trims the bloat.</p>
+          </header>
+          <div class="grid">
+            <article data-animate>
+              <h3>Live cancellation</h3>
+              <p>Each execution receives a unique ID so you can abort noisy chains the moment requirements change.</p>
+            </article>
+            <article data-animate>
+              <h3>Environment aware</h3>
+              <p>Scoped environments follow your .http file, ensuring the request running in prod is the one you meant.</p>
+            </article>
+            <article data-animate>
+              <h3>Scriptable hooks</h3>
+              <p>Use lightweight pre/post scripts to transform payloads, seed variables, or assert on responses.</p>
+            </article>
+            <article data-animate>
+              <h3>Chained responses</h3>
+              <p>Reference <code>{{request1.response.body.id}}</code> anywhere and RawRequest resolves it on the fly.</p>
+            </article>
+            <article data-animate>
+              <h3>Load testing</h3>
+              <p>Turn any request into a burst test with concurrency + iterations, then inspect the built-in metrics modal.</p>
+            </article>
+            <article data-animate>
+              <h3>Offline friendly</h3>
+              <p>No cloud account or sync needed. Everything lives in your repo, making diffs and reviews painless.</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="workflow panel" id="workflow">
+          <div class="workflow-content" data-animate>
+            <p class="eyebrow">Editor-native flow</p>
+            <h2>Compose → Execute → Inspect → Automate</h2>
+            <p>
+              RawRequest reads your .http files, shows grouped requests, and queues executions so you never double-run by accident.
+              When requirements shift, hit cancel and pick up right where you left off.
+            </p>
+            <ul class="steps">
+              <li><span>01</span> Author requests next to your code.</li>
+              <li><span>02</span> Trigger with a single keystroke.</li>
+              <li><span>03</span> Inspect structured responses + history.</li>
+              <li><span>04</span> Promote variables, assertions, and load tests.</li>
+            </ul>
+          </div>
+          <div class="workflow-visual" data-animate>
+            <div class="timeline">
+              <div class="timeline-item">
+                <span class="dot active"></span>
+                <div>
+                  <p>Queued Request</p>
+                  <small>POST /charges · Pending</small>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <span class="dot"></span>
+                <div>
+                  <p>Running Request</p>
+                  <small>GET /customers · 122 ms</small>
+                </div>
+              </div>
+              <div class="timeline-item">
+                <span class="dot"></span>
+                <div>
+                  <p>History Saved</p>
+                  <small>request3.response.body.id → {{userId}}</small>
+                </div>
+              </div>
+            </div>
+            <div class="code-block">
+<pre><code>### Create charge @group payments
+POST https://api.rawrequest.dev/v1/charges
+Content-Type: application/json
+Authorization: Bearer {{auth}}
+
+{
+  "amount": 4900,
+  "currency": "usd",
+  "customer": "{{request1.response.body.id}}"
+}
+</code></pre>
+            </div>
+          </div>
+        </section>
+
+        <section class="install-section panel" id="install" data-animate>
+          <header>
+            <p class="eyebrow">Get Started</p>
+            <h2>Install in seconds.</h2>
+            <p>Choose your preferred installation method. Building from source avoids macOS Gatekeeper warnings.</p>
+          </header>
+          <div class="install-options">
+            <div class="install-option">
+              <h3>📦 Direct Download</h3>
+              <p>Download the latest release from GitHub. You may need to approve the app in System Settings → Privacy & Security.</p>
+              <a class="btn btn-primary" href="https://github.com/portablesheep/RawRequest/releases">Download from GitHub</a>
+            </div>
+            <div class="install-option">
+              <h3>🍺 Homebrew (Source Build)</h3>
+              <p>Build from source to avoid Gatekeeper entirely. Requires Go, Node, and Wails.</p>
+              <div class="code-snippet">
+                <code>brew tap portablesheep/rawrequest<br/>brew install --build-from-source rawrequest</code>
+              </div>
+            </div>
+            <div class="install-option">
+              <h3>🔧 Build from Source</h3>
+              <p>Clone the repo and build it yourself for full control.</p>
+              <div class="code-snippet">
+                <code>git clone https://github.com/portablesheep/RawRequest.git<br/>cd RawRequest && wails build</code>
+              </div>
+            </div>
+          </div>
+          <p class="platform-note">Currently available for <strong>macOS</strong>. Windows and Linux coming soon.</p>
+        </section>
+
+        <section class="comparison panel" id="compare" data-animate>
+          <header>
+            <p class="eyebrow">Choose your fighter</p>
+            <h2>How RawRequest stacks up.</h2>
+          </header>
+          <div class="table">
+            <div class="head">
+              <span>Capability</span>
+              <span>RawRequest</span>
+              <span>Postman</span>
+              <span>Bruno</span>
+              <span>curl scripts</span>
+            </div>
+            <div>
+              <span>Inline scripting</span>
+              <span class="good">✓</span>
+              <span>✓</span>
+              <span>✕</span>
+              <span>Manual</span>
+            </div>
+            <div>
+              <span>Live cancellation</span>
+              <span class="good">✓</span>
+              <span>Partial</span>
+              <span>✕</span>
+              <span>Ctrl+C</span>
+            </div>
+            <div>
+              <span>Chained requests</span>
+              <span class="good">✓</span>
+              <span>✓</span>
+              <span>Limited</span>
+              <span>Manual</span>
+            </div>
+            <div>
+              <span>Offline first</span>
+              <span class="good">✓</span>
+              <span>✕</span>
+              <span>✓</span>
+              <span>✓</span>
+            </div>
+            <div>
+              <span>Install size</span>
+              <span class="good">< 50 MB</span>
+              <span>> 600 MB</span>
+              <span>120 MB</span>
+              <span>N/A</span>
+            </div>
+          </div>
+        </section>
+        <section class="cta-banner panel" id="cta" data-animate>
+          <div>
+            <p class="eyebrow">Ready to ship</p>
+            <h2>Stop waiting on heavy clients. Start building.</h2>
+            <p>RawRequest is free and open source. Star the repo to follow updates.</p>
+          </div>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="https://github.com/portablesheep/RawRequest/releases">Download RawRequest</a>
+            <a class="btn btn-ghost" href="https://github.com/portablesheep/RawRequest">⭐ Star on GitHub</a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <div>
+          <span class="logo-mark">RR</span>
+          <span>RawRequest</span>
+        </div>
+        <div class="footer-links">
+          <a href="#install">Install</a>
+          <a href="https://github.com/portablesheep/RawRequest">GitHub</a>
+          <a href="https://github.com/portablesheep/RawRequest/issues">Issues</a>
+        </div>
+        <p>© <span id="year"></span> RawRequest. Free & Open Source.</p>
+      </footer>
+    </div>
+
+    <script src="app.js" type="module"></script>
+  </body>
+</html>

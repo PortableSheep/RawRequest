@@ -1,0 +1,167 @@
+<nav class="flex items-center justify-between w-full h-12 px-4 bg-black border-b border-zinc-800 sticky top-0 z-50">
+    <div class="flex-1 min-w-0 overflow-x-auto no-scrollbar self-end">
+        <ul
+            class="flex gap-0.5"
+            (dragover)="handleTabStripDragOver($event)"
+            (drop)="handleTabStripDrop($event)"
+        >
+            @for (file of files(); track file.id; let i = $index) {
+                <li class="group flex items-center max-w-[200px] h-9 px-3.5 rounded-t-lg rounded-b-none border border-zinc-800 border-b-0 bg-zinc-900 text-zinc-400 text-[13px] cursor-pointer select-none transition-all hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-700 hover:border-b-0 relative"
+                    draggable="true"
+                    [class.bg-blue-500-10]="currentFileIndex() === i"
+                    [class.border-blue-500-50]="currentFileIndex() === i"
+                    [class.text-blue-400]="currentFileIndex() === i"
+                    [class.shadow-sm]="currentFileIndex() === i"
+                    [class.opacity-50]="draggingIndex === i"
+                    [class.z-10]="currentFileIndex() === i"
+                    [class.ring-2]="dragOverIndex === i"
+                    (dragstart)="handleTabDragStart($event, i)"
+                    (dragover)="handleTabDragOver($event, i)"
+                    (drop)="handleTabDrop($event, i)"
+                    (dragend)="handleTabDragEnd()"
+                    (contextmenu)="handleContextMenu($event, i)"
+                >
+                    <a
+                        class="flex flex-1 items-center min-w-0 text-inherit no-underline"
+                        aria-current="page"
+                        href="#"
+                        (click)="$event.preventDefault(); onFileSelect.emit(i)"
+                    >
+                        <span class="flex-1 truncate font-medium tracking-tight" [title]="file.displayName || file.name">
+                          {{file.displayName || file.name}}
+                        </span>
+
+                        <button
+                            type="button"
+                            class="flex items-center justify-center w-5 h-5 ml-2 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-all"
+                            draggable="false"
+                            (click)="$event.stopPropagation(); $event.preventDefault(); onCloseFile.emit(i)"
+                            title="Close File"
+                        >
+                            <span class="sr-only">Close file</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                        </button>
+                    </a>
+                </li>
+            }
+        </ul>
+    </div>
+
+    <!-- Context Menu -->
+    @if (contextMenu.show) {
+        <div class="fixed inset-0 z-[100]" (click)="closeContextMenu()" (contextmenu)="$event.preventDefault(); closeContextMenu()"></div>
+        <div class="fixed z-[101] min-w-[160px] py-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl"
+             [style.left.px]="contextMenu.x"
+             [style.top.px]="contextMenu.y">
+            @if (contextMenu.filePath) {
+                <button type="button"
+                        class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        (click)="revealInFinder()">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /></svg>
+                    <span>Reveal in Finder</span>
+                </button>
+            } @else {
+                <div class="px-3 py-2 text-sm text-zinc-500 italic">
+                    File not saved to disk
+                </div>
+            }
+            <div class="border-t border-zinc-700 my-1"></div>
+            <button type="button"
+                    class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    (click)="closeTab()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                <span>Close Tab</span>
+            </button>
+            <button type="button"
+                    class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    (click)="closeOtherTabs()">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /></svg>
+                <span>Close Other Tabs</span>
+            </button>
+        </div>
+    }
+
+    <div class="flex items-center gap-2">
+        <!-- Environment selector -->
+        <div class="relative flex items-center">
+            @if(environments().length > 0) {
+                <select class="appearance-none h-8 pl-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium cursor-pointer outline-none hover:border-zinc-700 hover:bg-zinc-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all min-w-[140px] shadow-sm"
+                    [ngModel]="selectedEnv()"
+                    (ngModelChange)="onEnvChange.emit($event)"
+                >
+                    @for (env of environments(); track env) {
+                        <option [value]="env" class="bg-zinc-900">{{env}}</option>
+                    }
+                </select>
+                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-zinc-500">
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </div>
+            } @else {
+                <span class="inline-flex items-center h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-500 text-xs font-medium">
+                    No Environments
+                </span>
+            }
+        </div>
+
+        <!-- New -->
+        <button
+            type="button"
+            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+            (click)="onNewFile.emit()"
+            title="New File"
+            aria-label="Create new file"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+            <span>New</span>
+        </button>
+
+        <!-- Open -->
+        <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+                (click)="onOpenFile.emit()"
+                title="Open File"
+                aria-label="Open existing file"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /></svg>
+            <span>Open</span>
+        </button>
+
+        <!-- Secrets -->
+        <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-amber-500/50 hover:text-amber-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm group"
+                (click)="onSecretsClick.emit()"
+                [disabled]="!selectedEnv()"
+                title="Manage Secrets"
+                aria-label="Manage secrets"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-500 group-hover:text-amber-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z" /><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" /><path d="M8 11v-4a4 4 0 1 1 8 0v4" /></svg>
+            <span>Secrets</span>
+        </button>
+
+        <!-- Support -->
+        <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-pink-500/50 hover:text-pink-400 focus:outline-none focus:ring-1 focus:ring-amber-500/20 transition-all shadow-sm group"
+                (click)="onDonateClick.emit()"
+                title="Support Development"
+                aria-label="Support Development"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-pink-500 group-hover:text-pink-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
+            <span>Support</span>
+        </button>
+
+        <!-- History -->
+        <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-purple-500/50 hover:text-purple-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+                (click)="onHistoryClick.emit()"
+                title="History"
+                aria-label="View request history"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-purple-500 group-hover:text-purple-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
+            <span>History</span>
+        </button>
+    </div>
+</nav>

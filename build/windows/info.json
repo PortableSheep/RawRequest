@@ -1,0 +1,15 @@
+{
+  "fixed": {
+    "file_version": "1.0.0"
+  },
+  "info": {
+    "0000": {
+      "ProductVersion": "1.0.0",
+      "CompanyName": "RawRequest",
+      "FileDescription": "RawRequest - HTTP Client for Developers",
+      "LegalCopyright": "Copyright © 2024",
+      "ProductName": "RawRequest",
+      "Comments": "A modern HTTP client built with Wails"
+    }
+  }
+}

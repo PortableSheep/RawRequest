@@ -1,0 +1,63 @@
+//.modal-overlay {
+//  position: fixed;
+//  inset: 0;
+//  background: rgba(3, 7, 18, 0.78);
+//  backdrop-filter: blur(10px);
+//  z-index: 1040;
+//}
+//
+//.donation-modal {
+//  display: block;
+//  z-index: 1050;
+//
+//  .modal-dialog {
+//    max-width: 720px;
+//  }
+//
+//  .modal-content {
+//    background: radial-gradient(circle at top, rgba(25, 33, 61, 0.96), rgba(7, 10, 19, 0.98));
+//    color: #f8fafc;
+//    border: 1px solid rgba(148, 163, 184, 0.25);
+//    border-radius: 1rem;
+//    box-shadow: 0 30px 70px rgba(0, 0, 0, 0.5);
+//  }
+//
+//  .modal-header {
+//    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+//  }
+//
+//  .modal-body {
+//    padding: 1.75rem;
+//  }
+//
+//  .donation-card {
+//    cursor: pointer;
+//    border: 1px solid rgba(148, 163, 184, 0.2);
+//    background: rgba(15, 23, 42, 0.75);
+//    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+//
+//    &:hover {
+//      transform: translateY(-4px);
+//      border-color: rgba(56, 189, 248, 0.5);
+//      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.35);
+//    }
+//
+//    &.featured {
+//      border-color: rgba(251, 191, 36, 0.8);
+//      box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
+//      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(15, 23, 42, 0.85));
+//    }
+//  }
+//
+//  .donation-icon {
+//    font-size: 2.25rem;
+//    margin-bottom: 0.5rem;
+//  }
+//
+//  .input-group-text,
+//  .form-control {
+//    background: rgba(15, 23, 42, 0.75);
+//    color: #f8fafc;
+//    border: 1px solid rgba(148, 163, 184, 0.2);
+//  }
+//}

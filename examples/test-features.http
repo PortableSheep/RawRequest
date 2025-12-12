@@ -1,0 +1,57 @@
+# Test File - Verify Chain, Load Test, and Regular Requests
+# This file tests the three main request types
+
+###############################################################################
+# 1. SIMPLE REQUEST TEST
+###############################################################################
+
+### Simple GET request
+GET https://httpbin.org/get
+User-Agent: RawRequest-Test
+
+###
+
+###############################################################################
+# 2. CHAIN REQUEST TEST
+###############################################################################
+
+### Step 1: Login (generates token)
+@name login
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "testpass"
+}
+
+> {
+  // Store a fake token for testing
+  setVar('authToken', 'Bearer test-token-' + Math.random().toString(36).substr(2, 9));
+  console.log('Token stored:', getVar('authToken'));
+}
+
+###
+
+### Step 2: Get Profile (depends on login)
+@name getProfile
+@depends login
+GET https://httpbin.org/get
+Authorization: {{authToken}}
+
+> {
+  console.log('Profile retrieved with token:', getVar('authToken'));
+}
+
+###
+
+###############################################################################
+# 3. LOAD TEST
+###############################################################################
+
+### Simple load test - 5 requests
+@name simpleLoadTest
+@load concurrent=2 iterations=5
+GET https://httpbin.org/get
+
+###

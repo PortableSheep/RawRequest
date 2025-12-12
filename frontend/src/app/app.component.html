@@ -1,0 +1,179 @@
+<!-- language: html -->
+<div class="min-h-screen flex flex-col bg-black text-zinc-100 selection:bg-blue-500/30">
+    <!-- Header Component -->
+    <app-header
+            [files]="files"
+            [currentFileIndex]="currentFileIndex"
+            [environments]="getEnvironments()"
+            [selectedEnv]="currentEnv()"
+            (onFileSelect)="switchToFile($event)"
+            (onNewFile)="addNewTab()"
+            (onOpenFile)="openFile()"
+            (onCloseFile)="closeTab($event)"
+            (onEnvChange)="onCurrentEnvChange($event)"
+            (onSecretsClick)="openSecretsModal()"
+            (onDonateClick)="showDonationModal = true"
+            (onHistoryClick)="toggleHistory()"
+            (onReorderTabs)="onTabsReordered($event)"
+            (onRevealInFinder)="revealInFinder($event)"
+            (onCloseOtherTabs)="closeOtherTabs($event)">
+    </app-header>
+
+    <!-- Main content flex: grows between header and footer -->
+    <main class="flex-1 relative">
+        <div class="mx-auto w-full px-4 py-4 h-full flex flex-col">
+            <!-- Request Manager (logic only, no layout impact) -->
+            <app-request-manager
+                    [files]="files"
+                    [currentFileIndex]="currentFileIndex"
+                    [currentEnv]="currentEnv()"
+                    (filesChange)="onFilesChange($event)"
+                    (currentFileIndexChange)="onCurrentFileIndexChange($event)"
+                    (currentEnvChange)="onCurrentEnvChange($event)"
+                    (requestExecuted)="onRequestExecuted($event)"
+                    (historyUpdated)="onHistoryUpdated($event)">
+            </app-request-manager>
+
+            <!-- Two-column main layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 h-full">
+                <!-- Editor column -->
+                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-blue-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col">
+                    <app-editor
+                        class="flex-1 overflow-hidden"
+                        [content]="currentFile.content"
+                        [requests]="currentFile.requests"
+                        [variables]="currentFile.variables"
+                        [environments]="currentFile.environments"
+                        [requestNames]="currentFileRequestNames()"
+                        [executingRequestIndex]="pendingRequestIndex"
+                        [isBusy]="isRequestRunning"
+                        (contentChange)="onEditorContentChange($event)"
+                        (requestExecute)="onRequestExecute($event)">
+                    </app-editor>
+                </div>
+
+                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-emerald-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col">
+                    <app-response-panel
+                        class="flex-1 overflow-hidden"
+                        [responseData]="lastExecutedRequestIndex !== null ? currentFile.responseData[lastExecutedRequestIndex] : null"
+                        [request]="lastExecutedRequestIndex !== null ? currentFile.requests[lastExecutedRequestIndex] : null"
+                        [isLoading]="isRequestRunning"
+                        [isCancelling]="isCancellingActiveRequest">
+                    </app-response-panel>
+                </div>
+            </div>
+        </div>
+
+        @if (activeRequestInfo; as active) {
+            @let activeRequest = getActiveRequestDetails();
+            <div class="fixed bottom-20 left-0 right-0 z-30 flex justify-center px-3">
+                <div class="glass-panel floating-overlay w-full max-w-4xl rounded-xl border border-blue-500 bg-zinc-900 shadow-lg shadow-blue-900/40 p-3 space-y-3">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="inline-flex items-center gap-2">
+                            <span
+                                class="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"
+                                [class.bg-amber-400]="isCancellingActiveRequest"
+                                [class.cancelling]="isCancellingActiveRequest"
+                            ></span>
+                            <div>
+                                <p class="text-sm font-medium">{{ active?.label }}</p>
+                                <small class="text-xs text-zinc-400">{{ getActiveRequestMeta() }}</small>
+                            </div>
+                        </div>
+                        <button
+                            type="button"
+                            class="btn-ambient inline-flex items-center rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-100 hover:bg-red-600 hover:border-red-500 hover:text-white transition disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-800 disabled:hover:border-zinc-700"
+                            (click)="cancelActiveRequest()"
+                            [disabled]="!active.canCancel || isCancellingActiveRequest"
+                        >
+                            {{ isCancellingActiveRequest ? 'Canceling...' : 'Cancel request' }}
+                        </button>
+                    </div>
+
+                    <div class="rounded-lg border border-zinc-700 bg-zinc-950 text-xs">
+                        <div class="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
+                            <span class="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-100">
+                                {{ activeRequest?.method || '—' }}
+                            </span>
+                            <span class="text-[11px] text-zinc-400">
+                                {{ active.type === 'load' ? 'Load test running' : active.type === 'chain' ? 'Chained request running' : 'Request running' }}
+                            </span>
+                        </div>
+                        <div class="px-3 py-2 border-b border-zinc-800 text-[11px] text-zinc-300 truncate">
+                            {{ activeRequest?.name || 'Waiting for request selection' }}
+                        </div>
+                        <pre class="max-h-64 overflow-auto px-3 py-2 text-[11px] leading-snug text-zinc-200"><code>{{ getActiveRequestPreview() }}</code></pre>
+                    </div>
+                </div>
+            </div>
+        }
+    </main>
+
+    <!-- Console Drawer Component -->
+    <app-console-drawer
+            [open]="consoleOpen()"
+            [logs]="scriptLogs()"
+            [latestLog]="latestConsoleEntry()"
+            [status]="footerStatus()"
+            version="Raw Request v1"
+            (onToggle)="toggleConsole()"
+            (onClear)="clearConsole()">
+    </app-console-drawer>
+
+   <!-- History Sidebar Component -->
+   <app-history-sidebar
+        [isOpen]="showHistory"
+        [history]="history"
+        [selectedItem]="selectedHistoryItem"
+        (onClose)="toggleHistory()"
+        (onItemClick)="viewHistory($event)">
+   </app-history-sidebar>
+
+   <!-- History Detail Modal Component -->
+   <app-history-detail-modal
+        [isOpen]="showHistoryModal"
+        [item]="selectedHistoryItem"
+        (onClose)="closeHistoryModal()">
+    </app-history-detail-modal>
+
+    <!-- Load Test Results Modal Component -->
+    <app-load-test-results-modal
+        [isOpen]="showLoadTestResults"
+        [metrics]="loadTestMetrics"
+        (onClose)="closeLoadTestResults()">
+    </app-load-test-results-modal>
+
+    <!-- Donation Modal Component -->
+    <app-donation-modal
+        [isOpen]="showDonationModal"
+        (onClose)="showDonationModal = false"
+        (onDonate)="donate($event)">
+    </app-donation-modal>
+
+    <!-- Secrets Modal Component -->
+    <app-secrets-modal
+        [isOpen]="showSecretsModal"
+        [selectedEnv]="currentEnv()"
+        [allSecrets]="allSecrets"
+        [vaultInfo]="vaultInfo"
+        (onClose)="showSecretsModal = false"
+        (onSave)="handleSecretSave($event)"
+        (onDeleteClick)="confirmDeleteSecret($event.env, $event.key)"
+        (onExport)="handleVaultExport()"
+        (onResetVault)="handleVaultReset()">
+    </app-secrets-modal>
+
+    <!-- Delete Confirm Modal Component -->
+    <app-delete-confirm-modal
+        [isOpen]="showDeleteConfirmModal"
+        [secretInfo]="secretToDelete"
+        (onConfirm)="deleteSecret()"
+        (onCancel)="cancelDeleteSecret()">
+    </app-delete-confirm-modal>
+
+    <!-- Toast Container -->
+    <app-toast-container></app-toast-container>
+
+    <!-- Update Notification -->
+    <app-update-notification></app-update-notification>
+</div>

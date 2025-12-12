@@ -1,0 +1,40 @@
+@if (isOpen()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
+    <div class="modal-animated relative w-full max-w-sm transform overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 shadow-xl transition-all sm:my-8" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
+      <div class="flex items-center justify-between border-b border-zinc-800 px-4 py-3">
+        <h3 id="delete-modal-title" class="text-sm font-semibold leading-6 text-zinc-100">🗑️ Delete Secret</h3>
+        <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors" (click)="onCancel.emit()" aria-label="Close modal">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+      
+      <div class="px-4 py-4">
+        <p class="text-sm text-zinc-300 mb-3">Are you sure you want to delete this secret?</p>
+        @if (secretInfo()) {
+          <div class="rounded-md bg-amber-500/10 border border-amber-500/20 p-3 text-sm text-amber-200">
+            <div class="flex flex-col gap-1">
+              <div><span class="font-semibold text-amber-400">Environment:</span> {{ secretInfo()!.env }}</div>
+              <div><span class="font-semibold text-amber-400">Key:</span> <code class="bg-amber-500/20 px-1 py-0.5 rounded text-xs">{{ secretInfo()!.key }}</code></div>
+            </div>
+          </div>
+        }
+      </div>
+      
+      <div class="flex items-center justify-end gap-3 border-t border-zinc-800 bg-zinc-900 px-4 py-3">
+        <button type="button" 
+                class="rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 shadow-sm hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-600" 
+                (click)="onCancel.emit()">
+          Cancel
+        </button>
+        <button type="button" 
+                class="rounded-md bg-red-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600" 
+                (click)="onConfirm.emit()">
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop-animated fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onCancel.emit()"></div>
+}

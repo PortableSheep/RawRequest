@@ -1,0 +1,136 @@
+@if (item()) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
+    <div class="modal-animated relative w-full max-w-6xl h-[90vh] flex flex-col transform overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl transition-all" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+      
+      <!-- Header -->
+      <div class="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900 shrink-0">
+        <div class="flex items-center gap-3 overflow-hidden">
+          <span class="px-2 py-1 rounded text-xs font-bold font-mono shrink-0"
+                [class.text-emerald-400]="item()!.method === 'GET'"
+                [class.bg-emerald-400-10]="item()!.method === 'GET'"
+                [class.text-amber-400]="item()!.method === 'POST'"
+                [class.bg-amber-400-10]="item()!.method === 'POST'"
+                [class.text-blue-400]="item()!.method === 'PUT' || item()!.method === 'PATCH'"
+                [class.bg-blue-400-10]="item()!.method === 'PUT' || item()!.method === 'PATCH'"
+                [class.text-red-400]="item()!.method === 'DELETE'"
+                [class.bg-red-400-10]="item()!.method === 'DELETE'">
+            {{item()!.method}}
+          </span>
+          <h5 class="text-sm font-mono text-zinc-100 truncate" [title]="item()!.url">{{item()!.url}}</h5>
+        </div>
+        <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors ml-4 shrink-0" (click)="onClose.emit()" aria-label="Close modal">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Body -->
+      <div class="flex-1 overflow-hidden flex flex-col bg-zinc-950">
+        <!-- Status and Meta Info -->
+        <div class="p-6 border-b border-zinc-800 bg-zinc-900 shrink-0">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Status</label>
+              <div>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                      [class.text-emerald-400]="item()!.status >= 200 && item()!.status < 300"
+                      [class.bg-emerald-400-10]="item()!.status >= 200 && item()!.status < 300"
+                      [class.text-amber-400]="item()!.status >= 300 && item()!.status < 400"
+                      [class.bg-amber-400-10]="item()!.status >= 300 && item()!.status < 400"
+                      [class.text-red-400]="item()!.status >= 400 || item()!.status === 0"
+                      [class.bg-red-400-10]="item()!.status >= 400 || item()!.status === 0">
+                  {{item()!.status || 'ERR'}} {{item()!.statusText}}
+                </span>
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Response Time</label>
+              <div class="text-sm font-mono text-zinc-200">{{item()!.responseTime}}ms</div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Size</label>
+              <div class="text-sm font-mono text-zinc-200">{{item()!.responseData.body.length}} bytes</div>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Time</label>
+              <div class="text-sm font-mono text-zinc-200">{{formatTime(item()!.timestamp)}}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="border-b border-zinc-800 bg-zinc-900/30 px-6 shrink-0">
+          <nav class="-mb-px flex space-x-6" role="tablist" aria-label="Response details">
+            <button 
+              (click)="activeTab='body'"
+              [class.border-blue-500]="activeTab==='body'"
+              [class.text-blue-400]="activeTab==='body'"
+              [class.border-transparent]="activeTab!=='body'"
+              [class.text-zinc-400]="activeTab!=='body'"
+              class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
+              role="tab"
+              [attr.aria-selected]="activeTab==='body'"
+              aria-controls="tabpanel-body"
+              id="tab-body">
+              Response Body
+            </button>
+            <button 
+              (click)="activeTab='headers'"
+              [class.border-blue-500]="activeTab==='headers'"
+              [class.text-blue-400]="activeTab==='headers'"
+              [class.border-transparent]="activeTab!=='headers'"
+              [class.text-zinc-400]="activeTab!=='headers'"
+              class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
+              role="tab"
+              [attr.aria-selected]="activeTab==='headers'"
+              aria-controls="tabpanel-headers"
+              id="tab-headers">
+              Headers
+            </button>
+          </nav>
+        </div>
+
+        <!-- Content -->
+        <div class="flex-1 overflow-auto p-0 relative">
+          <!-- Body Tab -->
+          @if (activeTab === 'body') {
+            <pre id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="absolute inset-0 p-6 text-xs font-mono leading-relaxed text-zinc-300 overflow-auto whitespace-pre-wrap" [innerHTML]="getFormattedResponse() | syntaxHighlight"></pre>
+          }
+
+          <!-- Headers Tab -->
+          @if (activeTab === 'headers') {
+            <div id="tabpanel-headers" role="tabpanel" aria-labelledby="tab-headers" class="absolute inset-0 overflow-auto">
+              <table class="min-w-full divide-y divide-zinc-800">
+                <thead class="bg-zinc-900/50 sticky top-0">
+                  <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider w-1/3">Header</th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Value</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-zinc-800 bg-transparent">
+                  @for (kv of (item()!.responseData.headers | keyvalue); track kv.key) {
+                    <tr class="hover:bg-zinc-900/30 transition-colors">
+                      <td class="px-6 py-2 whitespace-nowrap text-xs font-mono font-medium text-zinc-300">{{kv.key}}</td>
+                      <td class="px-6 py-2 text-xs font-mono text-zinc-400 break-all">{{kv.value}}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="border-t border-zinc-800 bg-zinc-900 px-6 py-4 flex justify-end shrink-0">
+        <button type="button" 
+                class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 shadow-sm hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-600" 
+                (click)="onClose.emit()">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="modal-backdrop-animated fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+}

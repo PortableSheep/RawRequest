@@ -1,0 +1,155 @@
+@if (open()) {
+  <div class="console-drawer fixed inset-x-0 bottom-0 z-40">
+    <div class="console-drawer__shell w-full px-4 pb-4 space-y-3" aria-hidden="false">
+      <!-- Resize handle -->
+      <div 
+        class="resize-handle group flex justify-center cursor-ns-resize py-1.5 -mb-1"
+        (mousedown)="startResize($event)"
+        (touchstart)="startResize($event)"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize console"
+      >
+        <div class="w-12 h-1 rounded-full bg-zinc-700 group-hover:bg-zinc-500 group-active:bg-blue-500 transition-colors"></div>
+      </div>
+      
+      <div class="rounded-t-2xl border border-zinc-800 bg-zinc-900/95 px-4 py-3 shadow-2xl shadow-black/40">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <span class="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-300">
+            {{ version() }}
+          </span>
+            <button
+              type="button"
+            class="btn-ambient inline-flex items-center gap-2 rounded-md border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-xs font-medium text-zinc-100 shadow-sm hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 transition"
+              (click)="handleToggle()"
+              aria-expanded="true"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-4 w-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path stroke="none" d="M0 0h24v24H0z" />
+                <path d="M6 15l6 -6l6 6" />
+              </svg>
+              <span>Hide console</span>
+              <span class="inline-flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-semibold text-blue-300">
+                {{ logs().length }}
+              </span>
+            </button>
+        </div>
+      </div>
+
+      <section
+        class="console-panel overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/95 shadow-2xl shadow-blue-950/40"
+        aria-hidden="false"
+        aria-expanded="true"
+      >
+        <div class="px-4 py-4 space-y-3">
+          <div class="flex items-center justify-between text-[11px] text-zinc-400">
+            <div>
+              @if (latestLog(); as latest) {
+                <p>Last entry {{ latest.timestamp | date:'shortTime' }}</p>
+              } @else {
+                <p>No entries yet</p>
+              }
+            </div>
+            <button
+              type="button"
+              class="inline-flex items-center gap-1 rounded-md border border-zinc-700 bg-transparent px-2 py-1 text-[11px] font-medium text-zinc-200 hover:bg-zinc-800 focus-visible:outline-1 focus-visible:outline-offset-2 focus-visible:outline-zinc-600 disabled:cursor-not-allowed disabled:opacity-50"
+              (click)="handleClear()"
+              [disabled]="!logs().length"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-3.5 w-3.5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path stroke="none" d="M0 0h24v24/H0z" />
+                <path d="M8 6h12" />
+                <path d="M6 12h12" />
+                <path d="M4 18h12" />
+              </svg>
+              <span>Clear</span>
+            </button>
+          </div>
+
+          @if (logs().length) {
+            <div 
+              class="console-panel__logs overflow-auto rounded-md border border-zinc-800 bg-zinc-950/90" 
+              [style.max-height.px]="panelHeight()"
+              [class.select-none]="isResizing()"
+              aria-live="polite"
+            >
+              @for (log of logs(); track trackLogEntry($index, log)) {
+                <article
+                  class="log-entry border-b border-zinc-800 px-3 py-1.5 text-[11px] leading-snug last:border-b-0"
+                  [class.log-entry--error]="log.level === 'error'"
+                  [class.log-entry--warn]="log.level === 'warn' || log.level === 'warning'"
+                  [class.log-entry--info]="log.level === 'info'"
+                  [class.log-entry--debug]="log.level === 'debug'"
+                  [class.log-entry--log]="log.level === 'log'"
+                  [attr.data-level]="log.level"
+                >
+                  <div class="flex flex-wrap items-center gap-2 text-zinc-400">
+                    <span class="log-level uppercase tracking-wide text-[10px] font-semibold">{{ log.level }}</span>
+                    <span class="text-[10px] text-zinc-500">{{ log.source }}</span>
+                    <span class="text-[10px] text-zinc-500 ms-auto">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+                  </div>
+                  <pre class="log-message mt-1 whitespace-pre-wrap text-zinc-100">{{ log.message }}</pre>
+                </article>
+              }
+            </div>
+          } @else {
+            <div class="flex flex-col items-center justify-center rounded-md border border-dashed border-zinc-700 bg-zinc-900/60 px-3 py-6 gap-2">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-zinc-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 17l6-6-6-6" />
+                <path d="M12 19h8" />
+              </svg>
+              <p class="text-sm text-zinc-400">Console is quiet. Trigger a script run to see output.</p>
+            </div>
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+} @else {
+  <button
+    type="button"
+    class="btn-ambient console-bubble inline-flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/95 px-3.5 py-2 text-xs font-semibold text-zinc-100 shadow-2xl shadow-black/40 transition hover:border-blue-500/60 hover:text-blue-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+    (click)="handleToggle()"
+    aria-label="Open console drawer"
+    aria-expanded="false"
+  >
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      class="h-4 w-4 text-blue-400"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <path stroke="none" d="M0 0h24v24/H0z" />
+      <path d="M8 9h8" />
+      <path d="M8 13h6" />
+      <path d="M16 5l3 3-3 3" />
+      <path d="M16 15l3 3-3 3" />
+    </svg>
+    <span>Console</span>
+    <span class="inline-flex items-center rounded-full bg-blue-500/15 px-2 py-0.5 text-[11px] font-semibold text-blue-200">
+      {{ logs().length }}
+    </span>
+  </button>
+}

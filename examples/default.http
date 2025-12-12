@@ -1,0 +1,1066 @@
+# RawRequest - Complete Feature Demonstration
+# This file showcases ALL features supported by RawRequest
+# Use this as a reference guide and testing playground
+
+###############################################################################
+# 1. ENVIRONMENT VARIABLES
+###############################################################################
+# Define environment-specific variables using @env.<envName>.<variableName>
+# These are accessible via {{variableName}} in requests
+# Switch environments using the dropdown in the header
+
+@env.local.baseUrl http://localhost:3000
+@env.local.apiKey local-api-key-12345
+@env.local.timeout 30000
+
+@env.dev.baseUrl https://dev-api.example.com
+@env.dev.apiKey dev-api-key-67890
+@env.dev.timeout 60000
+
+@env.test.baseUrl https://test-api.example.com
+@env.test.apiKey test-api-key-abcde
+@env.test.timeout 60000
+
+@env.stage.baseUrl https://stage-api.example.com
+@env.stage.apiKey stage-api-key-fghij
+@env.stage.timeout 90000
+
+@env.prod.baseUrl https://api.example.com
+@env.prod.apiKey prod-api-key-klmno
+@env.prod.timeout 120000
+
+###############################################################################
+# 2. GLOBAL VARIABLES
+###############################################################################
+# Variables available across all environments
+# Initialize with empty values or default values
+
+@apiVersion v1
+@contentType application/json
+@userAgent RawRequest/1.0
+@token
+@userId
+@sessionId
+@requestId
+@timestamp
+@checkoutSessionId
+@transactionId
+@cartTotal
+@finalTotal
+@helperStart
+
+###############################################################################
+# 3. BASIC HTTP METHODS
+###############################################################################
+
+### Simple GET request
+GET https://httpbin.org/get
+User-Agent: {{userAgent}}
+
+###
+
+### GET with environment variable
+GET {{baseUrl}}/api/{{apiVersion}}/status
+Accept: {{contentType}}
+
+###
+
+### POST with JSON body
+POST https://httpbin.org/post
+Content-Type: {{contentType}}
+User-Agent: {{userAgent}}
+
+{
+  "message": "Hello from RawRequest",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "version": "{{apiVersion}}"
+}
+
+###
+
+### PUT request
+PUT https://httpbin.org/put
+Content-Type: application/json
+
+{
+  "id": 123,
+  "status": "updated"
+}
+
+###
+
+### DELETE request
+DELETE https://httpbin.org/delete
+Authorization: Bearer fake-token
+
+###
+
+### PATCH request
+PATCH https://httpbin.org/patch
+Content-Type: application/json
+
+{
+  "field": "value"
+}
+
+###
+
+### HEAD request (gets headers only, no body)
+HEAD https://httpbin.org/get
+
+###
+
+### OPTIONS request (check available methods)
+OPTIONS https://httpbin.org/get
+
+###
+
+###############################################################################
+# 4. REQUEST CHAINING & DEPENDENCIES
+###############################################################################
+# Use @name to identify requests and @depends to create dependencies
+# Chain icon (🔗) appears in the gutter for dependent requests
+
+### Login - Sets authentication token
+@name login
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "username": "testuser",
+  "password": "password123"
+}
+
+< {
+  // Pre-request script: runs before the request
+  console.log('Attempting login...');
+  setVar('loginTime', Date.now());
+}
+
+> {
+  // Post-request script: runs after the request
+  const fakeToken = 'Bearer jwt-token-' + Math.random().toString(36).substr(2, 9);
+  setVar('token', fakeToken);
+  console.log('Login successful! Token:', getVar('token'));
+
+  // Simulate extracting user data from response
+  setVar('userId', 'user-' + Math.floor(Math.random() * 1000));
+}
+
+###
+
+### Get User Profile - Depends on login
+@name getUserProfile
+@depends login
+GET https://httpbin.org/get
+Authorization: {{token}}
+Accept: application/json
+
+> {
+  // Extract data from response
+  console.log('User profile retrieved for:', getVar('userId'));
+  setVar('userEmail', 'user@example.com');
+  setVar('userName', 'Test User');
+}
+
+###
+
+### Update User Profile - Depends on getUserProfile
+@name updateProfile
+@depends getUserProfile
+PUT https://httpbin.org/put
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "userId": "{{userId}}",
+  "email": "{{userEmail}}",
+  "name": "{{userName}}",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+
+> {
+  console.log('Profile updated successfully!');
+  setVar('profileUpdated', true);
+}
+
+###
+
+###############################################################################
+# 5. PRE & POST SCRIPTS
+###############################################################################
+# Use < for pre-request scripts and > for post-request scripts
+
+### Request with pre-script
+@name scriptDemo
+GET https://httpbin.org/delay/1
+
+< {
+  // Pre-script: Set variables, prepare data
+  setVar('requestStartTime', Date.now());
+  setVar('requestId', 'req-' + Math.random().toString(36).substr(2, 9));
+  console.log('Starting request:', getVar('requestId'));
+}
+
+> {
+  // Post-script: Process response, store data
+  const duration = Date.now() - getVar('requestStartTime');
+  console.log('Request completed in', duration, 'ms');
+  setVar('lastResponseTime', duration);
+
+  if (response.status === 200) {
+    setVar('lastRequestSuccess', true);
+    console.log('Success! Status:', response.status);
+  } else {
+    setVar('lastRequestSuccess', false);
+    console.error('Failed with status:', response.status);
+  }
+}
+
+###
+
+###############################################################################
+# 6. ASSERTIONS
+###############################################################################
+# Validate response status, headers, and body
+
+### Request with assertions
+@name assertionDemo
+GET https://httpbin.org/get
+
+### Assert
+status == 200
+
+### Assert
+headers.Content-Type contains application/json
+
+### Assert
+response.json.url == "https://httpbin.org/get"
+
+###
+
+###############################################################################
+# 7. LOAD TESTING
+###############################################################################
+# Use @load to configure load tests
+# Lightning icon (⚡) appears in the gutter for load test requests
+
+### Basic load test - 5 concurrent requests for 10 seconds
+@name loadTestBasic
+@load concurrent=5 duration=10s
+GET https://httpbin.org/get
+
+###
+
+### Load test with iterations
+@name loadTestIterations
+@load concurrent=10 iterations=100
+GET https://httpbin.org/delay/1
+
+###
+
+### Advanced load test with ramp-up
+@name loadTestAdvanced
+@load start=1 max=20 rampUp=30s duration=60s
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "testData": "load-test-payload"
+}
+
+###
+
+### Load test with rate limiting
+@name loadTestRate
+@load requestsPerSecond=50 duration=30s
+GET https://httpbin.org/get
+
+###
+
+###############################################################################
+# 8. SECRETS USAGE
+###############################################################################
+# Use {{secret:keyName}} to reference encrypted secrets
+
+### Request using secrets
+@name secretDemo
+GET https://httpbin.org/get
+Authorization: Bearer {{secret:api_token}}
+X-API-Key: {{secret:api_secret}}
+X-Client-ID: {{secret:client_id}}
+
+###
+
+###############################################################################
+# 9. COMPLEX WORKFLOWS
+###############################################################################
+# Combine multiple features for complex API workflows
+
+### Step 1: Initialize session
+@name initSession
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "action": "init_session"
+}
+
+> {
+  setVar('sessionId', 'sess-' + Math.random().toString(36).substr(2, 12));
+  console.log('Session initialized:', getVar('sessionId'));
+}
+
+###
+
+### Step 2: Create resource
+@name createResource
+@depends initSession
+POST https://httpbin.org/post
+Content-Type: application/json
+X-Session-ID: {{sessionId}}
+
+{
+  "type": "document",
+  "name": "Test Document",
+  "content": "This is a test document created via RawRequest"
+}
+
+> {
+  const resourceId = 'res-' + Math.random().toString(36).substr(2, 9);
+  setVar('resourceId', resourceId);
+  console.log('Resource created:', resourceId);
+}
+
+###
+
+### Step 3: Read resource
+@name readResource
+@depends createResource
+GET https://httpbin.org/get?id={{resourceId}}
+X-Session-ID: {{sessionId}}
+
+> {
+  console.log('Resource retrieved:', getVar('resourceId'));
+  setVar('resourceData', JSON.stringify(response.json));
+}
+
+###
+
+### Step 4: Update resource
+@name updateResource
+@depends readResource
+PUT https://httpbin.org/put
+Content-Type: application/json
+X-Session-ID: {{sessionId}}
+
+{
+  "id": "{{resourceId}}",
+  "content": "Updated content",
+  "version": 2
+}
+
+> {
+  console.log('Resource updated successfully');
+}
+
+###
+
+### Step 5: Delete resource
+@name deleteResource
+@depends updateResource
+DELETE https://httpbin.org/delete?id={{resourceId}}
+X-Session-ID: {{sessionId}}
+
+> {
+  console.log('Workflow completed - resource deleted');
+  console.log('Session:', getVar('sessionId'));
+}
+
+###
+
+###############################################################################
+# 10. ERROR HANDLING
+###############################################################################
+
+### Handle 404 error
+@name handle404
+GET https://httpbin.org/status/404
+
+> {
+  if (response.status === 404) {
+    console.error('Resource not found');
+    setVar('hasError', true);
+  }
+}
+
+###
+
+### Handle 500 error
+@name handle500
+GET https://httpbin.org/status/500
+
+> {
+  if (response.status >= 500) {
+    console.error('Server error:', response.status);
+    setVar('serverError', true);
+  }
+}
+
+###
+
+###############################################################################
+# 11. GRAPHQL REQUESTS
+###############################################################################
+
+### GraphQL query
+@name graphqlQuery
+POST https://httpbin.org/post
+Content-Type: application/json
+X-Request-Type: GraphQL
+
+{
+  "query": "query GetUser($id: ID!) { user(id: $id) { id name email posts { title } } }",
+  "variables": {
+    "id": "123"
+  }
+}
+
+###
+
+### GraphQL mutation
+@name graphqlMutation
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "query": "mutation CreatePost($input: PostInput!) { createPost(input: $input) { id title createdAt } }",
+  "variables": {
+    "input": {
+      "title": "New Post",
+      "content": "Post content here"
+    }
+  }
+}
+
+###
+
+###############################################################################
+# 12. FILE UPLOAD (MULTIPART)
+###############################################################################
+
+### Upload file with multipart/form-data
+@name fileUpload
+POST https://httpbin.org/post
+Content-Type: multipart/form-data; boundary=boundary123
+
+--boundary123
+Content-Disposition: form-data; name="file"; filename="document.txt"
+Content-Type: text/plain
+
+This is the file content that will be uploaded.
+It can span multiple lines.
+
+--boundary123
+Content-Disposition: form-data; name="metadata"
+Content-Type: application/json
+
+{
+  "uploadedBy": "{{userId}}",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "description": "Test file upload"
+}
+
+--boundary123
+Content-Disposition: form-data; name="category"
+
+documents
+--boundary123--
+
+###
+
+###############################################################################
+# 13. CUSTOM HEADERS & AUTHENTICATION
+###############################################################################
+
+### Basic Authentication
+@name basicAuth
+GET https://httpbin.org/basic-auth/user/passwd
+Authorization: Basic dXNlcjpwYXNzd2Q=
+
+###
+
+### Bearer Token Authentication
+@name bearerAuth
+GET https://httpbin.org/bearer
+Authorization: Bearer {{token}}
+
+###
+
+### API Key Authentication
+@name apiKeyAuth
+GET https://httpbin.org/get
+X-API-Key: {{apiKey}}
+X-Client-ID: client-123
+
+###
+
+### Custom Headers
+@name customHeaders
+GET https://httpbin.org/headers
+User-Agent: {{userAgent}}
+X-Custom-Header: custom-value
+X-Request-ID: {{requestId}}
+X-Correlation-ID: corr-{{sessionId}}
+Accept-Language: en-US,en;q=0.9
+Cache-Control: no-cache
+
+###
+
+###############################################################################
+# 14. DIFFERENT CONTENT TYPES
+###############################################################################
+
+### JSON request
+@name jsonRequest
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "key": "value",
+  "nested": {
+    "array": [1, 2, 3]
+  }
+}
+
+###
+
+### XML request
+@name xmlRequest
+POST https://httpbin.org/post
+Content-Type: application/xml
+
+<?xml version="1.0" encoding="UTF-8"?>
+<request>
+  <action>test</action>
+  <data>
+    <item>value1</item>
+    <item>value2</item>
+  </data>
+</request>
+
+###
+
+### Form URL encoded
+@name formRequest
+POST https://httpbin.org/post
+Content-Type: application/x-www-form-urlencoded
+
+name=John+Doe&email=john@example.com&age=30&subscribe=true
+
+###
+
+### Plain text request
+@name textRequest
+POST https://httpbin.org/post
+Content-Type: text/plain
+
+This is plain text content.
+It can span multiple lines.
+
+###
+
+###############################################################################
+# 15. QUERY PARAMETERS & DYNAMIC URLS
+###############################################################################
+
+### URL with query parameters
+@name queryParams
+GET https://httpbin.org/get?search={{userName}}&page=1&limit=10&sort=desc
+
+###
+
+### Dynamic URL construction
+@name dynamicUrl
+GET {{baseUrl}}/api/{{apiVersion}}/users/{{userId}}/profile?include=posts,comments
+
+###
+
+###############################################################################
+# 16. TESTING & DEBUGGING
+###############################################################################
+
+### Debug request with logging
+@name debugRequest
+GET https://httpbin.org/get
+
+< {
+  console.log('=== DEBUG REQUEST ===');
+  console.log('Base URL:', getVar('baseUrl'));
+  console.log('User ID:', getVar('userId'));
+  console.log('Token:', getVar('token'));
+  console.log('Session ID:', getVar('sessionId'));
+}
+
+> {
+  console.log('=== DEBUG RESPONSE ===');
+  console.log('Status:', response.status);
+  console.log('Response time:', getVar('lastResponseTime'), 'ms');
+  console.log('Response body:', JSON.stringify(response.json, null, 2));
+}
+
+###
+
+### Performance test
+@name performanceTest
+GET https://httpbin.org/delay/2
+
+< {
+  setVar('perfStartTime', Date.now());
+}
+
+> {
+  const duration = Date.now() - getVar('perfStartTime');
+  console.log('Request took:', duration, 'ms');
+
+  if (duration > 3000) {
+    console.warn('Request took longer than 3 seconds!');
+  }
+}
+
+###
+
+###############################################################################
+# 17. DYNAMIC JAVASCRIPT EXPRESSIONS IN VARIABLES
+###############################################################################
+# You can use JavaScript expressions directly in variable interpolation
+
+### Dynamic timestamp in request
+@name dynamicData
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "timestamp": "{{new Date().toISOString()}}",
+  "randomId": "{{Math.random().toString(36).substr(2, 9)}}",
+  "unixTime": "{{Date.now()}}",
+  "uuid": "{{crypto.randomUUID()}}"
+}
+
+###
+
+###############################################################################
+# 18. CONDITIONAL LOGIC IN SCRIPTS
+###############################################################################
+
+### Conditional execution
+@name conditionalTest
+GET https://httpbin.org/get
+
+> {
+  // Conditional variable setting
+  if (response.status === 200) {
+    setVar('healthStatus', 'healthy');
+    console.log('✓ Service is healthy');
+  } else if (response.status >= 500) {
+    setVar('healthStatus', 'down');
+    console.error('✗ Service is down');
+  } else {
+    setVar('healthStatus', 'degraded');
+    console.warn('⚠ Service is degraded');
+  }
+
+  // Loop through response data
+  if (response.json && response.json.headers) {
+    console.log('Response headers:');
+    for (const [key, value] of Object.entries(response.json.headers)) {
+      console.log(`  ${key}: ${value}`);
+    }
+  }
+}
+
+###
+
+###############################################################################
+# 19. RESPONSE DATA EXTRACTION & MANIPULATION
+###############################################################################
+
+### Extract and transform data
+@name dataExtraction
+GET https://httpbin.org/json
+
+> {
+  // Extract nested data
+  const data = response.json;
+
+  // Store extracted values
+  if (data.slideshow) {
+    setVar('title', data.slideshow.title);
+    setVar('author', data.slideshow.author);
+    setVar('slides', JSON.stringify(data.slideshow.slides));
+  }
+
+  // Transform and store
+  setVar('dataSize', JSON.stringify(data).length);
+  setVar('responseTime', Date.now() - getVar('requestStartTime') || 0);
+
+  console.log('Extracted:', {
+    title: getVar('title'),
+    author: getVar('author'),
+    size: getVar('dataSize') + ' bytes'
+  });
+}
+
+###
+
+###############################################################################
+# 20. COMPREHENSIVE WORKFLOW - E-COMMERCE CHECKOUT
+###############################################################################
+# This demonstrates a complete multi-step workflow with all features combined
+
+### Step 1: Initialize Shopping Session
+@name initCheckout
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "action": "init_checkout",
+  "timestamp": "{{new Date().toISOString()}}"
+}
+
+< {
+  console.log('🛒 Starting checkout flow...');
+  setVar('checkoutStartTime', Date.now());
+}
+
+> {
+  const sessionId = 'checkout-' + Math.random().toString(36).substr(2, 12);
+  setVar('checkoutSessionId', sessionId);
+  console.log('Session initialized:', sessionId);
+}
+
+###
+
+### Step 2: Add Items to Cart (depends on session)
+@name addToCart
+@depends initCheckout
+POST https://httpbin.org/post
+Content-Type: application/json
+X-Session-ID: {{checkoutSessionId}}
+
+{
+  "items": [
+    {"productId": "prod-123", "quantity": 2, "price": 29.99},
+    {"productId": "prod-456", "quantity": 1, "price": 49.99}
+  ],
+  "sessionId": "{{checkoutSessionId}}"
+}
+
+> {
+  const items = JSON.parse(request.body).items;
+  const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  setVar('cartTotal', total);
+  console.log('Cart total: $' + total.toFixed(2));
+}
+
+###
+
+### Step 3: Apply Discount Code
+@name applyDiscount
+@depends addToCart
+POST https://httpbin.org/post
+Content-Type: application/json
+X-Session-ID: {{checkoutSessionId}}
+
+{
+  "discountCode": "SAVE20",
+  "cartTotal": {{cartTotal}}
+}
+
+> {
+  const discount = getVar('cartTotal') * 0.20;
+  const finalTotal = getVar('cartTotal') - discount;
+  setVar('discount', discount);
+  setVar('finalTotal', finalTotal);
+  console.log('Discount applied: -$' + discount.toFixed(2));
+  console.log('Final total: $' + finalTotal.toFixed(2));
+}
+
+###
+
+### Step 4: Process Payment
+@name processPayment
+@depends applyDiscount
+POST https://httpbin.org/post
+Content-Type: application/json
+X-Session-ID: {{checkoutSessionId}}
+Authorization: Bearer {{secret:payment_api_key}}
+
+{
+  "amount": {{finalTotal}},
+  "currency": "USD",
+  "paymentMethod": "card_test_12345",
+  "sessionId": "{{checkoutSessionId}}"
+}
+
+> {
+  if (response.status === 200) {
+    const transactionId = 'txn-' + Math.random().toString(36).substr(2, 16);
+    setVar('transactionId', transactionId);
+    console.log('✓ Payment successful! Transaction:', transactionId);
+  } else {
+    console.error('✗ Payment failed:', response.status);
+    throw new Error('Payment processing failed');
+  }
+}
+
+###
+
+### Step 5: Script helper & console showcase (optional)
+@name helperShowcase
+@depends processPayment
+GET https://httpbin.org/anything
+
+< {
+  return (async () => {
+    console.log('🧰 Helper demo starting...');
+
+    // Dynamically tweak the outbound request without editing the HTTP block
+    updateRequest({
+      url: `https://httpbin.org/anything/helpers/${Date.now()}`,
+      headers: {
+        'X-Helper-Demo': 'true',
+        'X-Workflow-Stage': 'post-payment'
+      }
+    });
+
+    // Inject/override a single header on the fly
+    setHeader('X-Session-ID', getVar('checkoutSessionId'));
+
+    setVar('helperStart', Date.now());
+    console.info('Waiting 250ms to simulate downstream dependency...');
+    await delay(250);
+  })();
+}
+
+> {
+  // Guarantee happy-path behavior
+  assert(response.status === 200, 'Helper showcase should return 200');
+
+  const duration = Date.now() - getVar('helperStart');
+  console.log('Helper request finished in', duration, 'ms');
+  console.log('Console output is visible live inside the Script Console tray.');
+}
+
+###
+
+### Step 6: Send Confirmation Email
+@name sendConfirmation
+@depends processPayment
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "to": "customer@example.com",
+  "subject": "Order Confirmation",
+  "orderId": "{{checkoutSessionId}}",
+  "transactionId": "{{transactionId}}",
+  "amount": {{finalTotal}},
+  "timestamp": "{{new Date().toISOString()}}"
+}
+
+> {
+  const duration = Date.now() - getVar('checkoutStartTime');
+  console.log('✓ Checkout complete!');
+  console.log('Total time:', duration, 'ms');
+  console.log('Session:', getVar('checkoutSessionId'));
+  console.log('Transaction:', getVar('transactionId'));
+  console.log('Amount:', '$' + getVar('finalTotal'));
+}
+
+### Assert
+status == 200
+
+###
+
+###############################################################################
+# 21. SCRIPT CONSOLE & HELPER QUICK REFERENCE
+###############################################################################
+# Available script helpers (pre or post blocks):
+# - setVar(key, value) / getVar(key)
+# - setHeader(name, value)
+# - updateRequest({ url, method, headers, body, ... })
+# - assert(condition, message?)
+# - delay(milliseconds)
+# - console.log/info/warn/error/debug(...args) -> pipes into the floating Script Console
+#
+# Use the helperShowcase request above to watch logs stream live and inspect how
+# headers + URLs can be rewritten without editing the HTTP block. The console tray
+# can be collapsed, cleared, and shows which stage (pre/post) emitted each line.
+
+###############################################################################
+# 22. BATCH OPERATIONS WITH ITERATION
+###############################################################################
+
+### Batch user creation
+@name batchUsers
+POST https://httpbin.org/post
+Content-Type: application/json
+
+{
+  "users": [
+    {"email": "user1@example.com", "name": "User One"},
+    {"email": "user2@example.com", "name": "User Two"},
+    {"email": "user3@example.com", "name": "User Three"}
+  ]
+}
+
+> {
+  const users = JSON.parse(request.body).users;
+  const userIds = [];
+
+  users.forEach((user, index) => {
+    const userId = 'user-' + (index + 1) + '-' + Math.random().toString(36).substr(2, 6);
+    userIds.push(userId);
+    console.log(`Created ${user.name} with ID: ${userId}`);
+  });
+
+  setVar('createdUserIds', JSON.stringify(userIds));
+  setVar('totalUsersCreated', userIds.length);
+}
+
+###
+
+###############################################################################
+# 23. RETRY LOGIC AND ERROR RECOVERY
+###############################################################################
+
+### Request with retry logic
+@name retryExample
+GET https://httpbin.org/status/503
+
+< {
+  if (!getVar('retryCount')) {
+    setVar('retryCount', 0);
+  }
+}
+
+> {
+  if (response.status >= 500) {
+    const retryCount = parseInt(getVar('retryCount') || '0');
+
+    if (retryCount < 3) {
+      setVar('retryCount', retryCount + 1);
+      console.warn(`Request failed (attempt ${retryCount + 1}/3). Retry needed.`);
+      setVar('shouldRetry', true);
+    } else {
+      console.error('Max retries reached. Request failed permanently.');
+      setVar('shouldRetry', false);
+    }
+  } else {
+    console.log('Request succeeded!');
+    setVar('retryCount', 0);
+  }
+}
+
+###
+
+###############################################################################
+# 24. DATA VALIDATION & TESTING
+###############################################################################
+
+### Comprehensive validation test
+@name validationTest
+GET https://httpbin.org/json
+
+### Assert
+status == 200
+
+### Assert
+headers.Content-Type contains application/json
+
+### Assert
+response.json != null
+
+> {
+  // Custom validation logic
+  const data = response.json;
+  const errors = [];
+
+  if (!data.slideshow) {
+    errors.push('Missing slideshow object');
+  }
+
+  if (!data.slideshow?.title) {
+    errors.push('Missing title');
+  }
+
+  if (errors.length > 0) {
+    console.error('Validation errors:', errors);
+    setVar('validationPassed', false);
+  } else {
+    console.log('✓ All validations passed');
+    setVar('validationPassed', true);
+  }
+}
+
+###
+
+###############################################################################
+# END OF EXAMPLES
+###############################################################################
+# This file demonstrates ALL features of RawRequest:
+#
+# ✓ Environment variables (@env.{env}.{key})
+# ✓ Global variables (@variableName)
+# ✓ All HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+# ✓ Request naming (@name)
+# ✓ Request chaining & dependencies (@depends) with chain icons (🔗)
+# ✓ Pre-request scripts (< { ... })
+# ✓ Post-request scripts (> { ... })
+# ✓ Assertions (### Assert)
+# ✓ Load testing (@load) with lightning icons (⚡)
+# ✓ Secrets management ({{secret:key}})
+# ✓ Complex multi-step workflows
+# ✓ Error handling & recovery
+# ✓ GraphQL queries
+# ✓ File uploads (multipart/form-data)
+# ✓ Authentication methods (Basic, Bearer, API Key)
+# ✓ Multiple content types (JSON, XML, form-data, plain text)
+# ✓ Query parameters & dynamic URLs
+# ✓ JavaScript expressions in variables ({{Math.random()}}, {{new Date()}})
+# ✓ Conditional logic in scripts
+# ✓ Response data extraction & transformation
+# ✓ Script helper APIs (setHeader, updateRequest, assert, delay) + live console
+# ✓ Batch operations
+# ✓ Retry logic
+# ✓ Data validation & testing
+# ✓ Performance monitoring
+# ✓ Debugging utilities
+#
+# SCRIPT API REFERENCE:
+# - setVar(key, value)     → Set a variable
+# - getVar(key)            → Get a variable value
+# - setHeader(name, value) → Inject/override an outgoing header
+# - updateRequest(patch)   → Modify URL/method/body/headers during scripts
+# - delay(ms)              → Awaitable delay helper for async flows
+# - assert(condition,msg)  → Throw when assertions fail
+# - console.log/warn/error → Log messages to console
+# - response.status        → HTTP status code
+# - response.headers       → Response headers object
+# - response.json          → Parsed JSON response body
+# - response.text          → Raw response body text
+# - request.method         → Request HTTP method
+# - request.url            → Request URL
+# - request.headers        → Request headers object
+# - request.body           → Request body
+#
+# TIPS:
+# - Use Ctrl+Enter to execute the request at cursor
+# - Click play button (▶) in gutter to run specific request
+# - Click chain button (🔗) to run dependent request chain
+# - Click lightning (⚡) to run load test
+# - View history in sidebar to replay past requests
+# - Use secrets for sensitive data - never commit API keys!
+#
+###############################################################################

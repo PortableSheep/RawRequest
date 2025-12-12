@@ -1,0 +1,269 @@
+<!-- language: html -->
+<div class="flex flex-col h-full bg-transparent overflow-hidden">
+    @let chainItems = getChainItems();
+
+    <!-- Fixed header -->
+    <div class="flex items-center px-4 py-3 bg-zinc-900 border-b border-zinc-800 text-[13px] font-medium text-emerald-100">
+        <span>Response chain</span>
+        @if (chainItems.length) {
+            <span class="ml-2 text-xs text-zinc-400">
+                {{ chainItems.length }} request{{ chainItems.length === 1 ? '' : 's' }}
+            </span>
+        }
+    </div>
+
+    <!-- Scrollable content area -->
+    <div class="flex-1 overflow-y-auto p-4">
+        @if (isLoading() && !chainItems.length) {
+            <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-400">
+                <div class="spinner text-emerald-400"></div>
+                <p>Executing request…</p>
+            </div>
+        } @else if (!chainItems.length && !isLoading()) {
+            <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-500">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-zinc-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.121 2.121m8.486 8.486l2.121 2.121M5.636 18.364l2.121-2.121m8.486-8.486l2.121-2.121"/>
+                </svg>
+                <p>Waiting for a request to be ran.</p>
+            </div>
+        } @else if (chainItems.length) {
+            <div class="space-y-3">
+                @for (entry of chainItems; track entry.id; let idx = $index) {
+                    <article class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden transition-colors hover:border-zinc-700 shadow-sm">
+                        <!-- Row header -->
+                        <div
+                            class="flex items-center justify-between p-3 bg-zinc-900 cursor-pointer select-none hover:bg-zinc-800 transition-colors"
+                            (click)="toggleEntry(entry.id)"
+                        >
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="text-[13px] font-semibold text-zinc-500 font-mono">
+                                    {{ (idx + 1) | number:'2.0' }}
+                                </span>
+                                <div class="min-w-0">
+                                    <div class="text-[13px] font-medium text-zinc-100 truncate" [title]="entry.request.name || entry.label">
+                                        {{ entry.request.name || entry.label }}
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-1 text-[11px]">
+                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-white shadow-sm"
+                                              [class.bg-emerald-500]="entry.request.method === 'GET'"
+                                              [class.bg-amber-500]="entry.request.method === 'POST'"
+                                              [class.bg-blue-500]="entry.request.method === 'PUT'"
+                                              [class.bg-red-500]="entry.request.method === 'DELETE'"
+                                              [class.bg-violet-500]="entry.request.method === 'PATCH'"
+                                              [class.bg-zinc-500]="!['GET','POST','PUT','DELETE','PATCH'].includes(entry.request.method)">
+                                            {{ entry.request.method }}
+                                        </span>
+                                        <span class="text-zinc-400 truncate" [title]="entry.request.url">
+                                            {{ entry.request.url }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 text-xs">
+                                <span
+                                    class="px-2 py-0.5 rounded-full text-[11px] font-semibold shadow-sm"
+                                    [ngClass]="getStatusClass(entry)"
+                                >
+                                    {{ getStatusLabel(entry) }}
+                                </span>
+
+                                @if (entry.response) {
+                                    <span class="text-zinc-400 font-mono text-[11px]" [title]="'Total: ' + entry.response!.responseTime + 'ms'">
+                                        {{ entry.response!.responseTime }}ms
+                                    </span>
+                                    @if (entry.response!.timing?.timeToFirstByte) {
+                                        <span class="text-zinc-500 font-mono text-[10px]" title="Time to First Byte">
+                                            TTFB {{ entry.response!.timing!.timeToFirstByte }}ms
+                                        </span>
+                                    }
+                                    @if (entry.response!.size !== undefined) {
+                                        <span class="text-zinc-500 font-mono text-[11px]">
+                                            {{ formatSize(entry.response!.size) }}
+                                        </span>
+                                    }
+                                }
+
+                                <span class="text-zinc-500">
+                                    @if (expandedEntryId() === entry.id) {
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>
+                                    } @else {
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                    }
+                                </span>
+                            </div>
+                        </div>
+
+                        <!-- Expanded details -->
+                        @if (expandedEntryId() === entry.id) {
+                            <div class="p-3 bg-zinc-950 border-t border-zinc-800 border-l-2 border-l-blue-500 text-xs">
+                                <!-- Collapsible Request Section -->
+                                <div class="mb-3">
+                                    <button
+                                        type="button"
+                                        class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-300 transition-colors"
+                                        (click)="toggleRequestSection(entry.id)"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform" [class.rotate-90]="!isRequestCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                                        Request Details
+                                    </button>
+                                    
+                                    @if (!isRequestCollapsed(entry.id)) {
+                                        <div class="mt-3 space-y-3 pl-5 border-l-2 border-zinc-800">
+                                            @let reqHeaders = entry.request.headers | keyvalue;
+                                            @if (reqHeaders.length) {
+                                                <div>
+                                                    <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Headers</span>
+                                                    <ul class="mt-1 rounded-md border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
+                                                        @for (kv of reqHeaders; track kv.key) {
+                                                            <li class="flex justify-between gap-4 px-3 py-1.5">
+                                                                <span class="font-mono text-[11px] text-sky-400">{{ kv.key }}</span>
+                                                                <span class="truncate text-[11px] text-zinc-300">{{ kv.value }}</span>
+                                                            </li>
+                                                        }
+                                                    </ul>
+                                                </div>
+                                            }
+
+                                            @if (entry.request.body) {
+                                                <div>
+                                                    <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Body</span>
+                                                    <pre class="max-h-80 overflow-auto rounded-md border border-zinc-800 bg-black p-3 font-mono text-[11px] leading-relaxed text-zinc-300" [innerHTML]="entry.request.body | syntaxHighlight"></pre>
+                                                </div>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+
+                                <!-- Response section -->
+                                <div class="mt-4 pt-3 border-t border-zinc-800">
+                                    @if (entry.response) {
+                                        <!-- Timing breakdown -->
+                                        @if (entry.response!.timing) {
+                                            <div class="mb-4">
+                                                <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Timing Breakdown</span>
+                                                <div class="flex flex-wrap gap-3 text-xs">
+                                                    @if (entry.response!.timing!.dnsLookup > 0) {
+                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="DNS Lookup - Time to resolve the domain name to an IP address">
+                                                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
+                                                            <span class="text-zinc-400">DNS</span>
+                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.dnsLookup }}ms</span>
+                                                        </div>
+                                                    }
+                                                    @if (entry.response!.timing!.tcpConnect > 0) {
+                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="TCP Connection - Time to establish a TCP connection with the server">
+                                                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                                            <span class="text-zinc-400">TCP</span>
+                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.tcpConnect }}ms</span>
+                                                        </div>
+                                                    }
+                                                    @if (entry.response!.timing!.tlsHandshake > 0) {
+                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="TLS Handshake - Time to complete the secure connection negotiation">
+                                                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                            <span class="text-zinc-400">TLS</span>
+                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.tlsHandshake }}ms</span>
+                                                        </div>
+                                                    }
+                                                    @if (entry.response!.timing!.timeToFirstByte > 0) {
+                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="Time to First Byte - Time from request sent until first byte received from server">
+                                                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
+                                                            <span class="text-zinc-400">TTFB</span>
+                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.timeToFirstByte }}ms</span>
+                                                        </div>
+                                                    }
+                                                    @if (entry.response!.timing!.contentTransfer > 0) {
+                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="Content Transfer - Time to download the complete response body">
+                                                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
+                                                            <span class="text-zinc-400">Download</span>
+                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.contentTransfer }}ms</span>
+                                                        </div>
+                                                    }
+                                                    <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800 border border-zinc-600" data-tooltip="Total Request Time - Complete round-trip duration">
+                                                        <span class="text-zinc-300 font-medium">Total</span>
+                                                        <span class="font-mono text-zinc-100 font-semibold">{{ entry.response!.timing!.total }}ms</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        }
+
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                            @if (entry.response!.headers['content-type']) {
+                                                <div>
+                                                    <span class="block mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Content-Type</span>
+                                                    <p class="text-xs text-zinc-200 break-all">
+                                                        {{ entry.response!.headers['content-type'] }}
+                                                    </p>
+                                                </div>
+                                            }
+                                        </div>
+
+                                        <div class="mt-3">
+                                            <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Headers</span>
+                                            @let resHeaders = entry.response!.headers | keyvalue;
+                                            @if (resHeaders.length) {
+                                                <ul class="mt-1 rounded-md border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
+                                                    @for (kv of resHeaders; track kv.key) {
+                                                        <li class="flex justify-between gap-4 px-3 py-1.5">
+                                                            <span class="font-mono text-[11px] text-sky-400">{{ kv.key }}</span>
+                                                            <span class="truncate text-[11px] text-zinc-300">{{ kv.value }}</span>
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            } @else {
+                                                <p class="mt-1 text-xs text-zinc-500">No response headers</p>
+                                            }
+                                        </div>
+
+                                        <div class="mt-3">
+                                            <div class="mb-1 flex items-center justify-between">
+                                                <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Body</span>
+                                                <button
+                                                    type="button"
+                                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                                    [class.border-zinc-700]="getCopyState(entry.id) === 'idle'"
+                                                    [class.bg-zinc-900]="getCopyState(entry.id) === 'idle'"
+                                                    [class.text-zinc-300]="getCopyState(entry.id) === 'idle'"
+                                                    [class.hover:bg-zinc-800]="getCopyState(entry.id) === 'idle'"
+                                                    [class.border-emerald-600]="getCopyState(entry.id) === 'copied'"
+                                                    [class.bg-emerald-900/30]="getCopyState(entry.id) === 'copied'"
+                                                    [class.text-emerald-400]="getCopyState(entry.id) === 'copied'"
+                                                    [class.border-red-600]="getCopyState(entry.id) === 'error'"
+                                                    [class.bg-red-900/30]="getCopyState(entry.id) === 'error'"
+                                                    [class.text-red-400]="getCopyState(entry.id) === 'error'"
+                                                    (click)="copyResponseBody(entry.id, entry.response!.body)"
+                                                    [disabled]="!entry.response!.body"
+                                                    aria-label="Copy response body"
+                                                >
+                                                    @switch (getCopyState(entry.id)) {
+                                                        @case ('copied') {
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                                            <span>Copied</span>
+                                                        }
+                                                        @case ('error') {
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                                            <span>Failed</span>
+                                                        }
+                                                        @default {
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                            <span>Copy</span>
+                                                        }
+                                                    }
+                                                </button>
+                                            </div>
+                                            <pre
+                                                class="max-h-80 overflow-auto rounded-md border border-zinc-800 bg-black p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
+                                                [innerHTML]="(entry.response!.body || '') | syntaxHighlight"
+                                            ></pre>
+                                        </div>
+                                    } @else {
+                                        <p class="text-xs text-zinc-500">Awaiting response...</p>
+                                    }
+                                </div>
+                            </div>
+                        }
+                    </article>
+                }
+            </div>
+        }
+    </div>
+</div>

@@ -1,0 +1,77 @@
+<div class="fixed inset-y-0 right-0 w-[420px] max-w-[90vw] bg-zinc-900 border-l border-zinc-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out"
+     [class.translate-x-0]="isOpen()"
+     [class.translate-x-full]="!isOpen()"
+     tabindex="-1">
+  
+  <div class="flex items-center justify-between p-4 border-b border-zinc-800 bg-transparent">
+    <h5 class="text-sm font-semibold text-blue-400 uppercase tracking-wide">Request History</h5>
+    <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors" (click)="onClose.emit()">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 6L6 18M6 6l12 12"></path>
+      </svg>
+    </button>
+  </div>
+
+  <div class="p-4 overflow-y-auto h-[calc(100%-60px)] bg-transparent">
+    @if (history().length > 0) {
+      <div class="space-y-2">
+        @for (item of history(); track item.timestamp) {
+          <div class="group relative p-3 rounded-lg border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-700 cursor-pointer transition-all shadow-sm"
+               [class.border-blue-500]="selectedItem() === item"
+               [class.bg-blue-500-10]="selectedItem() === item"
+               (click)="onItemClick.emit(item)">
+            
+            <div class="flex flex-col gap-2">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono"
+                        [class.text-emerald-400]="item.method === 'GET'"
+                        [class.bg-emerald-400_10]="item.method === 'GET'"
+                        [class.text-amber-400]="item.method === 'POST'"
+                        [class.bg-amber-400_10]="item.method === 'POST'"
+                        [class.text-blue-400]="item.method === 'PUT' || item.method === 'PATCH'"
+                        [class.bg-blue-400_10]="item.method === 'PUT' || item.method === 'PATCH'"
+                        [class.text-red-400]="item.method === 'DELETE'"
+                        [class.bg-red-400_10]="item.method === 'DELETE'">
+                    {{item.method}}
+                  </span>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        [class.text-emerald-400]="item.status >= 200 && item.status < 300"
+                        [class.bg-emerald-400_10]="item.status >= 200 && item.status < 300"
+                        [class.text-amber-400]="item.status >= 300 && item.status < 400"
+                        [class.bg-amber-400_10]="item.status >= 300 && item.status < 400"
+                        [class.text-red-400]="item.status >= 400 || item.status === 0"
+                        [class.bg-red-400_10]="item.status >= 400 || item.status === 0">
+                    {{item.status || 'ERR'}}
+                  </span>
+                </div>
+                <span class="text-[10px] text-zinc-400 font-mono">{{item.responseTime}}ms</span>
+              </div>
+
+              <div class="text-xs text-zinc-300 truncate font-mono" [title]="item.url">
+                {{item.url}}
+              </div>
+
+              <div class="text-[10px] text-zinc-400 text-right">
+                {{formatTime(item.timestamp)}}
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="flex flex-col items-center justify-center h-64 text-zinc-500">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-zinc-700 mb-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 8l0 4l2 2" />
+          <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" />
+        </svg>
+        <p class="text-sm">No request history yet.</p>
+        <small class="text-xs mt-1 text-zinc-600">Requests you send will appear here.</small>
+      </div>
+    }
+  </div>
+</div>
+
+@if (isOpen()) {
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+}
