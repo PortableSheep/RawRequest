@@ -1,0 +1,67 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+// Variable hover tooltip styles
+::ng-deep .cm-tooltip {
+  &.cm-tooltip-hover {
+    border: 1px solid #404040;
+    background: #1e1e1e;
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+  }
+}
+
+::ng-deep .cm-variable-tooltip {
+  padding: 8px 12px;
+  font-size: 12px;
+  max-width: 350px;
+  
+  .tooltip-header {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  
+  .tooltip-name {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 13px;
+    color: #dcdcaa;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  
+  .tooltip-value {
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    color: #ce9178;
+    background: #0d0d0d;
+    padding: 6px 8px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 100px;
+    overflow-y: auto;
+  }
+  
+  .tooltip-hint {
+    font-size: 11px;
+    color: #666;
+    font-style: italic;
+    margin-top: 4px;
+  }
+  
+  &.cm-variable-undefined {
+    .tooltip-header {
+      color: #f0a020;
+    }
+    
+    .tooltip-name {
+      color: #f0a020;
+    }
+  }
+}

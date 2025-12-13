@@ -1,8 +1,8 @@
 import { Component, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect } from '@angular/core';
 
 import { basicSetup, EditorView } from 'codemirror';
-import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
-import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, GutterMarker, gutter, BlockInfo, keymap } from '@codemirror/view';
+import { EditorState, RangeSetBuilder, Compartment, StateField, StateEffect } from '@codemirror/state';
+import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, GutterMarker, gutter, BlockInfo, keymap, hoverTooltip, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
 
@@ -12,6 +12,20 @@ const LOAD_REGEX = /^@load\s+/i;
 const TIMEOUT_REGEX = /^@timeout\s+/i;
 const ANNOTATION_REGEX = /^@(name|depends|load|timeout)\s+/i;
 const SERPARATOR_REGEX = /^\s*###\s+/;
+
+// Script block markers
+const SCRIPT_START_REGEX = /^\s*[<>]\s*\{?\s*$/;
+const SCRIPT_END_REGEX = /^\s*\}\s*$/;
+
+// JavaScript syntax patterns for script highlighting
+const JS_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|new|typeof|instanceof|in|of|async|await|class|extends|import|export|default|from|yield)\b/g;
+const JS_BUILTINS = /\b(console|Math|Date|JSON|Object|Array|String|Number|Boolean|Promise|Error|RegExp|Map|Set|setTimeout|setInterval|crypto)\b/g;
+const JS_SCRIPT_HELPERS = /\b(setVar|getVar|setHeader|updateRequest|assert|delay|response|request)\b/g;
+const JS_STRINGS = /'[^']*'|"[^"]*"|`[^`]*`/g;
+const JS_NUMBERS = /\b\d+\.?\d*\b/g;
+const JS_COMMENTS = /\/\/.*$|\/\*[\s\S]*?\*\//gm;
+const JS_PROPERTIES = /\.([a-zA-Z_$][a-zA-Z0-9_$]*)/g;
+const JS_FUNCTIONS = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
 
 // Common HTTP headers for autocomplete
 const HTTP_HEADERS = [
@@ -93,6 +107,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   requests = input.required<any[]>();
   variables = input<{ [key: string]: string }>({});
   environments = input<{ [env: string]: { [key: string]: string } }>({});
+  currentEnv = input<string>('');
   requestNames = input<string[]>([]);
   executingRequestIndex = input<number | null>(null);
   isBusy = input<boolean>(false);
@@ -151,6 +166,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         oneDark,
         this.createRequestHighlighter(),
         this.autocompleteCompartment.of(this.createAutocomplete()),
+        this.createVariableHoverTooltip(),
         gutter({
           class: 'cm-gutter-play',
           lineMarker: (view: EditorView, line: BlockInfo) => {
@@ -223,7 +239,10 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       }
 
       buildDecorations(view: EditorView): DecorationSet {
-        const builder = new RangeSetBuilder<Decoration>();
+        // Collect all decorations, then sort, then build
+        const decorations: Array<{ from: number; to: number; cls: string }> = [];
+        let inScript = false;
+        let scriptBraceDepth = 0;
 
         for (let i = 1; i <= view.state.doc.lines; i++) {
           const line = view.state.doc.line(i);
@@ -231,69 +250,186 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           const trimmedText = text.trimStart();
           const leadingWhitespace = text.length - trimmedText.length;
 
+          // Check for script block start: < { or > { (can have content after)
+          const scriptStartMatch = trimmedText.match(/^([<>])\s*\{/);
+          if (scriptStartMatch && !inScript) {
+            inScript = true;
+            const markerIndex = text.indexOf(scriptStartMatch[1]);
+            decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
+            scriptBraceDepth = 0;
+            for (const char of text) {
+              if (char === '{') scriptBraceDepth++;
+              if (char === '}') scriptBraceDepth--;
+            }
+            const braceIndex = text.indexOf('{', markerIndex);
+            if (braceIndex >= 0 && braceIndex < text.length - 1) {
+              this.collectJSDecorations(decorations, line.from, text, braceIndex + 1);
+            }
+            if (scriptBraceDepth <= 0) inScript = false;
+            continue;
+          }
+
+          // Check for standalone < or > (brace on next line)
+          if (!inScript && (trimmedText === '<' || trimmedText === '>')) {
+            const markerIndex = text.indexOf(trimmedText);
+            decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
+            continue;
+          }
+
+          // Check for standalone opening brace after < or >
+          if (!inScript && trimmedText.startsWith('{')) {
+            const prevLine = i > 1 ? view.state.doc.line(i - 1).text.trim() : '';
+            if (prevLine === '<' || prevLine === '>') {
+              inScript = true;
+              scriptBraceDepth = 0;
+              for (const char of text) {
+                if (char === '{') scriptBraceDepth++;
+                if (char === '}') scriptBraceDepth--;
+              }
+              const braceIndex = text.indexOf('{');
+              if (braceIndex >= 0 && braceIndex < text.length - 1) {
+                this.collectJSDecorations(decorations, line.from, text, braceIndex + 1);
+              }
+              if (scriptBraceDepth <= 0) inScript = false;
+              continue;
+            }
+          }
+
+          // Inside a script block
+          if (inScript) {
+            let lineOpenBraces = 0;
+            let lineCloseBraces = 0;
+            for (const char of text) {
+              if (char === '{') lineOpenBraces++;
+              if (char === '}') lineCloseBraces++;
+            }
+            scriptBraceDepth += lineOpenBraces - lineCloseBraces;
+
+            if (scriptBraceDepth <= 0) {
+              inScript = false;
+              const closingBraceIdx = text.lastIndexOf('}');
+              if (closingBraceIdx > 0) {
+                this.collectJSDecorations(decorations, line.from, text, 0, closingBraceIdx);
+              }
+            } else {
+              this.collectJSDecorations(decorations, line.from, text, 0);
+            }
+            continue;
+          }
+
           // Highlight HTTP methods
           const methodMatch = trimmedText.match(METHOD_REGEX);
           if (methodMatch) {
-            builder.add(
-              line.from + leadingWhitespace,
-              line.from + leadingWhitespace + methodMatch[1].length,
-              Decoration.mark({ class: 'cm-http-method' })
-            );
+            decorations.push({
+              from: line.from + leadingWhitespace,
+              to: line.from + leadingWhitespace + methodMatch[1].length,
+              cls: 'cm-http-method'
+            });
           }
 
           // Highlight headers
           const headerMatch = text.match(/^([^:]+):\s*(.+)$/);
           if (headerMatch && !methodMatch && !trimmedText.startsWith('@')) {
-            builder.add(
-              line.from,
-              line.from + headerMatch[1].length,
-              Decoration.mark({ class: 'cm-http-header' })
-            );
+            decorations.push({
+              from: line.from,
+              to: line.from + headerMatch[1].length,
+              cls: 'cm-http-header'
+            });
           }
 
           // Highlight variables
           const varRegex = /{{[^}]+}}/g;
           let varMatch;
           while ((varMatch = varRegex.exec(text)) !== null) {
-            builder.add(
-              line.from + varMatch.index,
-              line.from + varMatch.index + varMatch[0].length,
-              Decoration.mark({ class: 'cm-variable' })
-            );
+            decorations.push({
+              from: line.from + varMatch.index,
+              to: line.from + varMatch.index + varMatch[0].length,
+              cls: 'cm-variable'
+            });
           }
 
           // Highlight environment variables
           const envRegex = /@env\.[^=\s]+/g;
           let envMatch;
           while ((envMatch = envRegex.exec(text)) !== null) {
-            builder.add(
-              line.from + envMatch.index,
-              line.from + envMatch.index + envMatch[0].length,
-              Decoration.mark({ class: 'cm-environment' })
-            );
+            decorations.push({
+              from: line.from + envMatch.index,
+              to: line.from + envMatch.index + envMatch[0].length,
+              cls: 'cm-environment'
+            });
           }
 
           // Highlight @name, @depends, @load annotations
           const annotationMatch = trimmedText.match(ANNOTATION_REGEX);
           if (annotationMatch) {
-            builder.add(
-              line.from + leadingWhitespace,
-              line.from + leadingWhitespace + annotationMatch[0].length,
-              Decoration.mark({ class: 'cm-annotation' })
-            );
+            decorations.push({
+              from: line.from + leadingWhitespace,
+              to: line.from + leadingWhitespace + annotationMatch[0].length,
+              cls: 'cm-annotation'
+            });
           }
 
           // Highlight separators
           if (SERPARATOR_REGEX.test(trimmedText)) {
-            builder.add(
-              line.from,
-              line.to,
-              Decoration.mark({ class: 'cm-separator' })
-            );
+            decorations.push({
+              from: line.from,
+              to: line.to,
+              cls: 'cm-separator'
+            });
           }
         }
 
+        // Sort by position (required by RangeSetBuilder)
+        decorations.sort((a, b) => a.from - b.from || a.to - b.to);
+
+        // Build the final decoration set
+        const builder = new RangeSetBuilder<Decoration>();
+        for (const d of decorations) {
+          builder.add(d.from, d.to, Decoration.mark({ class: d.cls }));
+        }
         return builder.finish();
+      }
+
+      collectJSDecorations(decorations: Array<{ from: number; to: number; cls: string }>, lineFrom: number, text: string, startOffset: number, endOffset?: number) {
+        const segment = endOffset !== undefined ? text.substring(startOffset, endOffset) : text.substring(startOffset);
+        if (!segment.trim()) return;
+
+        const highlighted: Array<[number, number]> = [];
+        const add = (start: number, end: number, cls: string) => {
+          const absStart = startOffset + start;
+          const absEnd = startOffset + end;
+          for (const [hs, he] of highlighted) {
+            if ((absStart >= hs && absStart < he) || (absEnd > hs && absEnd <= he)) return;
+          }
+          highlighted.push([absStart, absEnd]);
+          decorations.push({ from: lineFrom + absStart, to: lineFrom + absEnd, cls });
+        };
+
+        let m;
+        const commentRx = /\/\/.*$|\/\*[\s\S]*?\*\//g;
+        while ((m = commentRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-comment');
+
+        const stringRx = /'(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`/g;
+        while ((m = stringRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-string');
+
+        const helperRx = /\b(setVar|getVar|setHeader|updateRequest|assert|delay|response|request)\b/g;
+        while ((m = helperRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-helper');
+
+        const kwRx = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|new|typeof|instanceof|in|of|async|await|class|extends|import|export|default|from|yield)\b/g;
+        while ((m = kwRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-keyword');
+
+        const builtinRx = /\b(console|Math|Date|JSON|Object|Array|String|Number|Boolean|Promise|Error|RegExp|Map|Set|setTimeout|setInterval|crypto|true|false|null|undefined)\b/g;
+        while ((m = builtinRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-builtin');
+
+        const numRx = /\b\d+\.?\d*\b/g;
+        while ((m = numRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-js-number');
+
+        const funcRx = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
+        while ((m = funcRx.exec(segment)) !== null) {
+          if (!['if', 'for', 'while', 'switch', 'catch', 'function'].includes(m[1])) {
+            add(m.index, m.index + m[1].length, 'cm-js-function');
+          }
+        }
       }
     }, {
       decorations: v => v.decorations
@@ -471,4 +607,149 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       btn.disabled = disableAll;
     });
   }
+
+  private createVariableHoverTooltip() {
+    const getVariables = () => this.variables();
+    const getEnvironments = () => this.environments();
+    const getCurrentEnv = () => this.currentEnv();
+    
+    return hoverTooltip((view, pos) => {
+      const line = view.state.doc.lineAt(pos);
+      const lineText = line.text;
+      
+      // Find {{variable}} pattern at the hover position
+      const varRegex = /\{\{([^}]+)\}\}/g;
+      let match;
+      
+      while ((match = varRegex.exec(lineText)) !== null) {
+        const start = line.from + match.index;
+        const end = start + match[0].length;
+        
+        // Check if cursor is within this match
+        if (pos >= start && pos <= end) {
+          const varName = match[1].trim();
+          const vars = getVariables();
+          const envs = getEnvironments();
+          const currentEnvName = getCurrentEnv();
+          const currentEnvVars = currentEnvName ? envs[currentEnvName] || {} : {};
+          
+          // Check if it's a regular variable
+          if (vars[varName] !== undefined) {
+            return {
+              pos: start,
+              end: end,
+              above: true,
+              create() {
+                const dom = document.createElement('div');
+                dom.className = 'cm-variable-tooltip';
+                const value = vars[varName];
+                const displayValue = value.length > 100 ? value.slice(0, 100) + '...' : value;
+                dom.innerHTML = `
+                  <div class="tooltip-header">📦 Variable</div>
+                  <div class="tooltip-name">${varName}</div>
+                  <div class="tooltip-value">${escapeHtml(displayValue)}</div>
+                `;
+                return { dom };
+              }
+            };
+          }
+          
+          // Check if it's defined in the current environment
+          if (currentEnvVars[varName] !== undefined) {
+            const value = currentEnvVars[varName];
+            const displayValue = value.length > 100 ? value.slice(0, 100) + '...' : value;
+            return {
+              pos: start,
+              end: end,
+              above: true,
+              create() {
+                const dom = document.createElement('div');
+                dom.className = 'cm-variable-tooltip';
+                dom.innerHTML = `
+                  <div class="tooltip-header">🌍 Environment Variable</div>
+                  <div class="tooltip-name">${currentEnvName} → ${varName}</div>
+                  <div class="tooltip-value">${escapeHtml(displayValue)}</div>
+                `;
+                return { dom };
+              }
+            };
+          }
+          
+          // Check if it's an env.name.key pattern
+          const envMatch = varName.match(/^env\.([^.]+)\.(.+)$/);
+          if (envMatch) {
+            const [, envName, key] = envMatch;
+            if (envs[envName]?.[key] !== undefined) {
+              return {
+                pos: start,
+                end: end,
+                above: true,
+                create() {
+                  const dom = document.createElement('div');
+                  dom.className = 'cm-variable-tooltip';
+                  const value = envs[envName][key];
+                  const displayValue = value.length > 100 ? value.slice(0, 100) + '...' : value;
+                  dom.innerHTML = `
+                    <div class="tooltip-header">🌍 Environment Variable</div>
+                    <div class="tooltip-name">${envName} → ${key}</div>
+                    <div class="tooltip-value">${escapeHtml(displayValue)}</div>
+                  `;
+                  return { dom };
+                }
+              };
+            }
+          }
+          
+          // Check if it's a request reference
+          const reqMatch = varName.match(/^(request\d+)\.(response\.(body|status|headers).*)/);
+          if (reqMatch) {
+            return {
+              pos: start,
+              end: end,
+              above: true,
+              create() {
+                const dom = document.createElement('div');
+                dom.className = 'cm-variable-tooltip';
+                dom.innerHTML = `
+                  <div class="tooltip-header">🔗 Request Reference</div>
+                  <div class="tooltip-name">${reqMatch[1]}.${reqMatch[2]}</div>
+                  <div class="tooltip-hint">Value resolved at runtime from previous request</div>
+                `;
+                return { dom };
+              }
+            };
+          }
+          
+          // Unknown variable
+          return {
+            pos: start,
+            end: end,
+            above: true,
+            create() {
+              const dom = document.createElement('div');
+              dom.className = 'cm-variable-tooltip cm-variable-undefined';
+              dom.innerHTML = `
+                <div class="tooltip-header">⚠️ Undefined Variable</div>
+                <div class="tooltip-name">${escapeHtml(varName)}</div>
+                <div class="tooltip-hint">This variable is not defined</div>
+              `;
+              return { dom };
+            }
+          };
+        }
+      }
+      
+      return null;
+    }, { hoverTime: 300 });
+  }
+}
+
+// Helper function to escape HTML
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

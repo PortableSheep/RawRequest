@@ -33,7 +33,12 @@
 # 2. GLOBAL VARIABLES
 ###############################################################################
 # Variables available across all environments
-# Initialize with empty values or default values
+# NOTE: Pre-defining variables is OPTIONAL! You can use setVar() in scripts
+# to create new variables dynamically without declaring them here first.
+# These declarations are useful for:
+#   - Documentation purposes
+#   - Setting default/initial values
+#   - Autocomplete suggestions in the editor
 
 @apiVersion v1
 @contentType application/json

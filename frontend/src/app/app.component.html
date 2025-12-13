@@ -38,12 +38,25 @@
             <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 h-full">
                 <!-- Editor column -->
                 <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-blue-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col">
+                    <div class="flex items-center justify-between px-3 py-1 border-b border-zinc-800 bg-zinc-950/50">
+                        <span class="text-xs text-zinc-500">Editor</span>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
+                            (click)="openSnippetModal()"
+                            title="Insert script snippet"
+                        >
+                            <span>📜</span>
+                            <span>Snippets</span>
+                        </button>
+                    </div>
                     <app-editor
                         class="flex-1 overflow-hidden"
                         [content]="currentFile.content"
                         [requests]="currentFile.requests"
                         [variables]="currentFile.variables"
                         [environments]="currentFile.environments"
+                        [currentEnv]="currentEnv()"
                         [requestNames]="currentFileRequestNames()"
                         [executingRequestIndex]="pendingRequestIndex"
                         [isBusy]="isRequestRunning"
@@ -176,4 +189,11 @@
 
     <!-- Update Notification -->
     <app-update-notification></app-update-notification>
+
+    <!-- Script Snippet Modal -->
+    <app-script-snippet-modal
+        #snippetModal
+        (snippetSelected)="onSnippetSelected($event)"
+        (closed)="showSnippetModal = false">
+    </app-script-snippet-modal>
 </div>

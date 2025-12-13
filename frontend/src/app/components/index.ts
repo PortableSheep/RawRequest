@@ -8,3 +8,4 @@ export { SecretsModalComponent } from './secrets-modal/secrets-modal.component';
 export { DeleteConfirmModalComponent } from './delete-confirm-modal/delete-confirm-modal.component';
 export { ConsoleDrawerComponent } from './console-drawer/console-drawer.component';
 export { UpdateNotificationComponent } from './update-notification/update-notification.component';
+export { ScriptSnippetModalComponent } from './script-snippet-modal/script-snippet-modal.component';

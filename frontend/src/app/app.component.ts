@@ -13,7 +13,8 @@ import {
   SecretsModalComponent,
   DeleteConfirmModalComponent,
   ConsoleDrawerComponent,
-  UpdateNotificationComponent
+  UpdateNotificationComponent,
+  ScriptSnippetModalComponent
 } from './components';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry } from './models/http.models';
@@ -23,6 +24,7 @@ import { SecretService, SecretIndex, VaultInfo } from './services/secret.service
 import { ScriptConsoleService } from './services/script-console.service';
 import { ToastService } from './services/toast.service';
 import { UpdateService } from './services/update.service';
+import { ScriptSnippet } from './services/script-snippet.service';
 import { Subject, takeUntil } from 'rxjs';
 
 type AlertType = 'info' | 'success' | 'warning' | 'danger';
@@ -45,7 +47,8 @@ type AlertType = 'info' | 'success' | 'warning' | 'danger';
     DeleteConfirmModalComponent,
     ConsoleDrawerComponent,
     ToastContainerComponent,
-    UpdateNotificationComponent
+    UpdateNotificationComponent,
+    ScriptSnippetModalComponent
   ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
@@ -121,6 +124,7 @@ export class AppComponent implements OnInit, OnDestroy {
   loadTestMetrics: any = null;
   showDonationModal = false;
   showSecretsModal = false;
+  showSnippetModal = false;
   showDeleteConfirmModal = false;
   secretToDelete: { env: string, key: string } | null = null;
   allSecrets: SecretIndex = {};
@@ -132,6 +136,8 @@ export class AppComponent implements OnInit, OnDestroy {
     const entries = this.scriptConsole.logs();
     return entries.length ? entries[entries.length - 1] : null;
   });
+
+  @ViewChild('snippetModal') snippetModal!: ScriptSnippetModalComponent;
 
   private destroy$ = new Subject<void>();
   private alertTimeout: any;
@@ -940,5 +946,32 @@ export class AppComponent implements OnInit, OnDestroy {
       // Silently fail - update check is non-critical
       console.debug('Update check failed:', error);
     }
+  }
+
+  // Script Snippets
+  openSnippetModal(): void {
+    this.showSnippetModal = true;
+    setTimeout(() => this.snippetModal?.open(), 0);
+  }
+
+  onSnippetSelected(event: { snippet: ScriptSnippet; type: 'pre' | 'post' }): void {
+    const { snippet, type } = event;
+    const code = type === 'pre' ? snippet.preScript : snippet.postScript;
+    if (!code) return;
+
+    // Insert the snippet at the cursor or append to the current file content
+    const file = this.files[this.currentFileIndex];
+    if (!file) return;
+
+    // Determine if we should wrap in pre/post script block
+    const scriptBlock = type === 'pre' 
+      ? `\n< {\n${code}\n}\n` 
+      : `\n> {\n${code}\n}\n`;
+
+    // Append to the end of the current content
+    const newContent = file.content + scriptBlock;
+    this.onEditorContentChange(newContent);
+    this.toast.success(`Inserted "${snippet.name}" snippet`);
+    this.showSnippetModal = false;
   }
 }

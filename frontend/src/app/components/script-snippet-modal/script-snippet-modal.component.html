@@ -1,0 +1,116 @@
+@if (isOpen()) {
+  <div class="modal-overlay" (click)="close()">
+    <div class="modal-container" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <h2>📜 Script Snippets</h2>
+        <button class="close-btn" (click)="close()">×</button>
+      </div>
+      
+      <div class="modal-body">
+        <div class="sidebar">
+          <div class="search-box">
+            <input 
+              type="text" 
+              placeholder="Search snippets..." 
+              [ngModel]="searchQuery()"
+              (ngModelChange)="searchQuery.set($event)"
+            />
+          </div>
+          
+          <div class="category-tabs">
+            <button 
+              [class.active]="selectedCategory() === 'all'"
+              (click)="selectedCategory.set('all')"
+            >
+              All
+            </button>
+            @for (category of snippetService.getAllCategories(); track category) {
+              <button 
+                [class.active]="selectedCategory() === category"
+                (click)="selectedCategory.set(category)"
+              >
+                {{ snippetService.getCategoryLabel(category) }}
+              </button>
+            }
+          </div>
+          
+          <div class="snippet-list">
+            @for (snippet of filteredSnippets; track snippet.id) {
+              <div 
+                class="snippet-item"
+                [class.selected]="selectedSnippet()?.id === snippet.id"
+                (click)="selectSnippet(snippet)"
+              >
+                <div class="snippet-name">{{ snippet.name }}</div>
+                <div class="snippet-desc">{{ snippet.description }}</div>
+                <div class="snippet-badges">
+                  @if (hasPreScript(snippet)) {
+                    <span class="badge pre">Pre</span>
+                  }
+                  @if (hasPostScript(snippet)) {
+                    <span class="badge post">Post</span>
+                  }
+                </div>
+              </div>
+            }
+            @if (filteredSnippets.length === 0) {
+              <div class="no-results">
+                No snippets found matching your search.
+              </div>
+            }
+          </div>
+        </div>
+        
+        <div class="preview-pane">
+          @if (selectedSnippet()) {
+            <div class="preview-header">
+              <h3>{{ selectedSnippet()!.name }}</h3>
+              <p>{{ selectedSnippet()!.description }}</p>
+            </div>
+            
+            <div class="preview-tabs">
+              @if (hasPreScript(selectedSnippet()!)) {
+                <button 
+                  [class.active]="previewTab() === 'pre'"
+                  (click)="previewTab.set('pre')"
+                >
+                  Pre-Request Script
+                </button>
+              }
+              @if (hasPostScript(selectedSnippet()!)) {
+                <button 
+                  [class.active]="previewTab() === 'post'"
+                  (click)="previewTab.set('post')"
+                >
+                  Post-Request Script
+                </button>
+              }
+            </div>
+            
+            <div class="code-preview">
+              <pre><code>{{ getPreviewCode() }}</code></pre>
+            </div>
+            
+            <div class="insert-buttons">
+              @if (hasPreScript(selectedSnippet()!)) {
+                <button class="insert-btn pre" (click)="insertAsPreScript()">
+                  Insert as Pre-Request
+                </button>
+              }
+              @if (hasPostScript(selectedSnippet()!)) {
+                <button class="insert-btn post" (click)="insertAsPostScript()">
+                  Insert as Post-Request
+                </button>
+              }
+            </div>
+          } @else {
+            <div class="no-selection">
+              <div class="placeholder-icon">📝</div>
+              <p>Select a snippet to preview</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+}

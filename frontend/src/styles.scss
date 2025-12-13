@@ -313,6 +313,48 @@ body::after {
   color: var(--rr-separator) !important;
 }
 
+// JavaScript syntax highlighting for script blocks
+.cm-script-marker {
+  color: #c586c0 !important; // Purple for < and >
+  font-weight: 700;
+}
+
+.cm-script-brace {
+  color: #ffd700 !important; // Gold for { and }
+  font-weight: 700;
+}
+
+.cm-js-keyword {
+  color: #c586c0 !important; // Purple for keywords (const, let, if, etc.)
+  font-weight: 600;
+}
+
+.cm-js-builtin {
+  color: #4ec9b0 !important; // Teal for built-in objects (console, Math, etc.)
+}
+
+.cm-js-helper {
+  color: #dcdcaa !important; // Yellow for script helpers (setVar, getVar, etc.)
+  font-weight: 600;
+}
+
+.cm-js-string {
+  color: #ce9178 !important; // Orange/rust for strings
+}
+
+.cm-js-number {
+  color: #b5cea8 !important; // Light green for numbers
+}
+
+.cm-js-comment {
+  color: #6a9955 !important; // Green for comments
+  font-style: italic;
+}
+
+.cm-js-function {
+  color: #dcdcaa !important; // Yellow for function calls
+}
+
 .gutter-chain-icon,
 .gutter-lightning-icon {
   cursor: default;

@@ -79,7 +79,7 @@ jobs:
         with:
           name: macos-release
           path: dist/releases/*
-
+ 
   build-windows:
     runs-on: windows-latest
     steps:
