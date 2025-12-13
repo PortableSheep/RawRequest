@@ -201,7 +201,43 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           // Only recalculate gutter markers when the document actually changes
           lineMarkerChange: (update: ViewUpdate) => update.docChanged
         }),
-        // EditorView.scrollMargins.of(() => ({ top: 0, bottom: 0 })),
+        // Prevent scroll jumping and unwanted selection caused by stale cursor state
+        EditorView.domEventHandlers({
+          mousedown: (event, view) => {
+            // Only intervene if this is a plain click (no modifier keys)
+            // Modifier keys indicate intentional selection behavior
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+              const scrollTop = view.scrollDOM.scrollTop;
+              const hadSelection = !view.state.selection.main.empty;
+              
+              // Use setTimeout to check after CodeMirror processes the click
+              setTimeout(() => {
+                const newScrollTop = view.scrollDOM.scrollTop;
+                const selection = view.state.selection.main;
+                
+                // If scroll jumped more than 100px, restore it
+                if (Math.abs(newScrollTop - scrollTop) > 100) {
+                  view.scrollDOM.scrollTop = scrollTop;
+                }
+                
+                // If a selection was created but there wasn't one before,
+                // and user didn't drag (mousedown only), collapse it to cursor
+                if (!hadSelection && !selection.empty) {
+                  // Check if this looks like an accidental selection (spans many lines)
+                  const fromLine = view.state.doc.lineAt(selection.from).number;
+                  const toLine = view.state.doc.lineAt(selection.to).number;
+                  if (Math.abs(toLine - fromLine) > 2) {
+                    // Collapse selection to the click point (selection.to is where user clicked)
+                    view.dispatch({
+                      selection: { anchor: selection.to }
+                    });
+                  }
+                }
+              }, 0);
+            }
+            return false; // Don't prevent default handling
+          }
+        }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             this.isUpdatingFromInput = true;
