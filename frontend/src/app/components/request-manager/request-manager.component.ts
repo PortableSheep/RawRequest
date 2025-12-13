@@ -2,6 +2,7 @@ import { Component, input, output, inject, OnInit, OnDestroy, signal, effect } f
 
 import { HttpService } from '../../services/http.service';
 import { ParserService } from '../../services/parser.service';
+import { NotificationService } from '../../services/notification.service';
 import {
   Request,
   FileTab,
@@ -22,6 +23,7 @@ import {
 export class RequestManagerComponent {
   private httpService = inject(HttpService);
   private parserService = inject(ParserService);
+  private notificationService = inject(NotificationService);
 
   // Inputs
   files = input.required<FileTab[]>();
@@ -101,6 +103,9 @@ export class RequestManagerComponent {
 
       console.log('[RequestManager] Adding to history:', historyItem);
       await this.pushHistoryEntry(currentFile.id, historyItem);
+
+      // Send notification if app is in background
+      this.notificationService.notifyRequestComplete(request.name, response.status, response.responseTime);
 
       // Emit execution result
       this.requestExecuted.emit({ requestIndex, response: responseWithChain });
@@ -210,6 +215,11 @@ export class RequestManagerComponent {
       };
 
       await this.pushHistoryEntry(currentFile.id, historyItem);
+
+      // Send notification if app is in background
+      const totalDuration = responses.reduce((sum, r) => sum + (r?.responseTime || 0), 0);
+      const allSuccessful = responses.every(r => r && r.status >= 200 && r.status < 300);
+      this.notificationService.notifyChainComplete(chain.length, totalDuration, allSuccessful);
 
       this.requestExecuted.emit({ requestIndex, response: decoratedLastResponse });
     } catch (error: any) {
@@ -361,6 +371,14 @@ export class RequestManagerComponent {
       };
 
       await this.pushHistoryEntry(currentFile.id, historyItem);
+
+      // Send notification if app is in background
+      this.notificationService.notifyLoadTestComplete(
+        request.name,
+        metrics.totalRequests,
+        results.endTime - results.startTime,
+        metrics.averageResponseTime
+      );
 
     } catch (error: any) {
       const errorResponse: ResponseData = {

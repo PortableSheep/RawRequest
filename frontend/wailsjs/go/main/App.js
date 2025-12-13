@@ -130,6 +130,10 @@ export function SaveWindowState() {
   return window['go']['main']['App']['SaveWindowState']();
 }
 
+export function SendNotification(arg1, arg2) {
+  return window['go']['main']['App']['SendNotification'](arg1, arg2);
+}
+
 export function SendRequest(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['SendRequest'](arg1, arg2, arg3, arg4);
 }

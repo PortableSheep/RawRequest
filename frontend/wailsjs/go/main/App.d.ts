@@ -66,6 +66,8 @@ export function SaveSecret(arg1:string,arg2:string,arg3:string):Promise<Record<s
 
 export function SaveWindowState():Promise<void>;
 
+export function SendNotification(arg1:string,arg2:string):Promise<void>;
+
 export function SendRequest(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
 
 export function SendRequestWithID(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;

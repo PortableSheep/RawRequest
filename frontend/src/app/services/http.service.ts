@@ -651,7 +651,17 @@ export class HttpService {
       for (let i = 0; i < batchSize; i++) {
         const promise = this.sendRequest(request, variables, undefined, envName)
           .then(response => {
-            results.successfulRequests++;
+            // Check if response indicates an error (status 0 means network/connection error)
+            if (response.status === 0 || response.status >= 400) {
+              results.failedRequests++;
+              results.errors.push({
+                status: response.status,
+                statusText: response.statusText,
+                body: response.body
+              });
+            } else {
+              results.successfulRequests++;
+            }
             results.responseTimes.push(response.responseTime);
           })
           .catch(error => {

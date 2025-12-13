@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/gen2brain/beeep"
 )
 
 // TimingBreakdown contains detailed timing information for an HTTP request
@@ -161,6 +162,11 @@ func (a *App) ExportSecrets() (map[string]map[string]string, error) {
 		return nil, err
 	}
 	return vault.Export()
+}
+
+// SendNotification sends an OS-level notification
+func (a *App) SendNotification(title, message string) error {
+	return beeep.Notify(title, message, "")
 }
 
 func (a *App) getSecretVault() (*SecretVault, error) {

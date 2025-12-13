@@ -62,13 +62,9 @@
 GET https://httpbin.org/get
 User-Agent: {{userAgent}}
 
-###
-
 ### GET with environment variable
 GET {{baseUrl}}/api/{{apiVersion}}/status
 Accept: {{contentType}}
-
-###
 
 ### POST with JSON body
 POST https://httpbin.org/post
@@ -81,8 +77,6 @@ User-Agent: {{userAgent}}
   "version": "{{apiVersion}}"
 }
 
-###
-
 ### PUT request
 PUT https://httpbin.org/put
 Content-Type: application/json
@@ -92,13 +86,9 @@ Content-Type: application/json
   "status": "updated"
 }
 
-###
-
 ### DELETE request
 DELETE https://httpbin.org/delete
 Authorization: Bearer fake-token
-
-###
 
 ### PATCH request
 PATCH https://httpbin.org/patch
@@ -108,17 +98,11 @@ Content-Type: application/json
   "field": "value"
 }
 
-###
-
 ### HEAD request (gets headers only, no body)
 HEAD https://httpbin.org/get
 
-###
-
 ### OPTIONS request (check available methods)
 OPTIONS https://httpbin.org/get
-
-###
 
 ###############################################################################
 # 4. REQUEST CHAINING & DEPENDENCIES
@@ -159,8 +143,6 @@ Content-Type: application/json
   setVar('userId', 'user-' + Math.floor(Math.random() * 1000));
 }
 
-###
-
 ### Get User Profile - Depends on login
 # This request only runs if login succeeds
 @name getUserProfile
@@ -178,8 +160,6 @@ Accept: application/json
   setVar('userEmail', 'user@example.com');
   setVar('userName', 'Test User');
 }
-
-###
 
 ### Update User Profile - Depends on getUserProfile
 @name updateProfile
@@ -199,8 +179,6 @@ Content-Type: application/json
   console.log('Profile updated successfully!');
   setVar('profileUpdated', true);
 }
-
-###
 
 ###############################################################################
 # 5. PRE & POST SCRIPTS
@@ -233,8 +211,6 @@ GET https://httpbin.org/delay/1
   }
 }
 
-###
-
 ###############################################################################
 # 6. ASSERTIONS
 ###############################################################################
@@ -259,8 +235,6 @@ GET https://httpbin.org/get
   console.log('✓ All assertions passed!');
 }
 
-###
-
 ###############################################################################
 # 7. LOAD TESTING
 ###############################################################################
@@ -272,14 +246,10 @@ GET https://httpbin.org/get
 @load concurrent=5 duration=10s
 GET https://httpbin.org/get
 
-###
-
 ### Load test with iterations
 @name loadTestIterations
 @load concurrent=10 iterations=100
 GET https://httpbin.org/delay/1
-
-###
 
 ### Advanced load test with ramp-up
 @name loadTestAdvanced
@@ -291,14 +261,10 @@ Content-Type: application/json
   "testData": "load-test-payload"
 }
 
-###
-
 ### Load test with rate limiting
 @name loadTestRate
 @load requestsPerSecond=50 duration=30s
 GET https://httpbin.org/get
-
-###
 
 ###############################################################################
 # 8. SECRETS USAGE
@@ -311,8 +277,6 @@ GET https://httpbin.org/get
 Authorization: Bearer {{secret:api_token}}
 X-API-Key: {{secret:api_secret}}
 X-Client-ID: {{secret:client_id}}
-
-###
 
 ###############################################################################
 # 9. COMPLEX WORKFLOWS
@@ -333,8 +297,6 @@ Content-Type: application/json
   console.log('Session initialized:', getVar('sessionId'));
 }
 
-###
-
 ### Step 2: Create resource
 @name createResource
 @depends initSession
@@ -354,8 +316,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource created:', resourceId);
 }
 
-###
-
 ### Step 3: Read resource
 @name readResource
 @depends createResource
@@ -366,8 +326,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource retrieved:', getVar('resourceId'));
   setVar('resourceData', JSON.stringify(response.json));
 }
-
-###
 
 ### Step 4: Update resource
 @name updateResource
@@ -386,8 +344,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource updated successfully');
 }
 
-###
-
 ### Step 5: Delete resource
 @name deleteResource
 @depends updateResource
@@ -398,8 +354,6 @@ X-Session-ID: {{sessionId}}
   console.log('Workflow completed - resource deleted');
   console.log('Session:', getVar('sessionId'));
 }
-
-###
 
 ###############################################################################
 # 10. ERROR HANDLING
@@ -416,8 +370,6 @@ GET https://httpbin.org/status/404
   }
 }
 
-###
-
 ### Handle 500 error
 @name handle500
 GET https://httpbin.org/status/500
@@ -428,8 +380,6 @@ GET https://httpbin.org/status/500
     setVar('serverError', true);
   }
 }
-
-###
 
 ###############################################################################
 # 11. GRAPHQL REQUESTS
@@ -448,8 +398,6 @@ X-Request-Type: GraphQL
   }
 }
 
-###
-
 ### GraphQL mutation
 @name graphqlMutation
 POST https://httpbin.org/post
@@ -464,8 +412,6 @@ Content-Type: application/json
     }
   }
 }
-
-###
 
 ###############################################################################
 # 12. FILE UPLOAD (MULTIPART)
@@ -499,8 +445,6 @@ Content-Disposition: form-data; name="category"
 documents
 --boundary123--
 
-###
-
 ###############################################################################
 # 13. CUSTOM HEADERS & AUTHENTICATION
 ###############################################################################
@@ -510,22 +454,16 @@ documents
 GET https://httpbin.org/basic-auth/user/passwd
 Authorization: Basic dXNlcjpwYXNzd2Q=
 
-###
-
 ### Bearer Token Authentication
 @name bearerAuth
 GET https://httpbin.org/bearer
 Authorization: Bearer {{token}}
-
-###
 
 ### API Key Authentication
 @name apiKeyAuth
 GET https://httpbin.org/get
 X-API-Key: {{apiKey}}
 X-Client-ID: client-123
-
-###
 
 ### Custom Headers
 @name customHeaders
@@ -536,8 +474,6 @@ X-Request-ID: {{requestId}}
 X-Correlation-ID: corr-{{sessionId}}
 Accept-Language: en-US,en;q=0.9
 Cache-Control: no-cache
-
-###
 
 ###############################################################################
 # 14. DIFFERENT CONTENT TYPES
@@ -555,8 +491,6 @@ Content-Type: application/json
   }
 }
 
-###
-
 ### XML request
 @name xmlRequest
 POST https://httpbin.org/post
@@ -571,16 +505,12 @@ Content-Type: application/xml
   </data>
 </request>
 
-###
-
 ### Form URL encoded
 @name formRequest
 POST https://httpbin.org/post
 Content-Type: application/x-www-form-urlencoded
 
 name=John+Doe&email=john@example.com&age=30&subscribe=true
-
-###
 
 ### Plain text request
 @name textRequest
@@ -590,8 +520,6 @@ Content-Type: text/plain
 This is plain text content.
 It can span multiple lines.
 
-###
-
 ###############################################################################
 # 15. QUERY PARAMETERS & DYNAMIC URLS
 ###############################################################################
@@ -600,13 +528,9 @@ It can span multiple lines.
 @name queryParams
 GET https://httpbin.org/get?search={{userName}}&page=1&limit=10&sort=desc
 
-###
-
 ### Dynamic URL construction
 @name dynamicUrl
 GET {{baseUrl}}/api/{{apiVersion}}/users/{{userId}}/profile?include=posts,comments
-
-###
 
 ###############################################################################
 # 16. TESTING & DEBUGGING
@@ -631,8 +555,6 @@ GET https://httpbin.org/get
   console.log('Response body:', JSON.stringify(response.json, null, 2));
 }
 
-###
-
 ### Performance test
 @name performanceTest
 GET https://httpbin.org/delay/2
@@ -649,8 +571,6 @@ GET https://httpbin.org/delay/2
     console.warn('Request took longer than 3 seconds!');
   }
 }
-
-###
 
 ###############################################################################
 # 17. DYNAMIC VALUES VIA PRE-SCRIPTS
@@ -708,8 +628,6 @@ GET https://httpbin.org/get
   }
 }
 
-###
-
 ###############################################################################
 # 19. RESPONSE DATA EXTRACTION & MANIPULATION
 ###############################################################################
@@ -740,8 +658,6 @@ GET https://httpbin.org/json
   });
 }
 
-###
-
 ###############################################################################
 # 20. COMPREHENSIVE WORKFLOW - E-COMMERCE CHECKOUT
 ###############################################################################
@@ -768,8 +684,6 @@ Content-Type: application/json
   console.log('Session initialized:', sessionId);
 }
 
-###
-
 ### Step 2: Add Items to Cart (depends on session)
 @name addToCart
 @depends initCheckout
@@ -792,8 +706,6 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Cart total: $' + total.toFixed(2));
 }
 
-###
-
 ### Step 3: Apply Discount Code
 @name applyDiscount
 @depends addToCart
@@ -814,8 +726,6 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Discount applied: -$' + discount.toFixed(2));
   console.log('Final total: $' + finalTotal.toFixed(2));
 }
-
-###
 
 ### Step 4: Process Payment
 @name processPayment
@@ -842,8 +752,6 @@ Authorization: Bearer {{secret:payment_api_key}}
     throw new Error('Payment processing failed');
   }
 }
-
-###
 
 ### Step 5: Script helper & console showcase (optional)
 @name helperShowcase
@@ -881,8 +789,6 @@ GET https://httpbin.org/anything
   console.log('Console output is visible live inside the Script Console tray.');
 }
 
-###
-
 ### Step 6: Send Confirmation Email
 @name sendConfirmation
 @depends processPayment
@@ -909,8 +815,6 @@ Content-Type: application/json
   // Validate the checkout succeeded
   assert(response.status === 200, 'Email confirmation should succeed');
 }
-
-###
 
 ###############################################################################
 # 21. SCRIPT CONSOLE & HELPER QUICK REFERENCE
@@ -958,8 +862,6 @@ Content-Type: application/json
   setVar('totalUsersCreated', userIds.length);
 }
 
-###
-
 ###############################################################################
 # 23. RETRY LOGIC AND ERROR RECOVERY
 ###############################################################################
@@ -991,8 +893,6 @@ GET https://httpbin.org/status/503
     setVar('retryCount', 0);
   }
 }
-
-###
 
 ###############################################################################
 # 24. DATA VALIDATION & TESTING
