@@ -141,6 +141,8 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -159,6 +161,18 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f
       
+      - name: Calculate SHA256 and update formula
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          TARBALL="artifacts/RawRequest-v${VERSION}-macos-universal.tar.gz"
+          if [ -f "$TARBALL" ]; then
+            SHA256=$(sha256sum "$TARBALL" | cut -d' ' -f1)
+            echo "SHA256: $SHA256"
+            sed -i "s/version \".*\"/version \"${VERSION}\"/" Formula/rawrequest.rb
+            sed -i "s/REPLACE_WITH_ACTUAL_SHA256/${SHA256}/g" Formula/rawrequest.rb
+            sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${SHA256}\"|g" Formula/rawrequest.rb
+          fi
+      
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
@@ -170,3 +184,11 @@ jobs:
             artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Commit updated formula
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/rawrequest.rb
+          git diff --staged --quiet || git commit -m "Update Homebrew formula for v${{ steps.version.outputs.version }}"
+          git push origin HEAD:main || echo "Formula update skipped (no changes or push failed)"

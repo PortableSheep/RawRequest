@@ -591,6 +591,42 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  /**
+   * Get the current cursor position in the editor
+   */
+  getCursorPosition(): number {
+    if (!this.editorView) return 0;
+    return this.editorView.state.selection.main.head;
+  }
+
+  /**
+   * Insert text at the current cursor position
+   */
+  insertAtCursor(text: string): void {
+    if (!this.editorView) return;
+    
+    const pos = this.getCursorPosition();
+    this.editorView.dispatch({
+      changes: { from: pos, insert: text },
+      selection: { anchor: pos + text.length }
+    });
+    this.editorView.focus();
+  }
+
+  /**
+   * Insert text at a specific position
+   */
+  insertAt(position: number, text: string): void {
+    if (!this.editorView) return;
+    
+    const safePos = Math.min(Math.max(0, position), this.editorView.state.doc.length);
+    this.editorView.dispatch({
+      changes: { from: safePos, insert: text },
+      selection: { anchor: safePos + text.length }
+    });
+    this.editorView.focus();
+  }
+
   private updateExecutingIndicator(activeIndex: number | null, disableAll: boolean) {
     if (!this.editorContainer?.nativeElement) {
       return;

@@ -65,6 +65,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
 
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
+  @ViewChild('editorComponent') editorComponent!: EditorComponent;
 
   // State management - convert to signals
   filesSignal = signal<FileTab[]>([]);
@@ -959,18 +960,23 @@ export class AppComponent implements OnInit, OnDestroy {
     const code = type === 'pre' ? snippet.preScript : snippet.postScript;
     if (!code) return;
 
-    // Insert the snippet at the cursor or append to the current file content
-    const file = this.files[this.currentFileIndex];
-    if (!file) return;
-
     // Determine if we should wrap in pre/post script block
     const scriptBlock = type === 'pre' 
       ? `\n< {\n${code}\n}\n` 
       : `\n> {\n${code}\n}\n`;
 
-    // Append to the end of the current content
-    const newContent = file.content + scriptBlock;
-    this.onEditorContentChange(newContent);
+    // Insert at cursor position using the editor component
+    if (this.editorComponent) {
+      this.editorComponent.insertAtCursor(scriptBlock);
+    } else {
+      // Fallback: append to end if editor not available
+      const file = this.files[this.currentFileIndex];
+      if (file) {
+        const newContent = file.content + scriptBlock;
+        this.onEditorContentChange(newContent);
+      }
+    }
+    
     this.toast.success(`Inserted "${snippet.name}" snippet`);
     this.showSnippetModal = false;
   }

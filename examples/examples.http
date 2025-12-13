@@ -1009,63 +1009,27 @@ response.json != null
   }
 }
 
-###
-
 ###############################################################################
-# END OF EXAMPLES
-###############################################################################
-# This file demonstrates ALL features of RawRequest:
-#
-# ✓ Environment variables (@env.{env}.{key})
-# ✓ Global variables (@variableName)
-# ✓ All HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
-# ✓ Request naming (@name)
-# ✓ Request chaining & dependencies (@depends) with chain icons (🔗)
-# ✓ Pre-request scripts (< { ... })
-# ✓ Post-request scripts (> { ... })
-# ✓ Assertions (### Assert)
-# ✓ Load testing (@load) with lightning icons (⚡)
-# ✓ Secrets management ({{secret:key}})
-# ✓ Complex multi-step workflows
-# ✓ Error handling & recovery
-# ✓ GraphQL queries
-# ✓ File uploads (multipart/form-data)
-# ✓ Authentication methods (Basic, Bearer, API Key)
-# ✓ Multiple content types (JSON, XML, form-data, plain text)
-# ✓ Query parameters & dynamic URLs
-# ✓ JavaScript expressions in variables ({{Math.random()}}, {{new Date()}})
-# ✓ Conditional logic in scripts
-# ✓ Response data extraction & transformation
-# ✓ Script helper APIs (setHeader, updateRequest, assert, delay) + live console
-# ✓ Batch operations
-# ✓ Retry logic
-# ✓ Data validation & testing
-# ✓ Performance monitoring
-# ✓ Debugging utilities
-#
 # SCRIPT API REFERENCE:
-# - setVar(key, value)     → Set a variable
-# - getVar(key)            → Get a variable value
+#
+# Helper Functions:
+# - setVar(key, value)     → Set a variable (no pre-definition required)
+# - getVar(key)            → Get a variable value (returns undefined if not set)
 # - setHeader(name, value) → Inject/override an outgoing header
 # - updateRequest(patch)   → Modify URL/method/body/headers during scripts
 # - delay(ms)              → Awaitable delay helper for async flows
 # - assert(condition,msg)  → Throw when assertions fail
 # - console.log/warn/error → Log messages to console
-# - response.status        → HTTP status code
+#
+# Response Object (available in post-scripts):
+# - response.status        → HTTP status code (number)
+# - response.statusText    → HTTP status text (e.g., "OK")
 # - response.headers       → Response headers object
-# - response.json          → Parsed JSON response body
-# - response.text          → Raw response body text
-# - request.method         → Request HTTP method
-# - request.url            → Request URL
-# - request.headers        → Request headers object
-# - request.body           → Request body
+# - response.body          → Raw response body text
+# - response.text          → Alias for response.body
+# - response.json          → Parsed JSON body (null if not valid JSON)
+# - response.responseTime  → Total request time in milliseconds
+# - response.size          → Response body size in bytes
 #
-# TIPS:
-# - Use Ctrl+Enter to execute the request at cursor
-# - Click play button (▶) in gutter to run specific request
-# - Click chain button (🔗) to run dependent request chain
-# - Click lightning (⚡) to run load test
-# - View history in sidebar to replay past requests
-# - Use secrets for sensitive data - never commit API keys!
-#
+# Request Object (available in pre and post-scripts):
 ###############################################################################

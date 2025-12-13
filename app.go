@@ -586,26 +586,76 @@ func (a *App) getJSONValue(data map[string]interface{}, path string) string {
 	return ""
 }
 
-// parseResponse parses the response string into structured data
+// parseResponse parses the response string into structured data for scripts
+// Response format: "Status: 200 OK\nHeaders: {...json...}\nBody: ..."
 func (a *App) parseResponse(response string) map[string]interface{} {
 	result := make(map[string]interface{})
 	lines := strings.Split(response, "\n")
 
-	if len(lines) > 0 {
-		// Parse status line
-		statusLine := lines[0]
-		if strings.Contains(statusLine, "Status: ") {
-			statusStr := strings.TrimPrefix(statusLine, "Status: ")
-			if statusCode, err := strconv.Atoi(statusStr); err == nil {
-				result["status"] = statusCode
+	for i := 0; i < len(lines); i++ {
+		line := lines[i]
+
+		// Parse status line: "Status: 200 OK"
+		if strings.HasPrefix(line, "Status: ") {
+			statusLine := strings.TrimPrefix(line, "Status: ")
+			parts := strings.SplitN(statusLine, " ", 2)
+			if len(parts) > 0 {
+				if statusCode, err := strconv.Atoi(parts[0]); err == nil {
+					result["status"] = statusCode
+				}
+				if len(parts) > 1 {
+					result["statusText"] = parts[1]
+				}
 			}
+			continue
+		}
+
+		// Parse headers: "Headers: {...ResponseMetadata JSON...}"
+		if strings.HasPrefix(line, "Headers: ") {
+			metadataStr := strings.TrimPrefix(line, "Headers: ")
+			var metadata struct {
+				Headers map[string]string `json:"headers"`
+				Timing  struct {
+					Total int64 `json:"total"`
+				} `json:"timing"`
+				Size int64 `json:"size"`
+			}
+			if err := json.Unmarshal([]byte(metadataStr), &metadata); err == nil {
+				if metadata.Headers != nil {
+					result["headers"] = metadata.Headers
+				} else {
+					result["headers"] = make(map[string]string)
+				}
+				result["responseTime"] = metadata.Timing.Total
+				result["size"] = metadata.Size
+			} else {
+				result["headers"] = make(map[string]string)
+			}
+			continue
+		}
+
+		// Parse body: "Body: ..." (may span multiple lines)
+		if strings.HasPrefix(line, "Body: ") {
+			body := strings.TrimPrefix(line, "Body: ")
+			// If there are more lines, append them (multiline body)
+			if i+1 < len(lines) {
+				body += "\n" + strings.Join(lines[i+1:], "\n")
+			}
+			result["body"] = body
+			result["text"] = body // Alias for consistency with frontend
+
+			// Try to parse JSON body
+			var jsonData interface{}
+			if err := json.Unmarshal([]byte(body), &jsonData); err == nil {
+				result["json"] = jsonData
+			}
+			break
 		}
 	}
 
-	if len(lines) > 1 && strings.Contains(lines[1], "Body: ") {
-		body := strings.TrimPrefix(lines[1], "Body: ")
-		result["body"] = body
-		result["headers"] = make(map[string]string) // Placeholder for headers
+	// Ensure headers exists even if not parsed
+	if _, exists := result["headers"]; !exists {
+		result["headers"] = make(map[string]string)
 	}
 
 	return result
