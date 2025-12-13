@@ -63,13 +63,13 @@ export class RequestManagerComponent {
     const variables = this.getCombinedVariables();
     const envName = this.getActiveEnvName();
 
-    const supportsCancellation = !request.loadTest;
-    this.activeRequestId = supportsCancellation ? (requestId ?? this.createRequestId(currentFile.id, requestIndex)) : null;
+    const supportsCancellation = true; // All request types now support cancellation
+    this.activeRequestId = requestId ?? this.createRequestId(currentFile.id, requestIndex);
 
     try {
       // Check if this is a load test
       if (request.loadTest) {
-        await this.executeLoadTest(requestIndex, envName);
+        await this.executeLoadTest(requestIndex, envName, this.activeRequestId);
         return;
       }
 
@@ -321,13 +321,13 @@ export class RequestManagerComponent {
   }
 
   // Execute load test
-  private async executeLoadTest(requestIndex: number, envName: string): Promise<void> {
+  private async executeLoadTest(requestIndex: number, envName: string, requestId: string): Promise<void> {
     const currentFile = this.files()[this.currentFileIndex()];
     const request = currentFile.requests[requestIndex];
     const variables = this.getCombinedVariables();
 
     try {
-      const results = await this.httpService.executeLoadTest(request, variables, envName);
+      const results = await this.httpService.executeLoadTest(request, variables, envName, requestId);
       const metrics = this.httpService.calculateLoadTestMetrics(results);
 
       // Create a summary response

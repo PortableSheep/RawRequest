@@ -32,11 +32,16 @@ export class HttpService {
 
   private readonly FILES_KEY = 'rawrequest_files';
   private readonly CANCELLED_RESPONSE = '__CANCELLED__';
+  private loadTestCancelled = new Set<string>();
 
   constructor() {
     this.scriptConsole.init().catch(() => {
       // Console UI will surface errors; swallow to avoid blocking requests
     });
+  }
+
+  cancelLoadTest(requestId: string): void {
+    this.loadTestCancelled.add(requestId);
   }
 
   async sendRequest(
@@ -569,6 +574,9 @@ export class HttpService {
       return;
     }
 
+    // Cancel load test if one is running with this ID
+    this.cancelLoadTest(requestId);
+
     try {
       await CancelBackendRequest(requestId);
     } catch (error) {
@@ -589,7 +597,8 @@ export class HttpService {
   async executeLoadTest(
     request: Request,
     variables: { [key: string]: string } = {},
-    env?: string
+    env?: string,
+    requestId?: string
   ): Promise<LoadTestResults> {
     const startTime = Date.now();
     const envName = this.normalizeEnvName(env);
@@ -603,6 +612,11 @@ export class HttpService {
       endTime: 0
     };
 
+    // Clear any previous cancellation state for this request
+    if (requestId) {
+      this.loadTestCancelled.delete(requestId);
+    }
+
     if (!request.loadTest) {
       throw new Error('No load test configuration');
     }
@@ -615,6 +629,14 @@ export class HttpService {
     const batches = Math.ceil(iterations / concurrent);
 
     for (let batch = 0; batch < batches; batch++) {
+      // Check for cancellation before each batch
+      if (requestId && this.loadTestCancelled.has(requestId)) {
+        this.loadTestCancelled.delete(requestId);
+        const cancellationError: any = new Error('Load test cancelled');
+        cancellationError.cancelled = true;
+        throw cancellationError;
+      }
+
       const batchSize = Math.min(concurrent, iterations - batch * concurrent);
       const promises: Promise<any>[] = [];
 
@@ -625,8 +647,10 @@ export class HttpService {
             results.responseTimes.push(response.responseTime);
           })
           .catch(error => {
-            results.failedRequests++;
-            results.errors.push(error);
+            if (!error?.cancelled) {
+              results.failedRequests++;
+              results.errors.push(error);
+            }
           });
         promises.push(promise);
         results.totalRequests++;

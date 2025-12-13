@@ -305,12 +305,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isRequestRunning = true;
     this.pendingRequestIndex = requestIndex;
     const request = activeFile.requests[requestIndex];
-    const requestId = request.loadTest ? undefined : this.buildRequestToken(activeFile.id, requestIndex);
+    const requestId = this.buildRequestToken(activeFile.id, requestIndex);
     this.activeRequestInfo = {
       id: requestId,
       label: this.buildRequestLabel(request),
       requestIndex,
-      canCancel: !request.loadTest,
+      canCancel: true,
       type: request.loadTest ? 'load' : request.depends ? 'chain' : 'single',
       startedAt: Date.now()
     };

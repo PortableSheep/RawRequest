@@ -215,77 +215,7 @@ body::after {
 }
 
 .cm-http-method {
-  color: var(--color-blue-500) !important;
-  font-weight: 700;
-}
-
-.cm-http-header {
-  color: var(--color-zinc-400) !important;
-}
-
-.cm-variable {
-  color: var(--color-amber-500) !important;
-  font-style: italic;
-}
-
-.cm-environment {
-  color: var(--color-emerald-500) !important;
-  font-weight: 700;
-}
-
-.cm-annotation {
-  color: #71717a !important; /* zinc-500 */
-  font-weight: 600;
-}
-
-.gutter-chain-icon,
-.gutter-lightning-icon {
-  cursor: default;
-  font-size: 14px;
-  line-height: 1;
-  opacity: 0.7;
-}
-
-.gutter-play-btn {
-  background: transparent;
-  border: none;
-  color: #10b981; /* emerald-500 */
-  cursor: pointer;
-  font-size: 14px;
-  line-height: 1;
-  padding: 4px;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    color: #4ade80; /* emerald-400 */
-    background: rgba(16, 185, 129, 0.1);
-    transform: scale(1.1);
-  }
-
-  &:disabled {
-    color: #52525b; /* zinc-600 */
-    cursor: not-allowed;
-    transform: none;
-    background: transparent;
-  }
-
-  &.loading {
-    animation: spin 1s linear infinite;
-    cursor: wait;
-  }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.cm-http-method {
-  color: var(--rr-method-put) !important; /* Using blue as generic method color */
+  color: var(--rr-method-put) !important;
   font-weight: 700;
 }
 
@@ -307,52 +237,47 @@ body::after {
   color: var(--rr-text-tertiary) !important;
   font-weight: 600;
 }
+
 .cm-separator {
   border-bottom: 1px dashed var(--rr-text-secondary);
   display: block;
   color: var(--rr-separator) !important;
 }
 
-// JavaScript syntax highlighting for script blocks
+/* Script block syntax highlighting */
 .cm-script-marker {
-  color: #c586c0 !important; // Purple for < and >
-  font-weight: 700;
-}
-
-.cm-script-brace {
-  color: #ffd700 !important; // Gold for { and }
+  color: #c678dd !important;
   font-weight: 700;
 }
 
 .cm-js-keyword {
-  color: #c586c0 !important; // Purple for keywords (const, let, if, etc.)
-  font-weight: 600;
+  color: #c678dd !important;
 }
 
 .cm-js-builtin {
-  color: #4ec9b0 !important; // Teal for built-in objects (console, Math, etc.)
+  color: #e5c07b !important;
 }
 
 .cm-js-helper {
-  color: #dcdcaa !important; // Yellow for script helpers (setVar, getVar, etc.)
+  color: #61afef !important;
   font-weight: 600;
 }
 
 .cm-js-string {
-  color: #ce9178 !important; // Orange/rust for strings
+  color: #98c379 !important;
 }
 
 .cm-js-number {
-  color: #b5cea8 !important; // Light green for numbers
+  color: #d19a66 !important;
 }
 
 .cm-js-comment {
-  color: #6a9955 !important; // Green for comments
+  color: #5c6370 !important;
   font-style: italic;
 }
 
 .cm-js-function {
-  color: #dcdcaa !important; // Yellow for function calls
+  color: #61afef !important;
 }
 
 .gutter-chain-icon,
@@ -365,13 +290,11 @@ body::after {
 
 .gutter-play-btn {
   background: transparent;
-  border: none;
   color: var(--rr-success);
   cursor: pointer;
   font-size: 14px;
-  line-height: 1;
+  line-height: .5;
   padding: 4px;
-  border-radius: 4px;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;

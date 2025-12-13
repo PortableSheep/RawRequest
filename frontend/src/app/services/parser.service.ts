@@ -170,18 +170,21 @@ export class ParserService {
         continue;
       }
 
-      // Check for scripts
-      if (inRequest && (line.startsWith('>') || line.startsWith('<'))) {
+      // Check for scripts - must be < or > followed by { on same line or next line
+      // This prevents XML bodies like <?xml or <root> from being parsed as scripts
+      if (inRequest && (line === '<' || line === '>' || line.match(/^[<>]\s*\{/))) {
         const result = this.extractScript(lines, i);
-        if (line.startsWith('<')) {
-          // Pre-script
-          currentRequest!.preScript = result.script;
-        } else if (line.startsWith('>')) {
-          // Post-script
-          currentRequest!.postScript = result.script;
+        if (result.script) {
+          if (line.startsWith('<')) {
+            // Pre-script
+            currentRequest!.preScript = result.script;
+          } else if (line.startsWith('>')) {
+            // Post-script
+            currentRequest!.postScript = result.script;
+          }
+          i += result.linesConsumed;
+          continue;
         }
-        i += result.linesConsumed;
-        continue;
       }
 
       // Check for assertions
@@ -194,15 +197,24 @@ export class ParserService {
         continue;
       }
 
-      // Check for body start (empty line or JSON/array start)
-      if (inRequest && (line === '' || line.trim().startsWith('{') || line.trim().startsWith('['))) {
-        inBody = true;
-        if (line.trim()) {
-          // If the line is not empty, it's the start of the body
-          requestBody += line + '\n';
+      // Check for body start - empty line transitions to body mode,
+      // or any content that's not a header (no colon pattern)
+      if (inRequest && !inBody) {
+        if (line === '') {
+          // Empty line marks start of body section
+          inBody = true;
+          i++;
+          continue;
         }
-        i++;
-        continue;
+        // If we're still in request but line doesn't look like a header, it's body content
+        // Headers must have "Key: Value" format
+        const looksLikeHeader = line.match(/^[A-Za-z][\w-]*:\s*.+$/);
+        if (!looksLikeHeader) {
+          inBody = true;
+          requestBody += lines[i] + '\n';  // Use original line, not trimmed
+          i++;
+          continue;
+        }
       }
 
       // Add to body
@@ -228,6 +240,19 @@ export class ParserService {
     let braceCount = 0;
     let inScript = false;
     let linesConsumed = 0;
+    const firstLine = lines[startIndex].trim();
+
+    // Verify this is actually a script block:
+    // Must be < or > followed by { on same line, OR standalone < or > with { on next line
+    const hasBraceOnFirstLine = firstLine.match(/^[<>]\s*\{/);
+    const isStandaloneMarker = firstLine === '<' || firstLine === '>';
+    const nextLine = startIndex + 1 < lines.length ? lines[startIndex + 1].trim() : '';
+    const nextLineStartsWithBrace = nextLine.startsWith('{');
+
+    if (!hasBraceOnFirstLine && !(isStandaloneMarker && nextLineStartsWithBrace)) {
+      // Not a valid script block (probably XML or other content)
+      return { script: '', linesConsumed: 0 };
+    }
 
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i];
