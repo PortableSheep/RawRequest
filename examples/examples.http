@@ -127,6 +127,7 @@ OPTIONS https://httpbin.org/get
 # Chain icon (🔗) appears in the gutter for dependent requests
 
 ### Login - Sets authentication token
+# If the assertion fails, the chain will stop and dependent requests won't run
 @name login
 POST https://httpbin.org/post
 Content-Type: application/json
@@ -143,6 +144,12 @@ Content-Type: application/json
 }
 
 > {
+  // Assertions in chained requests - if these fail, the chain stops!
+  assert(response.status === 200, 'Login failed: expected status 200');
+  
+  const contentType = response.headers['content-type'] || '';
+  assert(contentType.includes('application/json'), 'Expected JSON response');
+  
   // Post-request script: runs after the request
   const fakeToken = 'Bearer jwt-token-' + Math.random().toString(36).substr(2, 9);
   setVar('token', fakeToken);
@@ -155,6 +162,7 @@ Content-Type: application/json
 ###
 
 ### Get User Profile - Depends on login
+# This request only runs if login succeeds
 @name getUserProfile
 @depends login
 GET https://httpbin.org/get
@@ -162,6 +170,9 @@ Authorization: {{token}}
 Accept: application/json
 
 > {
+  // Assert before processing - stops chain if profile fetch failed
+  assert(response.status === 200, 'Failed to fetch user profile');
+  
   // Extract data from response
   console.log('User profile retrieved for:', getVar('userId'));
   setVar('userEmail', 'user@example.com');
@@ -227,20 +238,26 @@ GET https://httpbin.org/delay/1
 ###############################################################################
 # 6. ASSERTIONS
 ###############################################################################
-# Validate response status, headers, and body
+# Validate response status, headers, and body using assert() in post-scripts
 
 ### Request with assertions
+# Use the assert() function in post-request scripts to validate responses
 @name assertionDemo
 GET https://httpbin.org/get
 
-### Assert
-status == 200
-
-### Assert
-headers.Content-Type contains application/json
-
-### Assert
-response.json.url == "https://httpbin.org/get"
+> {
+  // Assert status code
+  assert(response.status === 200, 'Expected status 200');
+  
+  // Assert header value
+  const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+  assert(contentType.includes('application/json'), 'Expected JSON content type');
+  
+  // Assert response body content
+  assert(response.json.url === 'https://httpbin.org/get', 'Expected URL in response');
+  
+  console.log('✓ All assertions passed!');
+}
 
 ###
 
@@ -636,23 +653,30 @@ GET https://httpbin.org/delay/2
 ###
 
 ###############################################################################
-# 17. DYNAMIC JAVASCRIPT EXPRESSIONS IN VARIABLES
+# 17. DYNAMIC VALUES VIA PRE-SCRIPTS
 ###############################################################################
-# You can use JavaScript expressions directly in variable interpolation
+# Variable interpolation only supports simple {{key}} replacement.
+# For dynamic values like timestamps or random IDs, use a pre-script.
 
-### Dynamic timestamp in request
+### Dynamic timestamp in request (using pre-script)
 @name dynamicData
 POST https://httpbin.org/post
 Content-Type: application/json
 
 {
-  "timestamp": "{{new Date().toISOString()}}",
-  "randomId": "{{Math.random().toString(36).substr(2, 9)}}",
-  "unixTime": "{{Date.now()}}",
-  "uuid": "{{crypto.randomUUID()}}"
+  "timestamp": "{{timestamp}}",
+  "randomId": "{{randomId}}",
+  "unixTime": "{{unixTime}}",
+  "uuid": "{{uuid}}"
 }
 
-###
+< {
+  // Generate dynamic values in pre-script
+  setVar('timestamp', new Date().toISOString());
+  setVar('randomId', Math.random().toString(36).substr(2, 9));
+  setVar('unixTime', Date.now().toString());
+  setVar('uuid', crypto.randomUUID());
+}
 
 ###############################################################################
 # 18. CONDITIONAL LOGIC IN SCRIPTS
@@ -881,10 +905,10 @@ Content-Type: application/json
   console.log('Session:', getVar('checkoutSessionId'));
   console.log('Transaction:', getVar('transactionId'));
   console.log('Amount:', '$' + getVar('finalTotal'));
+  
+  // Validate the checkout succeeded
+  assert(response.status === 200, 'Email confirmation should succeed');
 }
-
-### Assert
-status == 200
 
 ###
 
@@ -978,16 +1002,15 @@ GET https://httpbin.org/status/503
 @name validationTest
 GET https://httpbin.org/json
 
-### Assert
-status == 200
-
-### Assert
-headers.Content-Type contains application/json
-
-### Assert
-response.json != null
-
 > {
+  // Assert status and content type
+  assert(response.status === 200, 'Expected status 200');
+  
+  const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
+  assert(contentType.includes('application/json'), 'Expected JSON content type');
+  
+  assert(response.json != null, 'Expected JSON response body');
+
   // Custom validation logic
   const data = response.json;
   const errors = [];
@@ -1003,6 +1026,8 @@ response.json != null
   if (errors.length > 0) {
     console.error('Validation errors:', errors);
     setVar('validationPassed', false);
+    // Fail the assertion with details
+    assert(false, 'Validation failed: ' + errors.join(', '));
   } else {
     console.log('✓ All validations passed');
     setVar('validationPassed', true);
@@ -1011,6 +1036,13 @@ response.json != null
 
 ###############################################################################
 # SCRIPT API REFERENCE:
+#
+# Variable Interpolation:
+# - {{variableName}}       → Simple key/value replacement only
+# - {{env.VAR_NAME}}       → System environment variable
+# - {{secret:key}}         → Secret from vault (environment-specific)
+# - NOTE: JavaScript expressions in {{...}} are NOT supported.
+#         Use pre-scripts with setVar() for dynamic values.
 #
 # Helper Functions:
 # - setVar(key, value)     → Set a variable (no pre-definition required)
@@ -1021,7 +1053,7 @@ response.json != null
 # - assert(condition,msg)  → Throw when assertions fail
 # - console.log/warn/error → Log messages to console
 #
-# Response Object (available in post-scripts):
+# Response Object (available in post-scripts only):
 # - response.status        → HTTP status code (number)
 # - response.statusText    → HTTP status text (e.g., "OK")
 # - response.headers       → Response headers object
@@ -1032,4 +1064,7 @@ response.json != null
 # - response.size          → Response body size in bytes
 #
 # Request Object (available in pre and post-scripts):
-###############################################################################
+# - request.method         → HTTP method
+# - request.url            → Request URL
+# - request.headers        → Request headers object
+# - request.body           → Request body

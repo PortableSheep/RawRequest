@@ -201,8 +201,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           // Only recalculate gutter markers when the document actually changes
           lineMarkerChange: (update: ViewUpdate) => update.docChanged
         }),
-        // Disable scroll-past-end
-        EditorView.scrollMargins.of(() => ({ top: 0, bottom: 0 })),
+        // EditorView.scrollMargins.of(() => ({ top: 0, bottom: 0 })),
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
             this.isUpdatingFromInput = true;

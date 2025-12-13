@@ -32,8 +32,21 @@ export class ParserService {
     while (i < lines.length) {
       const line = lines[i].trim();
 
-      // Skip empty lines and comments
-      if (!line || line.startsWith('#') || line.startsWith('//')) {
+      // Skip comments (but NOT empty lines - those are significant for body detection)
+      if (line.startsWith('#') || line.startsWith('//')) {
+        i++;
+        continue;
+      }
+
+      // Handle empty lines - they can mark the start of body content
+      if (!line) {
+        if (inRequest && !inBody) {
+          // Empty line after headers marks start of body section
+          inBody = true;
+        } else if (inRequest && inBody) {
+          // Empty line within body - preserve it
+          requestBody += '\n';
+        }
         i++;
         continue;
       }
@@ -126,7 +139,6 @@ export class ParserService {
             method: methodMatch[1].toUpperCase(),
             url: methodMatch[2],
             headers: {},
-            assertions: [],
             ...pendingMetadata
           };
           pendingMetadata = {}; // Reset pending metadata
@@ -187,25 +199,8 @@ export class ParserService {
         }
       }
 
-      // Check for assertions
-      if (inRequest && line.startsWith('???')) {
-        const assertion = this.parseAssertion(line);
-        if (assertion) {
-          currentRequest!.assertions!.push(assertion);
-        }
-        i++;
-        continue;
-      }
-
-      // Check for body start - empty line transitions to body mode,
-      // or any content that's not a header (no colon pattern)
+      // Check for body start - content that's not a header starts body mode
       if (inRequest && !inBody) {
-        if (line === '') {
-          // Empty line marks start of body section
-          inBody = true;
-          i++;
-          continue;
-        }
         // If we're still in request but line doesn't look like a header, it's body content
         // Headers must have "Key: Value" format
         const looksLikeHeader = line.match(/^[A-Za-z][\w-]*:\s*.+$/);
@@ -219,7 +214,7 @@ export class ParserService {
 
       // Add to body
       if (inRequest && inBody) {
-        requestBody += line + '\n';
+        requestBody += lines[i] + '\n';  // Use original line to preserve indentation
       }
       i++;
     }
@@ -274,19 +269,6 @@ export class ParserService {
     }
 
     return { script: script.trim(), linesConsumed };
-  }
-
-  private parseAssertion(line: string): any {
-    // Basic assertion parsing - can be expanded
-    const match = line.match(/\?\?\?\s*(.+)/);
-    if (match) {
-      return {
-        type: 'status',
-        operator: '==',
-        expected: match[1]
-      };
-    }
-    return null;
   }
 
   private parseLoadConfig(configStr: string): any {

@@ -7,7 +7,6 @@ export interface Request {
   group?: string;
   preScript?: string;
   postScript?: string;
-  assertions?: Assertion[];
   depends?: string;  // Name of request to execute first
   loadTest?: LoadTestConfig;  // Load test configuration
   options?: {
@@ -84,14 +83,6 @@ export interface LoadTestMetrics {
   maxResponseTime: number;
   errorRate: number;
   duration: number;
-}
-
-export interface Assertion {
-  type: 'status' | 'header' | 'body' | 'json';
-  operator: '==' | '!=' | 'contains' | 'not_contains' | 'matches';
-  expected: string;
-  actual?: string;
-  passed?: boolean;
 }
 
 export interface ResponseData {

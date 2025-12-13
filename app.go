@@ -207,7 +207,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 	var currentGroup string
 	var preScript strings.Builder
 	var postScript strings.Builder
-	var assertions []string
 	inPreScript := false
 	inPostScript := false
 
@@ -251,10 +250,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 				if postScript.Len() > 0 {
 					currentRequest["postScript"] = strings.TrimSpace(postScript.String())
 					postScript.Reset()
-				}
-				if len(assertions) > 0 {
-					currentRequest["assertions"] = assertions
-					assertions = nil
 				}
 				requests = append(requests, currentRequest)
 			}
@@ -307,13 +302,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 			continue
 		}
 
-		// Handle assertions
-		if strings.HasPrefix(trimmed, "### Assert") || strings.HasPrefix(trimmed, "### @assert") {
-			assertion := strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(trimmed, "### Assert"), "### @assert"))
-			assertions = append(assertions, assertion)
-			continue
-		}
-
 		if currentRequest == nil {
 			currentRequest = make(map[string]interface{})
 		}
@@ -360,9 +348,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 		}
 		if postScript.Len() > 0 {
 			currentRequest["postScript"] = strings.TrimSpace(postScript.String())
-		}
-		if len(assertions) > 0 {
-			currentRequest["assertions"] = assertions
 		}
 		requests = append(requests, currentRequest)
 	}
@@ -936,44 +921,6 @@ func buildScriptSource(ctx *scriptExecutionContext) string {
 		}
 	}
 	return stage
-}
-
-// executeAssertions executes assertion checks
-func (a *App) executeAssertions(assertions []string, responseData map[string]interface{}) {
-	for _, assertion := range assertions {
-		// Parse assertion like "status == 200" or "response contains 'success'"
-		if strings.Contains(assertion, "==") {
-			parts := strings.SplitN(assertion, "==", 2)
-			if len(parts) == 2 {
-				left := strings.TrimSpace(parts[0])
-				right := strings.TrimSpace(parts[1])
-
-				if left == "status" {
-					if status, ok := responseData["status"].(int); ok {
-						if expected, err := strconv.Atoi(right); err == nil {
-							if status != expected {
-								fmt.Printf("Assertion failed: expected status %d, got %d\n", expected, status)
-							}
-						}
-					}
-				}
-			}
-		} else if strings.Contains(assertion, "contains") {
-			parts := strings.SplitN(assertion, "contains", 2)
-			if len(parts) == 2 {
-				field := strings.TrimSpace(parts[0])
-				value := strings.Trim(strings.TrimSpace(parts[1]), "'\"")
-
-				if field == "response" {
-					if body, ok := responseData["body"].(string); ok {
-						if !strings.Contains(body, value) {
-							fmt.Printf("Assertion failed: response does not contain '%s'\n", value)
-						}
-					}
-				}
-			}
-		}
-	}
 }
 
 // ParseResponseForVariables parses JSON response and sets variables

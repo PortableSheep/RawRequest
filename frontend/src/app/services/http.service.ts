@@ -343,6 +343,10 @@ export class HttpService {
         debug: (...args: any[]) => emitLog('debug', args)
       };
 
+      // Extract response and request from context for direct access in scripts
+      const response = scriptContext.response || {};
+      const request = scriptContext.request || {};
+
       const func = new Function(
         'context',
         'setVar',
@@ -352,6 +356,8 @@ export class HttpService {
         'updateRequest',
         'assert',
         'delay',
+        'response',
+        'request',
         cleanScript
       );
 
@@ -363,7 +369,9 @@ export class HttpService {
         setHeader,
         updateRequest,
         assertFn,
-        delayFn
+        delayFn,
+        response,
+        request
       );
 
       if (result instanceof Promise) {
@@ -731,8 +739,7 @@ export class HttpService {
       headers,
       body,
       preScript: req.preScript,
-      postScript: req.postScript,
-      assertions: req.assertions
+      postScript: req.postScript
     };
 
     const preview: RequestPreview = {
