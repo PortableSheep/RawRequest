@@ -72,11 +72,6 @@
                                     <span class="text-zinc-400 font-mono text-[11px]" [title]="'Total: ' + entry.response!.responseTime + 'ms'">
                                         {{ entry.response!.responseTime }}ms
                                     </span>
-                                    @if (entry.response!.timing?.timeToFirstByte) {
-                                        <span class="text-zinc-500 font-mono text-[10px]" title="Time to First Byte">
-                                            TTFB {{ entry.response!.timing!.timeToFirstByte }}ms
-                                        </span>
-                                    }
                                     @if (entry.response!.size !== undefined) {
                                         <span class="text-zinc-500 font-mono text-[11px]">
                                             {{ formatSize(entry.response!.size) }}
