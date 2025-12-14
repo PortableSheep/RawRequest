@@ -154,6 +154,9 @@ export class AppComponent implements OnInit, OnDestroy {
     // Check for updates (non-blocking)
     this.checkForUpdates();
 
+    // Check if this is first run and open examples
+    this.checkFirstRun();
+
     this.secretService
       .onMissingSecret()
       .pipe(takeUntil(this.destroy$))
@@ -946,6 +949,25 @@ export class AppComponent implements OnInit, OnDestroy {
     } catch (error) {
       // Silently fail - update check is non-critical
       console.debug('Update check failed:', error);
+    }
+  }
+
+  private async checkFirstRun() {
+    try {
+      console.log('checkFirstRun: Starting first run check');
+      const { GetExamplesForFirstRun } = await import('../../wailsjs/go/main/App');
+      console.log('checkFirstRun: Imported GetExamplesForFirstRun');
+      const [content, filePath, isFirstRun] = await GetExamplesForFirstRun();
+      console.log('checkFirstRun: Called GetExamplesForFirstRun', { isFirstRun, hasContent: !!content, filePath });
+      
+      if (isFirstRun && content) {
+        // Open the examples file
+        const fileName = 'examples.http';
+        this.addFileFromContent(fileName, content, filePath);
+        console.log('First run detected - opened examples file');
+      }
+    } catch (error) {
+      console.warn('Failed to check for first run:', error);
     }
   }
 

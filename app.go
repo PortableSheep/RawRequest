@@ -94,6 +94,11 @@ func (a *App) startup(ctx context.Context) {
 func (a *App) onDomReady(ctx context.Context) {
 	// Restore window state after DOM is ready (ensures window functions work)
 	a.RestoreWindowState()
+
+	// Check if this is the first run - the frontend will handle opening examples
+	if a.IsFirstRun() {
+		fmt.Println("First run detected")
+	}
 }
 
 // onBeforeClose is called when the window is about to close
@@ -960,6 +965,58 @@ func (a *App) ParseResponseForVariables(responseBody string) {
 // 		json.Unmarshal(data, &a.variables)
 // 	}
 // }
+
+// IsFirstRun checks if this is the first time the app has been run
+func (a *App) IsFirstRun() bool {
+	appDir := a.getAppDir()
+	flagFile := filepath.Join(appDir, ".first-run-completed")
+	_, err := os.Stat(flagFile)
+	return os.IsNotExist(err)
+}
+
+// MarkFirstRunComplete marks the first run as completed
+func (a *App) MarkFirstRunComplete() error {
+	appDir := a.getAppDir()
+	fmt.Printf("MarkFirstRunComplete: Creating directory %s\n", appDir)
+	if err := os.MkdirAll(appDir, 0755); err != nil {
+		fmt.Printf("MarkFirstRunComplete: Error creating directory: %v\n", err)
+		return err
+	}
+	flagFile := filepath.Join(appDir, ".first-run-completed")
+	fmt.Printf("MarkFirstRunComplete: Writing flag file %s\n", flagFile)
+	err := os.WriteFile(flagFile, []byte("completed"), 0644)
+	if err != nil {
+		fmt.Printf("MarkFirstRunComplete: Error writing file: %v\n", err)
+	}
+	return err
+}
+
+// GetExamplesForFirstRun returns examples content if this is first run
+func (a *App) GetExamplesForFirstRun() (string, string, bool) {
+	fmt.Println("GetExamplesForFirstRun: Checking if first run")
+	if !a.IsFirstRun() {
+		fmt.Println("GetExamplesForFirstRun: Not first run")
+		return "", "", false
+	}
+
+	fmt.Println("GetExamplesForFirstRun: Is first run, reading embedded file")
+	// Read the embedded examples file
+	content, err := examplesFS.ReadFile("examples/examples.http")
+	if err != nil {
+		fmt.Printf("GetExamplesForFirstRun: Error reading embedded file: %v\n", err)
+		return "", "", false
+	}
+
+	fmt.Printf("GetExamplesForFirstRun: Successfully read %d bytes\n", len(content))
+
+	return string(content), "examples.http", true
+}
+
+// getAppDir returns the application data directory
+func (a *App) getAppDir() string {
+	homeDir, _ := os.UserHomeDir()
+	return filepath.Join(homeDir, "Library", "Application Support", "RawRequest")
+}
 
 // SetBasicAuth sets basic auth header
 // func (a *App) SetBasicAuth(username, password string) {

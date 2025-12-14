@@ -46,6 +46,10 @@ export function GetEnvironments() {
   return window['go']['main']['App']['GetEnvironments']();
 }
 
+export function GetExamplesForFirstRun() {
+  return window['go']['main']['App']['GetExamplesForFirstRun']();
+}
+
 export function GetScriptLogs() {
   return window['go']['main']['App']['GetScriptLogs']();
 }
@@ -66,6 +70,10 @@ export function GetVaultInfo() {
   return window['go']['main']['App']['GetVaultInfo']();
 }
 
+export function IsFirstRun() {
+  return window['go']['main']['App']['IsFirstRun']();
+}
+
 export function ListSecrets() {
   return window['go']['main']['App']['ListSecrets']();
 }
@@ -76,6 +84,10 @@ export function LoadFileHistory(arg1) {
 
 export function LoadWindowState() {
   return window['go']['main']['App']['LoadWindowState']();
+}
+
+export function MarkFirstRunComplete() {
+  return window['go']['main']['App']['MarkFirstRunComplete']();
 }
 
 export function OpenFileDialog() {

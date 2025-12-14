@@ -24,6 +24,8 @@ export function GetEnvVariables(arg1:string):Promise<Record<string, string>>;
 
 export function GetEnvironments():Promise<Record<string, Record<string, string>>>;
 
+export function GetExamplesForFirstRun():Promise<string>;
+
 export function GetScriptLogs():Promise<Array<main.ScriptLogEntry>>;
 
 export function GetSecretValue(arg1:string,arg2:string):Promise<string>;
@@ -34,11 +36,15 @@ export function GetVariables():Promise<Record<string, string>>;
 
 export function GetVaultInfo():Promise<main.VaultInfo>;
 
+export function IsFirstRun():Promise<boolean>;
+
 export function ListSecrets():Promise<Record<string, Array<string>>>;
 
 export function LoadFileHistory(arg1:string):Promise<string>;
 
 export function LoadWindowState():Promise<main.WindowState>;
+
+export function MarkFirstRunComplete():Promise<void>;
 
 export function OpenFileDialog():Promise<Array<string>>;
 

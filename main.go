@@ -11,6 +11,9 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed examples/*
+var examplesFS embed.FS
+
 func main() {
 	// Create an instance of the app structure
 	app := NewApp()
