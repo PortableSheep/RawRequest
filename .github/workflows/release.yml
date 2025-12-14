@@ -185,10 +185,10 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Commit updated formula
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/rawrequest.rb
-          git diff --staged --quiet || git commit -m "Update Homebrew formula for v${{ steps.version.outputs.version }}"
-          git push origin HEAD:main || echo "Formula update skipped (no changes or push failed)"
+      # - name: Commit updated formula
+      #   run: |
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #     git add Formula/rawrequest.rb
+      #     git diff --staged --quiet || git commit -m "Update Homebrew formula for v${{ steps.version.outputs.version }}"
+      #     git push origin HEAD:main || echo "Formula update skipped (no changes or push failed)"
