@@ -20,10 +20,10 @@ class Rawrequest < Formula
   if OS.mac?
     if Hardware::CPU.arm?
       url "https://github.com/portablesheep/RawRequest/releases/download/v#{version}/RawRequest-v#{version}-macos-universal.tar.gz"
-      sha256 "REPLACE_WITH_ACTUAL_SHA256"
+      sha256 "7336f34292ba7739c25e09304dee7ef9a444df39e56a9caabc9d2a882527271b"
     else
       url "https://github.com/portablesheep/RawRequest/releases/download/v#{version}/RawRequest-v#{version}-macos-universal.tar.gz"
-      sha256 "REPLACE_WITH_ACTUAL_SHA256"
+      sha256 "7336f34292ba7739c25e09304dee7ef9a444df39e56a9caabc9d2a882527271b"
     end
   end
 
