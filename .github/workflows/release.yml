@@ -168,9 +168,9 @@ jobs:
           if [ -f "$TARBALL" ]; then
             SHA256=$(sha256sum "$TARBALL" | cut -d' ' -f1)
             echo "SHA256: $SHA256"
-            sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/rawrequest.rb
-            sed -i "s/REPLACE_WITH_ACTUAL_SHA256/${SHA256}/g" Casks/rawrequest.rb
-            sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${SHA256}\"|g" Casks/rawrequest.rb
+            # sed -i "s/version \".*\"/version \"${VERSION}\"/" Casks/rawrequest.rb
+            # sed -i "s/REPLACE_WITH_ACTUAL_SHA256/${SHA256}/g" Casks/rawrequest.rb
+            # sed -i "s|sha256 \"[a-f0-9]\{64\}\"|sha256 \"${SHA256}\"|g" Casks/rawrequest.rb
           fi
       
       - name: Create Release
