@@ -183,20 +183,20 @@ jobs:
           files: |
             artifacts/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
 
       - name: Update Homebrew tap casks
         if: ${{ success() }}
         env:
           VERSION: ${{ steps.version.outputs.version }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
           TAP_REPO: portablesheep/homebrew-rawrequest
           CASKS_PATH: Casks/rawrequest.rb
         run: |
           set -e
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git clone --depth 1 https://x-access-token:${GITHUB_TOKEN}@github.com/${TAP_REPO}.git taprepo
+          git clone --depth 1 https://x-access-token:${TOKEN}@github.com/${TAP_REPO}.git taprepo
           cd taprepo
           # Update version and sha256 in the formula
           sed -i "s/version \".*\"/version \"${VERSION}\"/" ${CASKS_PATH}
