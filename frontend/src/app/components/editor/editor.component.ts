@@ -1,7 +1,7 @@
 import { Component, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect } from '@angular/core';
 
 import { basicSetup, EditorView } from 'codemirror';
-import { EditorState, RangeSetBuilder, Compartment, StateField, StateEffect } from '@codemirror/state';
+import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, GutterMarker, gutter, BlockInfo, keymap, hoverTooltip, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
@@ -9,23 +9,8 @@ import { autocompletion, CompletionContext, CompletionResult, Completion } from 
 const METHOD_REGEX = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT)\s+/i;
 const DEPENDS_REGEX = /^@depends\s+/i;
 const LOAD_REGEX = /^@load\s+/i;
-const TIMEOUT_REGEX = /^@timeout\s+/i;
 const ANNOTATION_REGEX = /^@(name|depends|load|timeout)\s+/i;
 const SERPARATOR_REGEX = /^\s*###\s+/;
-
-// Script block markers
-const SCRIPT_START_REGEX = /^\s*[<>]\s*\{?\s*$/;
-const SCRIPT_END_REGEX = /^\s*\}\s*$/;
-
-// JavaScript syntax patterns for script highlighting
-const JS_KEYWORDS = /\b(const|let|var|function|return|if|else|for|while|do|switch|case|break|continue|try|catch|finally|throw|new|typeof|instanceof|in|of|async|await|class|extends|import|export|default|from|yield)\b/g;
-const JS_BUILTINS = /\b(console|Math|Date|JSON|Object|Array|String|Number|Boolean|Promise|Error|RegExp|Map|Set|setTimeout|setInterval|crypto)\b/g;
-const JS_SCRIPT_HELPERS = /\b(setVar|getVar|setHeader|updateRequest|assert|delay|response|request)\b/g;
-const JS_STRINGS = /'[^']*'|"[^"]*"|`[^`]*`/g;
-const JS_NUMBERS = /\b\d+\.?\d*\b/g;
-const JS_COMMENTS = /\/\/.*$|\/\*[\s\S]*?\*\//gm;
-const JS_PROPERTIES = /\.([a-zA-Z_$][a-zA-Z0-9_$]*)/g;
-const JS_FUNCTIONS = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(/g;
 
 // Common HTTP headers for autocomplete
 const HTTP_HEADERS = [
@@ -36,7 +21,6 @@ const HTTP_HEADERS = [
   'X-API-Key', 'X-Auth-Token', 'X-Correlation-ID', 'X-Request-ID'
 ];
 
-// Common Content-Type values
 const CONTENT_TYPES = [
   'application/json',
   'application/xml',
@@ -47,10 +31,7 @@ const CONTENT_TYPES = [
   'text/xml'
 ];
 
-// HTTP methods
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
-
-// Annotations
 const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'];
 
 class PlayGutterMarker extends GutterMarker {
@@ -167,6 +148,98 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         this.createRequestHighlighter(),
         this.autocompleteCompartment.of(this.createAutocomplete()),
         this.createVariableHoverTooltip(),
+        keymap.of([
+          {
+            key: 'Tab',
+            run: ({ state, dispatch }) => {
+              const selection = state.selection.main;
+              const doc = state.doc;
+              
+              if (!selection.empty) {
+                const startLine = doc.lineAt(selection.from).number;
+                const endLine = doc.lineAt(selection.to).number;
+                
+                const changes = [];
+                for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+                  const line = doc.line(lineNum);
+                  changes.push({
+                    from: line.from,
+                    insert: '\t'
+                  });
+                }
+                
+                dispatch(state.update({
+                  changes,
+                  selection: {
+                    anchor: selection.from + 1,
+                    head: selection.to + (endLine - startLine + 1)
+                  }
+                }));
+                return true;
+              }
+
+              dispatch(state.update(state.replaceSelection('\t')));
+              return true;
+            }
+          }, {
+            key: 'Shift-Tab',
+            run: ({ state, dispatch }) => {
+              const selection = state.selection.main;
+              const doc = state.doc;
+              const startLine = doc.lineAt(selection.from).number;
+              const endLine = doc.lineAt(selection.to).number;
+              const linesToProcess = selection.empty ? [startLine] : 
+                Array.from({ length: endLine - startLine + 1 }, (_, i) => startLine + i);
+              
+              const changes = [];
+              let totalRemoved = 0;
+              
+              for (const lineNum of linesToProcess) {
+                const line = doc.line(lineNum);
+                const lineText = line.text;
+
+                let indentToRemove = '';
+                if (lineText.startsWith('\t')) {
+                  indentToRemove = '\t';
+                } else if (lineText.startsWith('  ')) {
+                  indentToRemove = '  ';
+                } else if (lineText.startsWith('    ')) {
+                  indentToRemove = '    ';
+                }
+                
+                if (indentToRemove) {
+                  changes.push({
+                    from: line.from,
+                    to: line.from + indentToRemove.length,
+                    insert: ''
+                  });
+                  totalRemoved += indentToRemove.length;
+                }
+              }
+              
+              if (changes.length > 0) {
+                let newAnchor = selection.from;
+                let newHead = selection.to;
+                
+                if (selection.empty) {
+                  newAnchor = Math.max(0, selection.from - totalRemoved / linesToProcess.length);
+                  newHead = newAnchor;
+                } else {
+                  newAnchor = Math.max(0, selection.from - (selection.from === doc.line(startLine).from ? totalRemoved / linesToProcess.length : 0));
+                  newHead = Math.max(0, selection.to - totalRemoved);
+                }
+                
+                dispatch(state.update({
+                  changes,
+                  selection: { anchor: newAnchor, head: newHead }
+                }));
+                return true;
+              }
+              
+              return true;
+            }
+          }
+        ]),
         gutter({
           class: 'cm-gutter-play',
           lineMarker: (view: EditorView, line: BlockInfo) => {
@@ -198,14 +271,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
             return null;
           },
-          // Only recalculate gutter markers when the document actually changes
+          
           lineMarkerChange: (update: ViewUpdate) => update.docChanged
         }),
-        // Prevent scroll jumping and unwanted selection caused by stale cursor state
+        
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
-            // Only intervene if this is a plain click (no modifier keys)
-            // Modifier keys indicate intentional selection behavior
             if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
               const scrollTop = view.scrollDOM.scrollTop;
               const hadSelection = !view.state.selection.main.empty;

@@ -21,7 +21,6 @@ export class ParserService {
     const groups: string[] = [];
 
     let currentRequest: Partial<Request> | null = null;
-    let currentSection = '';
     let inRequest = false;
     let requestBody = '';
     let inBody = false;

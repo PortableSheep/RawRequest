@@ -59,6 +59,11 @@ export class HttpService {
     let bodyPlaceholder: string | undefined;
 
     try {
+      // Execute pre-script if present
+      if (request.preScript) {
+        await this.executeScript(request.preScript, { request, variables }, 'pre');
+      }
+      
       // Replace secrets + variables in URL, headers, and body
       processedUrl = await this.hydrateText(request.url, variables, envName);
       processedHeaders = await this.hydrateHeaders(request.headers, variables, envName);
@@ -66,11 +71,6 @@ export class HttpService {
         processedBody = await this.hydrateText(String(request.body), variables, envName);
       } else if (request.body instanceof FormData) {
         bodyPlaceholder = '[FormData]';
-      }
-
-      // Execute pre-script if present
-      if (request.preScript) {
-        await this.executeScript(request.preScript, { request, variables }, 'pre');
       }
 
       // Prepare request options

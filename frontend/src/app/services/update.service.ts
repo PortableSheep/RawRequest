@@ -13,7 +13,7 @@ export interface UpdateInfo {
 
 const DISMISSED_VERSION_KEY = 'rawrequest_dismissed_update_version';
 const LAST_CHECK_KEY = 'rawrequest_last_update_check';
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CHECK_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
 
 @Injectable({
   providedIn: 'root'
@@ -38,20 +38,16 @@ export class UpdateService {
     }
   }
 
-  async checkForUpdates(force = false): Promise<UpdateInfo | null> {
-    // Check if we should skip based on last check time
-    if (!force) {
-      const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
-      if (lastCheck) {
-        const lastCheckTime = parseInt(lastCheck, 10);
-        if (Date.now() - lastCheckTime < CHECK_INTERVAL_MS) {
-          // Already checked recently, return cached info if available
-          const cached = this._updateInfo();
-          if (cached) return cached;
-        }
+  async checkForUpdates(): Promise<UpdateInfo | null> {
+    const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
+    if (lastCheck) {
+      const lastCheckTime = parseInt(lastCheck, 10);
+      if (Date.now() - lastCheckTime < CHECK_INTERVAL_MS) {
+        const cached = this._updateInfo();
+        if (cached) return cached;
       }
     }
-
+  
     this._isChecking.set(true);
     this._error.set(null);
 
@@ -60,7 +56,6 @@ export class UpdateService {
       this._updateInfo.set(info);
       localStorage.setItem(LAST_CHECK_KEY, Date.now().toString());
 
-      // Check if this version was dismissed
       if (info.available) {
         const dismissedVersion = localStorage.getItem(DISMISSED_VERSION_KEY);
         if (dismissedVersion !== info.latestVersion) {
@@ -99,7 +94,6 @@ export class UpdateService {
   }
 
   remindLater(): void {
-    // Just hide the notification without dismissing the version
     this._showNotification.set(false);
   }
 
