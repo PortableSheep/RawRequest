@@ -811,10 +811,11 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo++) {
         const next = state.doc.line(lineNo);
         if (isSeparatorLine(next.text)) {
-          if (next.from <= start) {
+          const end = next.from - 1;
+          if (end <= start) {
             return null;
           }
-          return { from: start, to: next.from };
+          return { from: start, to: end };
         }
       }
       if (start >= state.doc.length) return null;
