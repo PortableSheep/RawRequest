@@ -1,0 +1,33 @@
+package main
+
+// ExamplesForFirstRunResponse is the payload returned to the frontend when checking
+// if this is the first run and the embedded examples should be opened.
+type ExamplesForFirstRunResponse struct {
+	Content    string `json:"content"`
+	FilePath   string `json:"filePath"`
+	IsFirstRun bool   `json:"isFirstRun"`
+}
+
+// GetExamplesForFirstRun returns examples content if this is first run.
+func (a *App) GetExamplesForFirstRun() (*ExamplesForFirstRunResponse, error) {
+	if !a.IsFirstRun() {
+		return &ExamplesForFirstRunResponse{Content: "", FilePath: "", IsFirstRun: false}, nil
+	}
+
+	content, err := examplesFS.ReadFile("examples/examples.http")
+	if err != nil {
+		return nil, err
+	}
+
+	return &ExamplesForFirstRunResponse{Content: string(content), FilePath: "examples.http", IsFirstRun: true}, nil
+}
+
+// GetExamplesFile returns the embedded examples file content for reference.
+// This is always available (not limited to first run).
+func (a *App) GetExamplesFile() (*ExamplesForFirstRunResponse, error) {
+	content, err := examplesFS.ReadFile("examples/examples.http")
+	if err != nil {
+		return nil, err
+	}
+	return &ExamplesForFirstRunResponse{Content: string(content), FilePath: "examples.http", IsFirstRun: false}, nil
+}

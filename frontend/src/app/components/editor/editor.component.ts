@@ -2,15 +2,32 @@ import { Component, ElementRef, ViewChild, AfterViewInit, input, output, OnDestr
 
 import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
-import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, GutterMarker, gutter, BlockInfo, keymap, hoverTooltip, Tooltip } from '@codemirror/view';
+import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, hoverTooltip, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
+import { foldGutter, foldKeymap, foldService } from '@codemirror/language';
+import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
+import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 
-const METHOD_REGEX = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT)\s+/i;
-const DEPENDS_REGEX = /^@depends\s+/i;
-const LOAD_REGEX = /^@load\s+/i;
-const ANNOTATION_REGEX = /^@(name|depends|load|timeout)\s+/i;
-const SERPARATOR_REGEX = /^\s*###\s+/;
+import { createEditorKeymap } from './editor-keymap';
+import { createRequestGutter } from './editor-request-gutter';
+
+import type { SecretIndex } from '../../services/secret.service';
+import {
+  isMethodLine,
+  extractPlaceholders,
+  extractDependsTarget,
+  extractSetVarKeys,
+  METHOD_LINE_REGEX,
+  DEPENDS_LINE_REGEX,
+  LOAD_LINE_REGEX,
+  ANNOTATION_LINE_REGEX,
+  SEPARATOR_PREFIX_REGEX,
+  ENV_PLACEHOLDER_REGEX,
+  REQUEST_REF_PLACEHOLDER_REGEX,
+  SECRET_PLACEHOLDER_REGEX,
+  isSeparatorLine
+} from '../../utils/http-file-analysis';
 
 // Common HTTP headers for autocomplete
 const HTTP_HEADERS = [
@@ -34,46 +51,6 @@ const CONTENT_TYPES = [
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'];
 
-class PlayGutterMarker extends GutterMarker {
-  constructor(private onClick: (requestIndex: number) => void, private requestIndex: number) {
-    super();
-  }
-
-  override toDOM() {
-    const button = document.createElement('button');
-    button.innerHTML = '▶';
-    button.className = 'gutter-play-btn';
-    button.dataset['requestIndex'] = this.requestIndex.toString();
-    button.title = 'Send request';
-    button.onclick = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      this.onClick(this.requestIndex);
-    };
-    return button;
-  }
-}
-
-class ChainGutterMarker extends GutterMarker {
-  override toDOM() {
-    const icon = document.createElement('span');
-    icon.innerHTML = '🔗';
-    icon.className = 'gutter-chain-icon';
-    icon.title = 'Chained request';
-    return icon;
-  }
-}
-
-class LightningGutterMarker extends GutterMarker {
-  override toDOM() {
-    const icon = document.createElement('span');
-    icon.innerHTML = '⚡️';
-    icon.className = 'gutter-lightning-icon';
-    icon.title = 'Load test';
-    return icon;
-  }
-}
-
 @Component({
   selector: 'app-editor',
   standalone: true,
@@ -89,6 +66,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   variables = input<{ [key: string]: string }>({});
   environments = input<{ [env: string]: { [key: string]: string } }>({});
   currentEnv = input<string>('');
+  secrets = input<SecretIndex>({});
   requestNames = input<string[]>([]);
   executingRequestIndex = input<number | null>(null);
   isBusy = input<boolean>(false);
@@ -98,6 +76,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private editorView!: EditorView;
   private isUpdatingFromInput = false;
   private autocompleteCompartment = new Compartment();
+  private lintCompartment = new Compartment();
 
   constructor() {
     effect(() => {
@@ -116,14 +95,20 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       this.updateExecutingIndicator(activeIndex, disableAll);
     });
 
-    // Update autocomplete when variables/environments change
+    // Update autocomplete + lint when relevant inputs change
     effect(() => {
       const vars = this.variables();
       const envs = this.environments();
       const names = this.requestNames();
+      const reqs = this.requests();
+      const env = this.currentEnv();
+      const secrets = this.secrets();
       if (this.editorView) {
         this.editorView.dispatch({
-          effects: this.autocompleteCompartment.reconfigure(this.createAutocomplete())
+          effects: [
+            this.autocompleteCompartment.reconfigure(this.createAutocomplete()),
+            this.lintCompartment.reconfigure(this.createLintExtensions())
+          ]
         });
       }
     });
@@ -145,135 +130,18 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       extensions: [
         basicSetup,
         oneDark,
+        foldGutter(),
+        this.createRequestFolding(),
+        highlightSelectionMatches(),
         this.createRequestHighlighter(),
         this.autocompleteCompartment.of(this.createAutocomplete()),
         this.createVariableHoverTooltip(),
-        keymap.of([
-          {
-            key: 'Tab',
-            run: ({ state, dispatch }) => {
-              const selection = state.selection.main;
-              const doc = state.doc;
-              
-              if (!selection.empty) {
-                const startLine = doc.lineAt(selection.from).number;
-                const endLine = doc.lineAt(selection.to).number;
-                
-                const changes = [];
-                for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
-                  const line = doc.line(lineNum);
-                  changes.push({
-                    from: line.from,
-                    insert: '\t'
-                  });
-                }
-                
-                dispatch(state.update({
-                  changes,
-                  selection: {
-                    anchor: selection.from + 1,
-                    head: selection.to + (endLine - startLine + 1)
-                  }
-                }));
-                return true;
-              }
-
-              dispatch(state.update(state.replaceSelection('\t')));
-              return true;
-            }
-          }, {
-            key: 'Shift-Tab',
-            run: ({ state, dispatch }) => {
-              const selection = state.selection.main;
-              const doc = state.doc;
-              const startLine = doc.lineAt(selection.from).number;
-              const endLine = doc.lineAt(selection.to).number;
-              const linesToProcess = selection.empty ? [startLine] : 
-                Array.from({ length: endLine - startLine + 1 }, (_, i) => startLine + i);
-              
-              const changes = [];
-              let totalRemoved = 0;
-              
-              for (const lineNum of linesToProcess) {
-                const line = doc.line(lineNum);
-                const lineText = line.text;
-
-                let indentToRemove = '';
-                if (lineText.startsWith('\t')) {
-                  indentToRemove = '\t';
-                } else if (lineText.startsWith('  ')) {
-                  indentToRemove = '  ';
-                } else if (lineText.startsWith('    ')) {
-                  indentToRemove = '    ';
-                }
-                
-                if (indentToRemove) {
-                  changes.push({
-                    from: line.from,
-                    to: line.from + indentToRemove.length,
-                    insert: ''
-                  });
-                  totalRemoved += indentToRemove.length;
-                }
-              }
-              
-              if (changes.length > 0) {
-                let newAnchor = selection.from;
-                let newHead = selection.to;
-                
-                if (selection.empty) {
-                  newAnchor = Math.max(0, selection.from - totalRemoved / linesToProcess.length);
-                  newHead = newAnchor;
-                } else {
-                  newAnchor = Math.max(0, selection.from - (selection.from === doc.line(startLine).from ? totalRemoved / linesToProcess.length : 0));
-                  newHead = Math.max(0, selection.to - totalRemoved);
-                }
-                
-                dispatch(state.update({
-                  changes,
-                  selection: { anchor: newAnchor, head: newHead }
-                }));
-                return true;
-              }
-              
-              return true;
-            }
-          }
-        ]),
-        gutter({
-          class: 'cm-gutter-play',
-          lineMarker: (view: EditorView, line: BlockInfo) => {
-            const lineNo = view.state.doc.lineAt(line.from).number;
-            const lineContent = view.state.doc.line(lineNo).text;
-            const trimmedLine = lineContent.trimStart();
-
-            const isRequestLine = (value: string) => METHOD_REGEX.test(value.trimStart());
-
-            // Show play button on lines that define a request
-            if (isRequestLine(lineContent)) {
-              let requestIndex = 0;
-              for (let i = 1; i < lineNo; i++) {
-                const prevLine = view.state.doc.line(i).text;
-                if (isRequestLine(prevLine)) {
-                  requestIndex++;
-                }
-              }
-              return new PlayGutterMarker((index) => this.requestExecute.emit(index), requestIndex);
-            }
-
-            if (DEPENDS_REGEX.test(trimmedLine)) {
-              return new ChainGutterMarker();
-            }
-
-            if (LOAD_REGEX.test(trimmedLine)) {
-              return new LightningGutterMarker();
-            }
-
-            return null;
-          },
-          
-          lineMarkerChange: (update: ViewUpdate) => update.docChanged
+        this.lintCompartment.of(this.createLintExtensions()),
+        createEditorKeymap({
+          getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos),
+          onExecuteRequest: (index) => this.requestExecute.emit(index)
         }),
+        createRequestGutter((index) => this.requestExecute.emit(index)),
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
@@ -424,7 +292,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight HTTP methods
-          const methodMatch = trimmedText.match(METHOD_REGEX);
+          const methodMatch = trimmedText.match(METHOD_LINE_REGEX);
           if (methodMatch) {
             decorations.push({
               from: line.from + leadingWhitespace,
@@ -444,12 +312,10 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight variables
-          const varRegex = /{{[^}]+}}/g;
-          let varMatch;
-          while ((varMatch = varRegex.exec(text)) !== null) {
+          for (const placeholder of extractPlaceholders(text)) {
             decorations.push({
-              from: line.from + varMatch.index,
-              to: line.from + varMatch.index + varMatch[0].length,
+              from: line.from + placeholder.start,
+              to: line.from + placeholder.end,
               cls: 'cm-variable'
             });
           }
@@ -466,7 +332,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight @name, @depends, @load annotations
-          const annotationMatch = trimmedText.match(ANNOTATION_REGEX);
+          const annotationMatch = trimmedText.match(ANNOTATION_LINE_REGEX);
           if (annotationMatch) {
             decorations.push({
               from: line.from + leadingWhitespace,
@@ -476,7 +342,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight separators
-          if (SERPARATOR_REGEX.test(trimmedText)) {
+          if (SEPARATOR_PREFIX_REGEX.test(trimmedText)) {
             decorations.push({
               from: line.from,
               to: line.to,
@@ -558,6 +424,28 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     const lineText = line.text;
     const cursorPos = context.pos - line.from;
     const textBeforeCursor = lineText.slice(0, cursorPos);
+
+    // Check for secret completion: {{secret:
+    const secretMatch = textBeforeCursor.match(/\{\{\s*secret:([a-zA-Z0-9_\-\.]*)$/);
+    if (secretMatch) {
+      const prefix = secretMatch[1];
+      const from = context.pos - prefix.length;
+      const env = (this.currentEnv() || 'default').trim() || 'default';
+      const snapshot = this.secrets() || {};
+      const keys = new Set<string>([...(snapshot[env] || []), ...(snapshot['default'] || [])]);
+      const options: Completion[] = Array.from(keys)
+        .filter(k => k.toLowerCase().startsWith(prefix.toLowerCase()))
+        .sort((a, b) => a.localeCompare(b))
+        .map(k => ({
+          label: k,
+          type: 'variable',
+          detail: `secret:${env}`,
+          apply: `${k}}}`
+        }));
+
+      if (!options.length) return null;
+      return { from, options, validFor: /^[a-zA-Z0-9_\-\.]*$/ };
+    }
 
     // Check for variable completion: {{
     const variableMatch = textBeforeCursor.match(/\{\{([^}]*)$/);
@@ -754,6 +642,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     const getVariables = () => this.variables();
     const getEnvironments = () => this.environments();
     const getCurrentEnv = () => this.currentEnv();
+    const getSecrets = () => this.secrets();
     
     return hoverTooltip((view, pos) => {
       const line = view.state.doc.lineAt(pos);
@@ -773,6 +662,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           const vars = getVariables();
           const envs = getEnvironments();
           const currentEnvName = getCurrentEnv();
+          const secrets = getSecrets() || {};
           const currentEnvVars = currentEnvName ? envs[currentEnvName] || {} : {};
           
           // Check if it's a regular variable
@@ -841,9 +731,33 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               };
             }
           }
+
+          // Check if it's a secret reference (don't reveal value)
+          const secretMatch = varName.match(/^secret:([a-zA-Z0-9_\-\.]+)$/);
+          if (secretMatch) {
+            const secretKey = secretMatch[1];
+            const env = (currentEnvName || 'default').trim() || 'default';
+            const keys = new Set<string>([...(secrets[env] || []), ...(secrets['default'] || [])]);
+            const exists = keys.has(secretKey);
+            return {
+              pos: start,
+              end: end,
+              above: true,
+              create() {
+                const dom = document.createElement('div');
+                dom.className = 'cm-variable-tooltip' + (exists ? '' : ' cm-variable-undefined');
+                dom.innerHTML = `
+                  <div class="tooltip-header">🔐 Secret</div>
+                  <div class="tooltip-name">${escapeHtml(secretKey)}</div>
+                  <div class="tooltip-hint">${exists ? 'Resolved at runtime from vault' : 'Missing secret in current environment'}</div>
+                `;
+                return { dom };
+              }
+            };
+          }
           
           // Check if it's a request reference
-          const reqMatch = varName.match(/^(request\d+)\.(response\.(body|status|headers).*)/);
+          const reqMatch = varName.match(/^(request\d+)\.(response\.(body|status|headers|json|timing|size).*)/);
           if (reqMatch) {
             return {
               pos: start,
@@ -883,6 +797,250 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       
       return null;
     }, { hoverTime: 300 });
+  }
+
+  private createRequestFolding() {
+    return foldService.of((state, lineStart, _lineEnd) => {
+      const line = state.doc.lineAt(lineStart);
+      const text = line.text;
+      if (!isSeparatorLine(text)) {
+        return null;
+      }
+
+      const start = line.to;
+      for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo++) {
+        const next = state.doc.line(lineNo);
+        if (isSeparatorLine(next.text)) {
+          if (next.from <= start) {
+            return null;
+          }
+          return { from: start, to: next.from };
+        }
+      }
+      if (start >= state.doc.length) return null;
+      return { from: start, to: state.doc.length };
+    });
+  }
+
+  private createLintExtensions() {
+    return [
+      lintGutter(),
+      linter((view) => this.computeDiagnostics(view), { delay: 250 })
+    ];
+  }
+
+  private computeDiagnostics(view: EditorView): Diagnostic[] {
+    const diagnostics: Diagnostic[] = [];
+    const requests = this.requests() || [];
+
+    const nameToIndex = new Map<string, number>();
+    for (let i = 0; i < requests.length; i++) {
+      const name = (requests[i]?.name || '').trim();
+      if (name) nameToIndex.set(name, i);
+    }
+
+    const vars = this.variables() || {};
+    const envs = this.environments() || {};
+    const envName = (this.currentEnv() || 'default').trim() || 'default';
+    const currentEnvVars = envName ? envs[envName] || {} : {};
+
+    const secrets = this.secrets() || {};
+    const secretKeys = new Set<string>([...(secrets[envName] || []), ...(secrets['default'] || [])]);
+
+    const setVarsByRequest: Array<Set<string>> = requests.map((r: any) => {
+      const keys = new Set<string>();
+      for (const k of extractSetVarKeys(String(r?.preScript || ''))) keys.add(k);
+      for (const k of extractSetVarKeys(String(r?.postScript || ''))) keys.add(k);
+      return keys;
+    });
+
+    // Associate @depends lines to the next request method line so we can underline exactly the target token.
+    const dependsTokenByRequestIndex: Array<{ target: string; from: number; to: number } | null> = [];
+    let pendingDepends: { target: string; from: number; to: number } | null = null;
+    let requestIndexForLine = -1;
+
+    for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+      const line = view.state.doc.line(lineNo);
+      const text = line.text;
+
+      const depends = extractDependsTarget(text);
+      if (depends) {
+        pendingDepends = {
+          target: depends.target,
+          from: line.from + depends.start,
+          to: line.from + depends.end
+        };
+      }
+
+      if (isMethodLine(text)) {
+        requestIndexForLine++;
+        if (pendingDepends) {
+          dependsTokenByRequestIndex[requestIndexForLine] = pendingDepends;
+          pendingDepends = null;
+        }
+      }
+    }
+
+    // Build dependency graph using parsed requests, and emit errors for unknown targets/cycles.
+    const dependsIndex: Array<number | null> = requests.map((r: any) => {
+      const dependsName = (r?.depends || '').trim();
+      if (!dependsName) return null;
+      return nameToIndex.get(dependsName) ?? null;
+    });
+
+    for (let i = 0; i < requests.length; i++) {
+      const dependsName = (requests[i]?.depends || '').trim();
+      if (!dependsName) continue;
+      if (nameToIndex.has(dependsName)) continue;
+
+      const token = dependsTokenByRequestIndex[i];
+      const from = token?.from ?? 0;
+      const to = token?.to ?? 0;
+      if (from && to && to > from) {
+        diagnostics.push({
+          from,
+          to,
+          severity: 'error',
+          message: `Unknown @depends target "${dependsName}"`
+        });
+      }
+    }
+
+    // Cycle detection
+    const visiting = new Set<number>();
+    const visited = new Set<number>();
+    const dfs = (node: number): boolean => {
+      if (visited.has(node)) return false;
+      if (visiting.has(node)) return true;
+      visiting.add(node);
+      const next = dependsIndex[node];
+      if (next !== null && next !== undefined) {
+        if (dfs(next)) {
+          // Mark cycle error on this node's @depends token if present
+          const token = dependsTokenByRequestIndex[node];
+          if (token && token.to > token.from) {
+            diagnostics.push({
+              from: token.from,
+              to: token.to,
+              severity: 'error',
+              message: 'Cyclic @depends chain'
+            });
+          }
+          visiting.delete(node);
+          visited.add(node);
+          return true;
+        }
+      }
+      visiting.delete(node);
+      visited.add(node);
+      return false;
+    };
+    for (let i = 0; i < requests.length; i++) {
+      dfs(i);
+    }
+
+    // Precompute chain-variable availability per request (ancestors scripts + current pre-script).
+    const chainVarsCache: Array<Set<string>> = requests.map(() => new Set<string>());
+    const chainStack = new Set<number>();
+    const buildChainVars = (idx: number): Set<string> => {
+      if (chainVarsCache[idx].size) return chainVarsCache[idx];
+      if (chainStack.has(idx)) return chainVarsCache[idx];
+
+      chainStack.add(idx);
+      const result = new Set<string>();
+
+      const dep = dependsIndex[idx];
+      if (dep !== null && dep !== undefined) {
+        const depVars = buildChainVars(dep);
+        for (const k of depVars) result.add(k);
+        for (const k of setVarsByRequest[dep] || []) result.add(k);
+      }
+
+      // Only current pre-script is guaranteed to run before hydration.
+      for (const k of extractSetVarKeys(String(requests[idx]?.preScript || ''))) result.add(k);
+
+      chainVarsCache[idx] = result;
+      chainStack.delete(idx);
+      return result;
+    };
+    for (let i = 0; i < requests.length; i++) buildChainVars(i);
+
+    // Scan document placeholders and warn on unknown variables.
+    requestIndexForLine = -1;
+    for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
+      const line = view.state.doc.line(lineNo);
+      const text = line.text;
+
+      if (isMethodLine(text)) {
+        requestIndexForLine++;
+      }
+
+      const placeholders = extractPlaceholders(text);
+      if (!placeholders.length) continue;
+
+      for (const ph of placeholders) {
+        const inner = ph.inner;
+        const from = line.from + ph.start;
+        const to = line.from + ph.end;
+
+        // Reserved runtime placeholders (request references)
+        if (REQUEST_REF_PLACEHOLDER_REGEX.test(inner)) continue;
+
+        // secret:foo
+        const secretMatch = inner.match(SECRET_PLACEHOLDER_REGEX);
+        if (secretMatch) {
+          const key = secretMatch[1];
+          if (secretKeys.has(key)) continue;
+          diagnostics.push({ from, to, severity: 'warning', message: `Unknown secret "${key}" for environment "${envName}"` });
+          continue;
+        }
+
+        // env.name.key
+        const envMatch = inner.match(ENV_PLACEHOLDER_REGEX);
+        if (envMatch) {
+          const [, e, k] = envMatch;
+          if (envs?.[e]?.[k] !== undefined) continue;
+          diagnostics.push({ from, to, severity: 'warning', message: `Unknown env var "${e}.${k}"` });
+          continue;
+        }
+
+        // file vars / current env vars
+        if (vars[inner] !== undefined) continue;
+        if (currentEnvVars[inner] !== undefined) continue;
+
+        // Possibly defined by setVar in current pre-script or any earlier request in chain.
+        if (requestIndexForLine >= 0 && requestIndexForLine < chainVarsCache.length) {
+          if (chainVarsCache[requestIndexForLine].has(inner)) continue;
+        }
+
+        diagnostics.push({ from, to, severity: 'warning', message: `Unknown variable "${inner}"` });
+      }
+    }
+
+    return diagnostics;
+  }
+
+  private getRequestIndexAtPos(state: EditorState, pos: number): number | null {
+    const cursorLineNo = state.doc.lineAt(pos).number;
+    let methodLineNo: number | null = null;
+    for (let lineNo = cursorLineNo; lineNo >= 1; lineNo--) {
+      const line = state.doc.line(lineNo).text;
+      if (isMethodLine(line)) {
+        methodLineNo = lineNo;
+        break;
+      }
+      if (isSeparatorLine(line)) {
+        // allow cursor above first method in block; keep scanning upward
+        continue;
+      }
+    }
+    if (methodLineNo === null) return null;
+
+    let requestIndex = 0;
+    for (let i = 1; i < methodLineNo; i++) {
+      if (isMethodLine(state.doc.line(i).text)) requestIndex++;
+    }
+    return requestIndex;
   }
 }
 

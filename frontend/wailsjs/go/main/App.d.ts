@@ -24,7 +24,9 @@ export function GetEnvVariables(arg1:string):Promise<Record<string, string>>;
 
 export function GetEnvironments():Promise<Record<string, Record<string, string>>>;
 
-export function GetExamplesForFirstRun():Promise<string>;
+export function GetExamplesFile():Promise<main.ExamplesForFirstRunResponse>;
+
+export function GetExamplesForFirstRun():Promise<main.ExamplesForFirstRunResponse>;
 
 export function GetScriptLogs():Promise<Array<main.ScriptLogEntry>>;
 
@@ -41,6 +43,10 @@ export function IsFirstRun():Promise<boolean>;
 export function ListSecrets():Promise<Record<string, Array<string>>>;
 
 export function LoadFileHistory(arg1:string):Promise<string>;
+
+export function LoadFileHistoryFromDir(arg1:string,arg2:string):Promise<string>;
+
+export function LoadFileHistoryFromRunLocation(arg1:string):Promise<string>;
 
 export function LoadWindowState():Promise<main.WindowState>;
 
@@ -66,7 +72,17 @@ export function RestoreWindowState():Promise<void>;
 
 export function RevealInFinder(arg1:string):Promise<void>;
 
+export function SaveFileContents(arg1:string,arg2:string):Promise<string>;
+
 export function SaveFileHistory(arg1:string,arg2:string):Promise<void>;
+
+export function SaveFileHistoryToDir(arg1:string,arg2:string,arg3:string):Promise<void>;
+
+export function SaveFileHistoryToRunLocation(arg1:string,arg2:string):Promise<void>;
+
+export function SaveResponseFile(arg1:string,arg2:string):Promise<string>;
+
+export function SaveResponseFileToRunLocation(arg1:string,arg2:string):Promise<string>;
 
 export function SaveSecret(arg1:string,arg2:string,arg3:string):Promise<Record<string, Array<string>>>;
 
@@ -85,3 +101,7 @@ export function SetEnvVariable(arg1:string,arg2:string):Promise<void>;
 export function SetEnvironment(arg1:string):Promise<void>;
 
 export function SetVariable(arg1:string,arg2:string):Promise<void>;
+
+export function ShowSaveDialog(arg1:string):Promise<string>;
+
+export function StartUpdateAndRestart(arg1:string):Promise<void>;

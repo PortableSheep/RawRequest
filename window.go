@@ -6,10 +6,13 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	goruntime "runtime"
+	"strings"
+	"time"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -145,11 +148,87 @@ func (a *App) RestoreWindowState() {
 		state.Height = 768
 	}
 
-	// Set position and size
-	runtime.WindowSetPosition(a.ctx, state.X, state.Y)
+	if goruntime.GOOS != "darwin" {
+		runtime.WindowSetPosition(a.ctx, state.X, state.Y)
+	}
 	runtime.WindowSetSize(a.ctx, state.Width, state.Height)
 
 	if state.Maximized {
 		runtime.WindowMaximise(a.ctx)
 	}
+}
+
+// SaveFileContents writes the given content to the provided file path and returns the path.
+func (a *App) SaveFileContents(filePath string, content string) (string, error) {
+	if filePath == "" {
+		return "", errors.New("no file path provided")
+	}
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", err
+	}
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return "", err
+	}
+	return filePath, nil
+}
+
+// SaveResponseFile saves a response payload next to the HTTP file and returns the saved path.
+func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string, error) {
+	if httpFilePath == "" {
+		return "", errors.New("no http file path provided")
+	}
+	dir := filepath.Dir(httpFilePath)
+	base := filepath.Base(httpFilePath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	timestamp := time.Now().Format("20060102-150405")
+	outName := fmt.Sprintf("%s-response-%s.json", name, timestamp)
+	outPath := filepath.Join(dir, outName)
+	if err := os.WriteFile(outPath, []byte(responseJson), 0644); err != nil {
+		return "", err
+	}
+	return outPath, nil
+}
+
+// SaveResponseFileToRunLocation saves a response payload under the current working directory
+// in a "responses" folder. This is used for unsaved tabs.
+func (a *App) SaveResponseFileToRunLocation(fileID string, responseJson string) (string, error) {
+	if fileID == "" {
+		return "", errors.New("no file id provided")
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	outDir := filepath.Join(wd, "responses")
+	if err := os.MkdirAll(outDir, 0755); err != nil {
+		return "", err
+	}
+	timestamp := time.Now().Format("20060102-150405")
+	safe := a.sanitizeFileID(fileID)
+	outName := fmt.Sprintf("%s-response-%s.json", safe, timestamp)
+	outPath := filepath.Join(outDir, outName)
+	if err := os.WriteFile(outPath, []byte(responseJson), 0644); err != nil {
+		return "", err
+	}
+	return outPath, nil
+}
+
+// ShowSaveDialog opens a native save dialog and returns the chosen path.
+func (a *App) ShowSaveDialog(defaultName string) (string, error) {
+	p, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "Save HTTP File",
+		DefaultFilename: defaultName,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "HTTP Files", Pattern: "*.http"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	if p == "" {
+		return "", errors.New("no path selected")
+	}
+	return p, nil
 }

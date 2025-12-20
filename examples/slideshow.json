@@ -1,0 +1,26 @@
+{
+  "slideshow": {
+    "title": "RawRequest Demo Slideshow",
+    "author": "RawRequest",
+    "date": "2025-12-18",
+    "slides": [
+      {
+        "title": "Code-first HTTP",
+        "type": "all"
+      },
+      {
+        "title": "Scripts + Secrets",
+        "type": "all",
+        "items": [
+          "pre/post scripts",
+          "secret vault references",
+          "setVar chaining"
+        ]
+      },
+      {
+        "title": "History on disk",
+        "type": "all"
+      }
+    ]
+  }
+}

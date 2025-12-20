@@ -102,7 +102,17 @@ export class RequestManagerComponent {
       };
 
       console.log('[RequestManager] Adding to history:', historyItem);
-      await this.pushHistoryEntry(currentFile.id, historyItem);
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
+      // Save a response file next to the http file (if present)
+      try {
+        const { SaveResponseFile } = await import('@wailsjs/go/main/App');
+        if (currentFile.filePath) {
+          const saved = await SaveResponseFile(currentFile.filePath, JSON.stringify(responseWithChain, null, 2));
+          console.log('Saved response file:', saved);
+        }
+      } catch (err) {
+        console.warn('Failed to save response file:', err);
+      }
 
       // Send notification if app is in background
       this.notificationService.notifyRequestComplete(request.name, response.status, response.responseTime);
@@ -143,7 +153,7 @@ export class RequestManagerComponent {
         responseTime: errorResponse.responseTime,
         responseData: decoratedError
       };
-      await this.pushHistoryEntry(currentFile.id, errorHistoryItem);
+      await this.pushHistoryEntry(currentFile.id, errorHistoryItem, currentFile.filePath);
 
       this.requestExecuted.emit({ requestIndex, response: decoratedError });
     } finally {
@@ -214,7 +224,7 @@ export class RequestManagerComponent {
         responseData: decoratedLastResponse
       };
 
-      await this.pushHistoryEntry(currentFile.id, historyItem);
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
 
       // Send notification if app is in background
       const totalDuration = responses.reduce((sum, r) => sum + (r?.responseTime || 0), 0);
@@ -370,7 +380,7 @@ export class RequestManagerComponent {
         responseData: summaryResponse
       };
 
-      await this.pushHistoryEntry(currentFile.id, historyItem);
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
 
       // Send notification if app is in background
       this.notificationService.notifyLoadTestComplete(
@@ -427,8 +437,8 @@ export class RequestManagerComponent {
   //   this.httpService.saveFiles(this.files());
   // }
 
-  private async pushHistoryEntry(fileId: string, entry: HistoryItem) {
-    const history = await this.httpService.addToHistory(fileId, entry);
+  private async pushHistoryEntry(fileId: string, entry: HistoryItem, filePath?: string) {
+    const history = await this.httpService.addToHistory(fileId, entry, filePath);
     this.history = history;
     this.historyUpdated.emit({ fileId, history });
   }

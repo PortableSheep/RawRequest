@@ -6,6 +6,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 )
 
 //go:embed all:frontend/dist
@@ -23,8 +24,12 @@ func main() {
 		Title:     "RawRequest",
 		Width:     1024,
 		Height:    768,
-		MinWidth:  800,
-		MinHeight: 600,
+		MinWidth:  400,
+		MinHeight: 300,
+		Mac: &mac.Options{
+			DisableZoom: false,
+			TitleBar:    mac.TitleBarDefault(),
+		},
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

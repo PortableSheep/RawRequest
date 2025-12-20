@@ -1,5 +1,21 @@
 export namespace main {
 	
+	export class ExamplesForFirstRunResponse {
+	    content: string;
+	    filePath: string;
+	    isFirstRun: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ExamplesForFirstRunResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.content = source["content"];
+	        this.filePath = source["filePath"];
+	        this.isFirstRun = source["isFirstRun"];
+	    }
+	}
 	export class ScriptLogEntry {
 	    timestamp: string;
 	    level: string;

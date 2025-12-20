@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { CheckForUpdates, GetAppVersion, OpenReleaseURL } from '../../../wailsjs/go/main/App';
+import { CheckForUpdates, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
 
 export interface UpdateInfo {
   available: boolean;
@@ -82,6 +82,19 @@ export class UpdateService {
       } catch (err) {
         console.error('Failed to open release page:', err);
       }
+    }
+  }
+
+  async startUpdateAndRestart(): Promise<boolean> {
+    const info = this._updateInfo();
+    if (!info?.latestVersion) return false;
+
+    try {
+      await StartUpdateAndRestart(info.latestVersion);
+      return true;
+    } catch (err) {
+      console.error('Failed to start updater:', err);
+      return false;
     }
   }
 

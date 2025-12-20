@@ -2,12 +2,19 @@
 # This file showcases ALL features supported by RawRequest
 # Use this as a reference guide and testing playground
 
+@tab RawRequest Examples
+
 ###############################################################################
 # 1. ENVIRONMENT VARIABLES
 ###############################################################################
 # Define environment-specific variables using @env.<envName>.<variableName>
 # These are accessible via {{variableName}} in requests
 # Switch environments using the dropdown in the header
+
+# Default env is what RawRequest starts with. Keep it runnable out-of-the-box.
+@env.default.baseUrl https://httpbun.com
+@env.default.apiKey demo-api-key
+@env.default.timeout 30000
 
 @env.local.baseUrl http://localhost:3000
 @env.local.apiKey local-api-key-12345
@@ -16,6 +23,7 @@
 @env.dev.baseUrl https://dev-api.example.com
 @env.dev.apiKey dev-api-key-67890
 @env.dev.timeout 60000
+
 
 @env.test.baseUrl https://test-api.example.com
 @env.test.apiKey test-api-key-abcde
@@ -40,34 +48,48 @@
 #   - Setting default/initial values
 #   - Autocomplete suggestions in the editor
 
-@apiVersion v1
-@contentType application/json
-@userAgent RawRequest/1.0
-@token
-@userId
-@sessionId
-@requestId
-@timestamp
-@checkoutSessionId
-@transactionId
-@cartTotal
-@finalTotal
-@helperStart
+@apiVersion = v1
+@contentType = application/json
+@userAgent = RawRequest/1.0
+@baseUrl = https://httpbun.com
+@apiKey = demo-api-key
+@token = demo-token
+@userName = john
+@userEmail = john@example.com
+@userId =
+@sessionId =
+@requestId =
+@timestamp =
+@date =
+@resourceId =
+@randomId =
+@unixTime =
+@uuid =
+@checkoutSessionId =
+@transactionId =
+@cartTotal = 0
+@finalTotal = 0
+@helperStart =
 
 ###############################################################################
 # 3. BASIC HTTP METHODS
 ###############################################################################
 
 ### Simple GET request
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 User-Agent: {{userAgent}}
+Date: {{date}}
+
+< {
+  setVar('date', new Date().toUTCString());
+}
 
 ### GET with environment variable
 GET {{baseUrl}}/api/{{apiVersion}}/status
 Accept: {{contentType}}
 
 ### POST with JSON body
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: {{contentType}}
 User-Agent: {{userAgent}}
 
@@ -78,7 +100,7 @@ User-Agent: {{userAgent}}
 }
 
 ### PUT request
-PUT https://httpbin.org/put
+PUT https://httpbun.com/put
 Content-Type: application/json
 
 {
@@ -87,22 +109,28 @@ Content-Type: application/json
 }
 
 ### DELETE request
-DELETE https://httpbin.org/delete
+DELETE https://httpbun.com/delete
 Authorization: Bearer fake-token
 
 ### PATCH request
-PATCH https://httpbin.org/patch
+PATCH https://httpbun.com/patch
 Content-Type: application/json
 
 {
   "field": "value"
 }
 
+###
+
 ### HEAD request (gets headers only, no body)
-HEAD https://httpbin.org/get
+HEAD https://httpbun.com/get
+
+###
 
 ### OPTIONS request (check available methods)
-OPTIONS https://httpbin.org/get
+OPTIONS https://httpbun.com/get
+
+###
 
 ###############################################################################
 # 4. REQUEST CHAINING & DEPENDENCIES
@@ -111,9 +139,8 @@ OPTIONS https://httpbin.org/get
 # Chain icon (🔗) appears in the gutter for dependent requests
 
 ### Login - Sets authentication token
-# If the assertion fails, the chain will stop and dependent requests won't run
 @name login
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -128,12 +155,6 @@ Content-Type: application/json
 }
 
 > {
-  // Assertions in chained requests - if these fail, the chain stops!
-  assert(response.status === 200, 'Login failed: expected status 200');
-  
-  const contentType = response.headers['content-type'] || '';
-  assert(contentType.includes('application/json'), 'Expected JSON response');
-  
   // Post-request script: runs after the request
   const fakeToken = 'Bearer jwt-token-' + Math.random().toString(36).substr(2, 9);
   setVar('token', fakeToken);
@@ -143,28 +164,28 @@ Content-Type: application/json
   setVar('userId', 'user-' + Math.floor(Math.random() * 1000));
 }
 
+###
+
 ### Get User Profile - Depends on login
-# This request only runs if login succeeds
 @name getUserProfile
 @depends login
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 Authorization: {{token}}
 Accept: application/json
 
 > {
-  // Assert before processing - stops chain if profile fetch failed
-  assert(response.status === 200, 'Failed to fetch user profile');
-  
   // Extract data from response
   console.log('User profile retrieved for:', getVar('userId'));
   setVar('userEmail', 'user@example.com');
   setVar('userName', 'Test User');
 }
 
+###
+
 ### Update User Profile - Depends on getUserProfile
 @name updateProfile
 @depends getUserProfile
-PUT https://httpbin.org/put
+PUT https://httpbun.com/put
 Authorization: {{token}}
 Content-Type: application/json
 
@@ -180,6 +201,8 @@ Content-Type: application/json
   setVar('profileUpdated', true);
 }
 
+###
+
 ###############################################################################
 # 5. PRE & POST SCRIPTS
 ###############################################################################
@@ -187,7 +210,7 @@ Content-Type: application/json
 
 ### Request with pre-script
 @name scriptDemo
-GET https://httpbin.org/delay/1
+GET https://httpbun.com/delay/1
 
 < {
   // Pre-script: Set variables, prepare data
@@ -211,29 +234,27 @@ GET https://httpbin.org/delay/1
   }
 }
 
+###
+
 ###############################################################################
 # 6. ASSERTIONS
 ###############################################################################
-# Validate response status, headers, and body using assert() in post-scripts
+# Validate response status, headers, and body
 
 ### Request with assertions
-# Use the assert() function in post-request scripts to validate responses
 @name assertionDemo
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 
-> {
-  // Assert status code
-  assert(response.status === 200, 'Expected status 200');
-  
-  // Assert header value
-  const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
-  assert(contentType.includes('application/json'), 'Expected JSON content type');
-  
-  // Assert response body content
-  assert(response.json.url === 'https://httpbin.org/get', 'Expected URL in response');
-  
-  console.log('✓ All assertions passed!');
-}
+### Assert
+status == 200
+
+### Assert
+headers.Content-Type contains application/json
+
+### Assert
+response.json.url contains "httpbun.com/get"
+
+###
 
 ###############################################################################
 # 7. LOAD TESTING
@@ -244,27 +265,35 @@ GET https://httpbin.org/get
 ### Basic load test - 5 concurrent requests for 10 seconds
 @name loadTestBasic
 @load concurrent=5 duration=10s
-GET https://httpbin.org/get
+GET https://httpbun.com/get
+
+###
 
 ### Load test with iterations
 @name loadTestIterations
 @load concurrent=10 iterations=100
-GET https://httpbin.org/delay/1
+GET https://httpbun.com/delay/1
+
+###
 
 ### Advanced load test with ramp-up
 @name loadTestAdvanced
 @load start=1 max=20 rampUp=30s duration=60s
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
   "testData": "load-test-payload"
 }
 
+###
+
 ### Load test with rate limiting
 @name loadTestRate
 @load requestsPerSecond=50 duration=30s
-GET https://httpbin.org/get
+GET https://httpbun.com/get
+
+###
 
 ###############################################################################
 # 8. SECRETS USAGE
@@ -273,10 +302,24 @@ GET https://httpbin.org/get
 
 ### Request using secrets
 @name secretDemo
-GET https://httpbin.org/get
-Authorization: Bearer {{secret:api_token}}
-X-API-Key: {{secret:api_secret}}
-X-Client-ID: {{secret:client_id}}
+GET https://httpbun.com/get
+# To try secrets:
+# 1) Open the Secrets modal
+# 2) Add secrets for the active environment:
+#    - api_token
+#    - api_secret
+#    - client_id
+# 3) Uncomment the three headers below
+# Authorization: Bearer {{secret:api_token}}
+# X-API-Key: {{secret:api_secret}}
+# X-Client-ID: {{secret:client_id}}
+
+# Out-of-box runnable defaults (non-secret)
+Authorization: Bearer {{token}}
+X-API-Key: {{apiKey}}
+X-Client-ID: client-demo
+
+###
 
 ###############################################################################
 # 9. COMPLEX WORKFLOWS
@@ -285,7 +328,7 @@ X-Client-ID: {{secret:client_id}}
 
 ### Step 1: Initialize session
 @name initSession
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -297,10 +340,12 @@ Content-Type: application/json
   console.log('Session initialized:', getVar('sessionId'));
 }
 
+###
+
 ### Step 2: Create resource
 @name createResource
 @depends initSession
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 X-Session-ID: {{sessionId}}
 
@@ -316,10 +361,12 @@ X-Session-ID: {{sessionId}}
   console.log('Resource created:', resourceId);
 }
 
+###
+
 ### Step 3: Read resource
 @name readResource
 @depends createResource
-GET https://httpbin.org/get?id={{resourceId}}
+GET https://httpbun.com/get?id={{resourceId}}
 X-Session-ID: {{sessionId}}
 
 > {
@@ -327,10 +374,12 @@ X-Session-ID: {{sessionId}}
   setVar('resourceData', JSON.stringify(response.json));
 }
 
+###
+
 ### Step 4: Update resource
 @name updateResource
 @depends readResource
-PUT https://httpbin.org/put
+PUT https://httpbun.com/put
 Content-Type: application/json
 X-Session-ID: {{sessionId}}
 
@@ -344,10 +393,12 @@ X-Session-ID: {{sessionId}}
   console.log('Resource updated successfully');
 }
 
+###
+
 ### Step 5: Delete resource
 @name deleteResource
 @depends updateResource
-DELETE https://httpbin.org/delete?id={{resourceId}}
+DELETE https://httpbun.com/delete?id={{resourceId}}
 X-Session-ID: {{sessionId}}
 
 > {
@@ -355,13 +406,15 @@ X-Session-ID: {{sessionId}}
   console.log('Session:', getVar('sessionId'));
 }
 
+###
+
 ###############################################################################
 # 10. ERROR HANDLING
 ###############################################################################
 
 ### Handle 404 error
 @name handle404
-GET https://httpbin.org/status/404
+GET https://httpbun.com/status/404
 
 > {
   if (response.status === 404) {
@@ -370,9 +423,11 @@ GET https://httpbin.org/status/404
   }
 }
 
+###
+
 ### Handle 500 error
 @name handle500
-GET https://httpbin.org/status/500
+GET https://httpbun.com/status/500
 
 > {
   if (response.status >= 500) {
@@ -381,13 +436,15 @@ GET https://httpbin.org/status/500
   }
 }
 
+###
+
 ###############################################################################
 # 11. GRAPHQL REQUESTS
 ###############################################################################
 
 ### GraphQL query
 @name graphqlQuery
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 X-Request-Type: GraphQL
 
@@ -398,9 +455,11 @@ X-Request-Type: GraphQL
   }
 }
 
+###
+
 ### GraphQL mutation
 @name graphqlMutation
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -413,13 +472,15 @@ Content-Type: application/json
   }
 }
 
+###
+
 ###############################################################################
 # 12. FILE UPLOAD (MULTIPART)
 ###############################################################################
 
 ### Upload file with multipart/form-data
 @name fileUpload
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: multipart/form-data; boundary=boundary123
 
 --boundary123
@@ -445,29 +506,38 @@ Content-Disposition: form-data; name="category"
 documents
 --boundary123--
 
+###
+
 ###############################################################################
 # 13. CUSTOM HEADERS & AUTHENTICATION
 ###############################################################################
 
 ### Basic Authentication
 @name basicAuth
-GET https://httpbin.org/basic-auth/user/passwd
+GET https://httpbun.com/basic-auth/user/passwd
+### group: Authentication ###
 Authorization: Basic dXNlcjpwYXNzd2Q=
+
+###
 
 ### Bearer Token Authentication
 @name bearerAuth
-GET https://httpbin.org/bearer
+GET https://httpbun.com/bearer
 Authorization: Bearer {{token}}
+
+###
 
 ### API Key Authentication
 @name apiKeyAuth
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 X-API-Key: {{apiKey}}
 X-Client-ID: client-123
 
+###
+
 ### Custom Headers
 @name customHeaders
-GET https://httpbin.org/headers
+GET https://httpbun.com/headers
 User-Agent: {{userAgent}}
 X-Custom-Header: custom-value
 X-Request-ID: {{requestId}}
@@ -475,13 +545,15 @@ X-Correlation-ID: corr-{{sessionId}}
 Accept-Language: en-US,en;q=0.9
 Cache-Control: no-cache
 
+###
+
 ###############################################################################
 # 14. DIFFERENT CONTENT TYPES
 ###############################################################################
 
 ### JSON request
 @name jsonRequest
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -491,9 +563,11 @@ Content-Type: application/json
   }
 }
 
+###
+
 ### XML request
 @name xmlRequest
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/xml
 
 <?xml version="1.0" encoding="UTF-8"?>
@@ -505,20 +579,26 @@ Content-Type: application/xml
   </data>
 </request>
 
+###
+
 ### Form URL encoded
 @name formRequest
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/x-www-form-urlencoded
 
 name=John+Doe&email=john@example.com&age=30&subscribe=true
 
+###
+
 ### Plain text request
 @name textRequest
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: text/plain
 
 This is plain text content.
 It can span multiple lines.
+
+###
 
 ###############################################################################
 # 15. QUERY PARAMETERS & DYNAMIC URLS
@@ -526,19 +606,30 @@ It can span multiple lines.
 
 ### URL with query parameters
 @name queryParams
-GET https://httpbin.org/get?search={{userName}}&page=1&limit=10&sort=desc
+GET https://httpbun.com/get?search={{userName}}&page=1&limit=10&sort=desc
+
+###
 
 ### Dynamic URL construction
 @name dynamicUrl
 GET {{baseUrl}}/api/{{apiVersion}}/users/{{userId}}/profile?include=posts,comments
 
+###
+
 ###############################################################################
 # 16. TESTING & DEBUGGING
 ###############################################################################
 
+### Timeout override (per-request)
+# This uses the @timeout directive (milliseconds) to override the request timeout.
+# With a 1s timeout against a 2s delay endpoint, this should time out.
+@name timeoutOverride
+@timeout 1000
+GET https://httpbun.com/delay/2
+
 ### Debug request with logging
 @name debugRequest
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 
 < {
   console.log('=== DEBUG REQUEST ===');
@@ -555,9 +646,11 @@ GET https://httpbin.org/get
   console.log('Response body:', JSON.stringify(response.json, null, 2));
 }
 
+###
+
 ### Performance test
 @name performanceTest
-GET https://httpbin.org/delay/2
+GET https://httpbun.com/delay/2
 
 < {
   setVar('perfStartTime', Date.now());
@@ -572,16 +665,25 @@ GET https://httpbin.org/delay/2
   }
 }
 
-###############################################################################
-# 17. DYNAMIC VALUES VIA PRE-SCRIPTS
-###############################################################################
-# Variable interpolation only supports simple {{key}} replacement.
-# For dynamic values like timestamps or random IDs, use a pre-script.
+###
 
-### Dynamic timestamp in request (using pre-script)
+###############################################################################
+# 17. DYNAMIC JAVASCRIPT EXPRESSIONS IN VARIABLES
+###############################################################################
+# Generate dynamic values in pre-request scripts, then interpolate variables
+
+### Dynamic timestamp in request
 @name dynamicData
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
+
+< {
+  setVar('timestamp', new Date().toISOString());
+  setVar('randomId', Math.random().toString(36).substr(2, 9));
+  setVar('unixTime', String(Date.now()));
+  // Avoid relying on crypto.randomUUID() availability
+  setVar('uuid', 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
+}
 
 {
   "timestamp": "{{timestamp}}",
@@ -590,13 +692,7 @@ Content-Type: application/json
   "uuid": "{{uuid}}"
 }
 
-< {
-  // Generate dynamic values in pre-script
-  setVar('timestamp', new Date().toISOString());
-  setVar('randomId', Math.random().toString(36).substr(2, 9));
-  setVar('unixTime', Date.now().toString());
-  setVar('uuid', crypto.randomUUID());
-}
+###
 
 ###############################################################################
 # 18. CONDITIONAL LOGIC IN SCRIPTS
@@ -604,7 +700,7 @@ Content-Type: application/json
 
 ### Conditional execution
 @name conditionalTest
-GET https://httpbin.org/get
+GET https://httpbun.com/get
 
 > {
   // Conditional variable setting
@@ -628,27 +724,56 @@ GET https://httpbin.org/get
   }
 }
 
+###
+
 ###############################################################################
 # 19. RESPONSE DATA EXTRACTION & MANIPULATION
 ###############################################################################
 
 ### Extract and transform data
 @name dataExtraction
-GET https://httpbin.org/json
+POST https://httpbun.com/post
+Content-Type: application/json
+
+{
+  "slideshow": {
+    "title": "Sample Slide Show",
+    "author": "Yours Truly",
+    "date": "date of publication",
+    "slides": [
+      {
+        "title": "Wake up to WonderWidgets!",
+        "type": "all"
+      },
+      {
+        "title": "Overview",
+        "type": "all",
+        "items": [
+          "Why WonderWidgets are great",
+          "Who buys WonderWidgets"
+        ]
+      }
+    ]
+  }
+}
 
 > {
-  // Extract nested data
-  const data = response.json;
+  // Extract nested data.
+  // Different echo services wrap request JSON differently, so handle common shapes.
+  const data = response.json?.slideshow
+    ? response.json
+    : (response.json?.json || response.json?.data || response.json);
 
   // Store extracted values
-  if (data.slideshow) {
-    setVar('title', data.slideshow.title);
-    setVar('author', data.slideshow.author);
-    setVar('slides', JSON.stringify(data.slideshow.slides));
+  const slideshow = data?.slideshow;
+  if (slideshow) {
+    setVar('title', slideshow.title);
+    setVar('author', slideshow.author);
+    setVar('slides', JSON.stringify(slideshow.slides));
   }
 
   // Transform and store
-  setVar('dataSize', JSON.stringify(data).length);
+  setVar('dataSize', JSON.stringify(data || {}).length);
   setVar('responseTime', Date.now() - getVar('requestStartTime') || 0);
 
   console.log('Extracted:', {
@@ -658,6 +783,8 @@ GET https://httpbin.org/json
   });
 }
 
+###
+
 ###############################################################################
 # 20. COMPREHENSIVE WORKFLOW - E-COMMERCE CHECKOUT
 ###############################################################################
@@ -665,7 +792,7 @@ GET https://httpbin.org/json
 
 ### Step 1: Initialize Shopping Session
 @name initCheckout
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -684,10 +811,12 @@ Content-Type: application/json
   console.log('Session initialized:', sessionId);
 }
 
+###
+
 ### Step 2: Add Items to Cart (depends on session)
 @name addToCart
 @depends initCheckout
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 X-Session-ID: {{checkoutSessionId}}
 
@@ -706,10 +835,12 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Cart total: $' + total.toFixed(2));
 }
 
+###
+
 ### Step 3: Apply Discount Code
 @name applyDiscount
 @depends addToCart
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 X-Session-ID: {{checkoutSessionId}}
 
@@ -727,13 +858,15 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Final total: $' + finalTotal.toFixed(2));
 }
 
+###
+
 ### Step 4: Process Payment
 @name processPayment
 @depends applyDiscount
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 X-Session-ID: {{checkoutSessionId}}
-Authorization: Bearer {{secret:payment_api_key}}
+Authorization: Bearer {{token}}
 
 {
   "amount": {{finalTotal}},
@@ -753,10 +886,12 @@ Authorization: Bearer {{secret:payment_api_key}}
   }
 }
 
+###
+
 ### Step 5: Script helper & console showcase (optional)
 @name helperShowcase
 @depends processPayment
-GET https://httpbin.org/anything
+GET https://httpbun.com/any
 
 < {
   return (async () => {
@@ -764,7 +899,7 @@ GET https://httpbin.org/anything
 
     // Dynamically tweak the outbound request without editing the HTTP block
     updateRequest({
-      url: `https://httpbin.org/anything/helpers/${Date.now()}`,
+      url: `https://httpbun.com/any/helpers/${Date.now()}`,
       headers: {
         'X-Helper-Demo': 'true',
         'X-Workflow-Stage': 'post-payment'
@@ -789,10 +924,12 @@ GET https://httpbin.org/anything
   console.log('Console output is visible live inside the Script Console tray.');
 }
 
+###
+
 ### Step 6: Send Confirmation Email
 @name sendConfirmation
 @depends processPayment
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -811,10 +948,12 @@ Content-Type: application/json
   console.log('Session:', getVar('checkoutSessionId'));
   console.log('Transaction:', getVar('transactionId'));
   console.log('Amount:', '$' + getVar('finalTotal'));
-  
-  // Validate the checkout succeeded
-  assert(response.status === 200, 'Email confirmation should succeed');
 }
+
+### Assert
+status == 200
+
+###
 
 ###############################################################################
 # 21. SCRIPT CONSOLE & HELPER QUICK REFERENCE
@@ -837,7 +976,7 @@ Content-Type: application/json
 
 ### Batch user creation
 @name batchUsers
-POST https://httpbin.org/post
+POST https://httpbun.com/post
 Content-Type: application/json
 
 {
@@ -862,13 +1001,15 @@ Content-Type: application/json
   setVar('totalUsersCreated', userIds.length);
 }
 
+###
+
 ###############################################################################
 # 23. RETRY LOGIC AND ERROR RECOVERY
 ###############################################################################
 
 ### Request with retry logic
 @name retryExample
-GET https://httpbin.org/status/503
+GET https://httpbun.com/status/503
 
 < {
   if (!getVar('retryCount')) {
@@ -894,77 +1035,129 @@ GET https://httpbin.org/status/503
   }
 }
 
+###
+
 ###############################################################################
 # 24. DATA VALIDATION & TESTING
 ###############################################################################
 
 ### Comprehensive validation test
 @name validationTest
-GET https://httpbin.org/json
+POST https://httpbun.com/post
+Content-Type: application/json
+
+{
+  "slideshow": {
+    "title": "Sample Slide Show",
+    "author": "Yours Truly",
+    "date": "date of publication",
+    "slides": [
+      {
+        "title": "Wake up to WonderWidgets!",
+        "type": "all"
+      },
+      {
+        "title": "Overview",
+        "type": "all",
+        "items": [
+          "Why WonderWidgets are great",
+          "Who buys WonderWidgets"
+        ]
+      }
+    ]
+  }
+}
+
+### Assert
+status == 200
+
+### Assert
+headers.Content-Type contains application/json
+
+### Assert
+response.json != null
 
 > {
-  // Assert status and content type
-  assert(response.status === 200, 'Expected status 200');
-  
-  const contentType = response.headers['content-type'] || response.headers['Content-Type'] || '';
-  assert(contentType.includes('application/json'), 'Expected JSON content type');
-  
-  assert(response.json != null, 'Expected JSON response body');
-
   // Custom validation logic
-  const data = response.json;
+  const data = response.json?.slideshow
+    ? response.json
+    : (response.json?.json || response.json?.data || response.json);
   const errors = [];
 
-  if (!data.slideshow) {
+  if (!data?.slideshow) {
     errors.push('Missing slideshow object');
   }
 
-  if (!data.slideshow?.title) {
+  if (!data?.slideshow?.title) {
     errors.push('Missing title');
   }
 
   if (errors.length > 0) {
     console.error('Validation errors:', errors);
     setVar('validationPassed', false);
-    // Fail the assertion with details
-    assert(false, 'Validation failed: ' + errors.join(', '));
   } else {
     console.log('✓ All validations passed');
     setVar('validationPassed', true);
   }
 }
 
+###
+
 ###############################################################################
+# END OF EXAMPLES
+###############################################################################
+# This file demonstrates ALL features of RawRequest:
+#
+# ✓ Environment variables (@env.{env}.{key})
+# ✓ Global variables (@variableName)
+# ✓ All HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+# ✓ Request naming (@name)
+# ✓ Request chaining & dependencies (@depends) with chain icons (🔗)
+# ✓ Pre-request scripts (< { ... })
+# ✓ Post-request scripts (> { ... })
+# ✓ Assertions (### Assert)
+# ✓ Load testing (@load) with lightning icons (⚡)
+# ✓ Secrets management ({{secret:key}})
+# ✓ Complex multi-step workflows
+# ✓ Error handling & recovery
+# ✓ GraphQL queries
+# ✓ File uploads (multipart/form-data)
+# ✓ Authentication methods (Basic, Bearer, API Key)
+# ✓ Multiple content types (JSON, XML, form-data, plain text)
+# ✓ Query parameters & dynamic URLs
+# ✓ JavaScript expressions in variables ({{Math.random()}}, {{new Date()}})
+# ✓ Conditional logic in scripts
+# ✓ Response data extraction & transformation
+# ✓ Script helper APIs (setHeader, updateRequest, assert, delay) + live console
+# ✓ Batch operations
+# ✓ Retry logic
+# ✓ Data validation & testing
+# ✓ Performance monitoring
+# ✓ Debugging utilities
+#
 # SCRIPT API REFERENCE:
-#
-# Variable Interpolation:
-# - {{variableName}}       → Simple key/value replacement only
-# - {{env.VAR_NAME}}       → System environment variable
-# - {{secret:key}}         → Secret from vault (environment-specific)
-# - NOTE: JavaScript expressions in {{...}} are NOT supported.
-#         Use pre-scripts with setVar() for dynamic values.
-#
-# Helper Functions:
-# - setVar(key, value)     → Set a variable (no pre-definition required)
-# - getVar(key)            → Get a variable value (returns undefined if not set)
+# - setVar(key, value)     → Set a variable
+# - getVar(key)            → Get a variable value
 # - setHeader(name, value) → Inject/override an outgoing header
 # - updateRequest(patch)   → Modify URL/method/body/headers during scripts
 # - delay(ms)              → Awaitable delay helper for async flows
 # - assert(condition,msg)  → Throw when assertions fail
 # - console.log/warn/error → Log messages to console
-#
-# Response Object (available in post-scripts only):
-# - response.status        → HTTP status code (number)
-# - response.statusText    → HTTP status text (e.g., "OK")
+# - response.status        → HTTP status code
 # - response.headers       → Response headers object
-# - response.body          → Raw response body text
-# - response.text          → Alias for response.body
-# - response.json          → Parsed JSON body (null if not valid JSON)
-# - response.responseTime  → Total request time in milliseconds
-# - response.size          → Response body size in bytes
-#
-# Request Object (available in pre and post-scripts):
-# - request.method         → HTTP method
+# - response.json          → Parsed JSON response body
+# - response.text          → Raw response body text
+# - request.method         → Request HTTP method
 # - request.url            → Request URL
 # - request.headers        → Request headers object
 # - request.body           → Request body
+#
+# TIPS:
+# - Use Ctrl+Enter to execute the request at cursor
+# - Click play button (▶) in gutter to run specific request
+# - Click chain button (🔗) to run dependent request chain
+# - Click lightning (⚡) to run load test
+# - View history in sidebar to replay past requests
+# - Use secrets for sensitive data - never commit API keys!
+#
+###############################################################################

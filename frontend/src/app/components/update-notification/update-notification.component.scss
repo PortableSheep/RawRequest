@@ -1,18 +1,19 @@
 .update-notification {
     position: fixed;
-    bottom: 1rem;
-    right: 1rem;
-    z-index: 1000;
+    bottom: 1.5rem;
+    left: 1.5rem;
+    z-index: 9999;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
-    padding: 1rem;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(147, 51, 234, 0.15) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 0.75rem;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
-    max-width: 360px;
-    animation: slideIn 0.3s ease-out;
+    padding: 1rem 1.25rem;
+    background: #0f172a;
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 0.9rem;
+    box-shadow: 0 14px 32px -10px rgba(0, 0, 0, 0.55);
+    max-width: 420px;
+    animation: slideIn 0.28s ease-out;
+    color: #e5e7eb;
 }
 
 @keyframes slideIn {
@@ -39,9 +40,10 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(59, 130, 246, 0.2);
-    border-radius: 0.5rem;
-    color: #60a5fa;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 0.6rem;
+    color: #67e8f9;
 }
 
 .update-notification__text {
@@ -51,15 +53,15 @@
 
 .update-notification__title {
     margin: 0;
-    font-size: 0.875rem;
-    font-weight: 600;
-    color: #f4f4f5;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #e5e7eb;
 }
 
 .update-notification__subtitle {
     margin: 0.25rem 0 0;
-    font-size: 0.75rem;
-    color: #a1a1aa;
+    font-size: 0.8rem;
+    color: #9ca3af;
 }
 
 .update-notification__actions {
@@ -69,30 +71,31 @@
 }
 
 .update-notification__btn {
-    padding: 0.375rem 0.75rem;
-    font-size: 0.75rem;
-    font-weight: 500;
-    border-radius: 0.375rem;
+    padding: 0.4rem 0.95rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 0.5rem;
     cursor: pointer;
     transition: all 0.15s ease;
-    border: none;
+    border: 1px solid transparent;
 }
 
 .update-notification__btn--primary {
-    background: #3b82f6;
+    background: linear-gradient(135deg, #38bdf8 0%, #2563eb 100%);
     color: white;
+    border-color: rgba(56, 189, 248, 0.4);
 }
 
 .update-notification__btn--primary:hover {
-    background: #2563eb;
+    filter: brightness(1.05);
 }
 
 .update-notification__btn--secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #a1a1aa;
+    background: rgba(255, 255, 255, 0.06);
+    color: #e5e7eb;
+    border-color: rgba(148, 163, 184, 0.35);
 }
 
 .update-notification__btn--secondary:hover {
-    background: rgba(255, 255, 255, 0.15);
-    color: #f4f4f5;
+    background: rgba(255, 255, 255, 0.12);
 }

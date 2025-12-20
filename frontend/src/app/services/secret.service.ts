@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
-import type { main } from '../../../wailsjs/go/models';
+import type { main } from '@wailsjs/go/models';
 import {
   DeleteSecret,
   ExportSecrets,
@@ -9,7 +9,7 @@ import {
   ListSecrets,
   ResetVault,
   SaveSecret
-} from '../../../wailsjs/go/main/App';
+} from '@wailsjs/go/main/App';
 
 export type SecretIndex = Partial<Record<string, string[]>>;
 
@@ -57,28 +57,50 @@ export class SecretService {
 
   async getSecretValue(env: string, key: string): Promise<string> {
     const normalizedEnv = this.normalizeEnv(env);
-    const cacheKey = this.buildCacheKey(normalizedEnv, key);
+
+    const primary = await this.getSecretValueExact(normalizedEnv, key);
+    if (primary.found) {
+      return primary.value;
+    }
+
+    if (normalizedEnv !== 'default') {
+      const fallback = await this.getSecretValueExact('default', key);
+      if (fallback.found) {
+        return fallback.value;
+      }
+    }
+
+    this.handleMissingSecret(normalizedEnv, key);
+    return '';
+  }
+
+  private async getSecretValueExact(env: string, key: string): Promise<{ value: string; found: boolean }> {
+    const cacheKey = this.buildCacheKey(env, key);
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)!;
+      return { value: this.cache.get(cacheKey)!, found: true };
     }
     if (this.pending.has(cacheKey)) {
-      return this.pending.get(cacheKey)!;
+      const value = await this.pending.get(cacheKey)!;
+      return { value, found: true };
     }
-    const fetchPromise = GetSecretValue(normalizedEnv, key)
+
+    const fetchPromise = GetSecretValue(env, key)
       .then((value: string) => {
         this.cache.set(cacheKey, value);
         return value;
       })
-      .catch(error => {
-        console.warn('[SecretService] getSecretValue failed', error);
-        this.handleMissingSecret(normalizedEnv, key);
-        return '';
-      })
       .finally(() => {
         this.pending.delete(cacheKey);
       });
+
     this.pending.set(cacheKey, fetchPromise);
-    return fetchPromise;
+    try {
+      const value = await fetchPromise;
+      return { value, found: true };
+    } catch (error) {
+      console.warn('[SecretService] getSecretValue failed', error);
+      return { value: '', found: false };
+    }
   }
 
   async replaceSecrets(input: string, env: string): Promise<string> {

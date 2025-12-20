@@ -90,6 +90,10 @@ build_windows() {
     print_status "Creating portable ZIP..."
     mkdir -p "$BUILD_DIR/releases/portable"
     cp "./build/bin/${APP_NAME}.exe" "$BUILD_DIR/releases/portable/"
+
+    # Build and include updater helper
+    print_status "Building updater helper..."
+    CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o "$BUILD_DIR/releases/portable/rawrequest-updater.exe" ./cmd/rawrequest-updater
     
     cat > "$BUILD_DIR/releases/portable/README.txt" << EOF
 $APP_NAME - Portable Edition

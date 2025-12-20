@@ -1,7 +1,7 @@
 import { Injectable, signal } from '@angular/core';
 import { ScriptLogEntry } from '../models/http.models';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
-import { GetScriptLogs, ClearScriptLogs, RecordScriptLog } from '../../../wailsjs/go/main/App';
+import { GetScriptLogs, ClearScriptLogs, RecordScriptLog } from '@wailsjs/go/main/App';
 
 const SCRIPT_LOG_EVENT = 'script-log';
 const MAX_ENTRIES = 500;
@@ -12,12 +12,30 @@ export class ScriptConsoleService {
   private unsubscribe?: () => void;
   readonly logs = signal<ScriptLogEntry[]>([]);
 
+  private hasWailsBindings(): boolean {
+    const g: any = globalThis as any;
+    // Wails Go bindings are usually exposed under `window.go.*`.
+    if (!g || !g.go?.main?.App) {
+      return false;
+    }
+    // Wails runtime bindings live under `window.runtime`.
+    if (!g.runtime) {
+      return false;
+    }
+    return true;
+  }
+
   async init(): Promise<void> {
     if (this.initialized) {
       return;
     }
 
     this.initialized = true;
+
+    // In unit tests / non-Wails browser contexts, skip wiring.
+    if (!this.hasWailsBindings()) {
+      return;
+    }
 
     try {
       const entries = await GetScriptLogs() as ScriptLogEntry[];
@@ -43,6 +61,10 @@ export class ScriptConsoleService {
   }
 
   async clear(): Promise<void> {
+    if (!this.hasWailsBindings()) {
+      this.logs.set([]);
+      return;
+    }
     try {
       await ClearScriptLogs();
     } catch (error) {
@@ -53,6 +75,9 @@ export class ScriptConsoleService {
   }
 
   async record(level: string, source: string, message: string): Promise<void> {
+    if (!this.hasWailsBindings()) {
+      return;
+    }
     try {
       await RecordScriptLog(level, source, message);
     } catch (error) {

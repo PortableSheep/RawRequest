@@ -14,10 +14,23 @@ TARGET_DIR="$DIST_DIR/RawRequest-$VERSION"
 ARCHIVE_NAME="RawRequest-$VERSION-macos-universal.tar.gz"
 ARCHIVE_PATH="$DIST_DIR/$ARCHIVE_NAME"
 
+cd "$PROJECT_ROOT"
+
 if [[ ! -d "$BUILD_DIR/RawRequest.app" ]]; then
   echo "Missing app bundle at $BUILD_DIR/RawRequest.app. Run 'wails build' first." >&2
   exit 1
 fi
+
+# Build and embed updater helper into the app bundle
+UPDATER_DST="$BUILD_DIR/RawRequest.app/Contents/MacOS/rawrequest-updater"
+TMP_UPDATER_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_UPDATER_DIR"' EXIT
+
+echo "Building rawrequest-updater (universal)..."
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -o "$TMP_UPDATER_DIR/rawrequest-updater-amd64" ./cmd/rawrequest-updater
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -o "$TMP_UPDATER_DIR/rawrequest-updater-arm64" ./cmd/rawrequest-updater
+lipo -create -output "$UPDATER_DST" "$TMP_UPDATER_DIR/rawrequest-updater-amd64" "$TMP_UPDATER_DIR/rawrequest-updater-arm64"
+chmod +x "$UPDATER_DST"
 
 mkdir -p "$TARGET_DIR"
 rm -rf "$TARGET_DIR"/*

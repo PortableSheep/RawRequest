@@ -10,7 +10,8 @@
     "src/polyfills.ts"
   ],
   "include": [
-    "src/**/*.d.ts"
+    "src/**/*.d.ts",
+    "wailsjs/**/*.d.ts"
   ],
   "exclude": [
     "wailsjs/go/models.ts"

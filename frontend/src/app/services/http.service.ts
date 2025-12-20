@@ -9,17 +9,8 @@ import {
   RequestPreview
 } from '../models/http.models';
 import { cleanScriptContent } from '../utils/script-cleaner.generated';
-import {
-  SendRequest,
-  ExecuteRequests,
-  SetVariable,
-  GetVariable,
-  SaveFileHistory,
-  LoadFileHistory,
-  SendRequestWithID,
-  ExecuteRequestsWithID,
-  CancelRequest as CancelBackendRequest
-} from '../../../wailsjs/go/main/App';
+import { dirname } from '../utils/path';
+import { BackendClientService } from './backend-client.service';
 import { ScriptConsoleService } from './script-console.service';
 import { SecretService } from './secret.service';
 
@@ -27,6 +18,7 @@ import { SecretService } from './secret.service';
   providedIn: 'root'
 })
 export class HttpService {
+  private readonly backend = inject(BackendClientService);
   private readonly scriptConsole = inject(ScriptConsoleService);
   private readonly secretService = inject(SecretService);
 
@@ -112,8 +104,8 @@ export class HttpService {
 
       console.log('[HTTP Service] Sending request:', { method: request.method, url: processedUrl });
       const responseStr = requestId
-        ? await SendRequestWithID(requestId, request.method, processedUrl, headersJson, bodyStr)
-        : await SendRequest(request.method, processedUrl, headersJson, bodyStr);
+        ? await this.backend.sendRequestWithID(requestId, request.method, processedUrl, headersJson, bodyStr)
+        : await this.backend.sendRequest(request.method, processedUrl, headersJson, bodyStr);
 
       this.throwIfCancelled(responseStr);
       const responseTime = Date.now() - startTime;
@@ -287,7 +279,7 @@ export class HttpService {
         }
         const stringValue = String(value ?? '');
         scriptContext.variables[key] = stringValue;
-        SetVariable(key, stringValue).catch(err => console.error('Failed to sync variable:', err));
+        this.backend.setVariable(key, stringValue).catch(err => console.error('Failed to sync variable:', err));
       };
 
       const getVar = (key: string) => {
@@ -438,12 +430,14 @@ export class HttpService {
   }
 
   // History management
-  async loadHistory(fileId: string): Promise<HistoryItem[]> {
+  async loadHistory(fileId: string, filePath?: string): Promise<HistoryItem[]> {
     if (!fileId) {
       return [];
     }
     try {
-      const stored = await LoadFileHistory(fileId);
+      const stored = filePath
+        ? await this.backend.loadFileHistoryFromDir(fileId, dirname(filePath))
+        : await this.backend.loadFileHistoryFromRunLocation(fileId);
       if (stored) {
         const parsed = JSON.parse(stored);
         return parsed.map((item: any) => ({
@@ -457,24 +451,52 @@ export class HttpService {
     return [];
   }
 
-  private async saveHistory(fileId: string, history: HistoryItem[]): Promise<void> {
-    if (!fileId) {
-      return;
-    }
+  async saveHistorySnapshot(fileId: string, history: HistoryItem[], filePath?: string): Promise<void> {
+    if (!fileId) return;
+    const json = JSON.stringify(history || []);
     try {
-      await SaveFileHistory(fileId, JSON.stringify(history));
+      if (filePath) {
+        await this.backend.saveFileHistoryToDir(fileId, json, dirname(filePath));
+      } else {
+        await this.backend.saveFileHistoryToRunLocation(fileId, json);
+      }
     } catch (error) {
-      console.error('Error saving history for file', fileId, error);
+      console.error('Error saving history snapshot for file', fileId, error);
     }
   }
 
-  async addToHistory(fileId: string, item: HistoryItem, maxItems: number = 100): Promise<HistoryItem[]> {
-    const history = await this.loadHistory(fileId);
+  async addToHistory(fileId: string, item: HistoryItem, filePath?: string, maxItems: number = 100): Promise<HistoryItem[]> {
+    const history = await this.loadHistory(fileId, filePath);
     history.unshift(item);
     if (history.length > maxItems) {
       history.splice(maxItems);
     }
-    await this.saveHistory(fileId, history);
+    try {
+      if (filePath) {
+        await this.backend.saveFileHistoryToDir(fileId, JSON.stringify(history), dirname(filePath));
+      } else {
+        // Save to run location for unsaved tabs
+        await this.backend.saveFileHistoryToRunLocation(fileId, JSON.stringify(history));
+      }
+    } catch (error) {
+      console.error('Error saving history for file', fileId, error);
+    }
+
+    // If a file path was provided (file saved on disk), also save the response
+    // payload alongside the http file for easier inspection.
+    try {
+      if (filePath) {
+        // Save the response JSON for this history entry
+        const saved = await this.backend.saveResponseFile(filePath, JSON.stringify(item.responseData, null, 2));
+        console.debug('[HTTP Service] Saved response to', saved);
+      } else {
+        const saved = await this.backend.saveResponseFileToRunLocation(fileId, JSON.stringify(item.responseData, null, 2));
+        console.debug('[HTTP Service] Saved response to', saved);
+      }
+    } catch (err) {
+      console.warn('Failed to save response file:', err);
+    }
+
     return history;
   }
 
@@ -522,8 +544,8 @@ export class HttpService {
       console.log('[HTTP Service] Calling ExecuteRequests with data:', requestsData);
 
       const responseStr = requestId
-        ? await ExecuteRequestsWithID(requestId, requestsData)
-        : await ExecuteRequests(requestsData);
+        ? await this.backend.executeRequestsWithID(requestId, requestsData)
+        : await this.backend.executeRequests(requestsData);
 
       this.throwIfCancelled(responseStr);
       console.log('[HTTP Service] ExecuteRequests returned:', responseStr);
@@ -586,7 +608,7 @@ export class HttpService {
     this.cancelLoadTest(requestId);
 
     try {
-      await CancelBackendRequest(requestId);
+      await this.backend.cancelRequest(requestId);
     } catch (error) {
       console.error('[HTTP Service] Failed to cancel request', error);
       throw error;

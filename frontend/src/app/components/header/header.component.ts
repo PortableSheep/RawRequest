@@ -20,6 +20,9 @@ export class HeaderComponent {
   onFileSelect = output<number>();
   onNewFile = output<void>();
   onOpenFile = output<void>();
+  onSaveFile = output<void>();
+  onSaveFileAs = output<void>();
+  onOpenExamples = output<void>();
   onEnvChange = output<string>();
   onSecretsClick = output<void>();
   onDonateClick = output<void>();

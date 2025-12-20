@@ -127,12 +127,47 @@
             <span>Open</span>
         </button>
 
+        <!-- Examples -->
+        <button
+            type="button"
+            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+            (click)="onOpenExamples.emit()"
+            title="Open Examples"
+            aria-label="Open examples file"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9h1" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
+            <span>Examples</span>
+        </button>
+
+        <!-- Save -->
+        <button
+                type="button"
+                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-green-500/50 hover:text-green-400 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 transition-all shadow-sm group"
+                (click)="onSaveFile.emit()"
+                title="Save File"
+                aria-label="Save file"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 group-hover:text-green-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /></svg>
+            <span>Save</span>
+        </button>
+
+        <!-- Save As -->
+        <button
+            type="button"
+            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-green-500/50 hover:text-green-400 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 transition-all shadow-sm group"
+            (click)="onSaveFileAs.emit()"
+            title="Save As"
+            aria-label="Save file as"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 group-hover:text-green-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /><path d="M15 3v4" /></svg>
+            <span>Save As</span>
+        </button>
+
         <!-- Secrets -->
         <button
                 type="button"
                 class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-amber-500/50 hover:text-amber-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm group"
                 (click)="onSecretsClick.emit()"
-                [disabled]="!selectedEnv()"
                 title="Manage Secrets"
                 aria-label="Manage secrets"
         >

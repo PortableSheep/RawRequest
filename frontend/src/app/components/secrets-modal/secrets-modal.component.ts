@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, effect, input, output } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { SecretIndex, VaultInfo } from '../../services/secret.service';
@@ -13,14 +13,27 @@ import { SecretIndex, VaultInfo } from '../../services/secret.service';
 export class SecretsModalComponent {
   isOpen = input<boolean>(false);
   selectedEnv = input<string>('');
-  // environments = input<string[]>([]);
+  environments = input<string[]>([]);
   allSecrets = input<SecretIndex>({});
   vaultInfo = input<VaultInfo | null>(null);
 
   // Internal form state (not inputs)
   // selectedEnv = '';
+  targetEnv = '';
   newKey = '';
   newValue = '';
+
+  private wasOpen = false;
+
+  constructor() {
+    effect(() => {
+      const open = this.isOpen();
+      if (open && !this.wasOpen) {
+        this.targetEnv = (this.selectedEnv() || '').trim();
+      }
+      this.wasOpen = open;
+    });
+  }
 
   onClose = output<void>();
   onSave = output<{env: string, key: string, value: string}>();
@@ -31,12 +44,12 @@ export class SecretsModalComponent {
   Object = Object;
 
   handleSave() {
-    if (!this.newKey || !this.newValue || !this.selectedEnv()) {
+    if (!this.newKey || !this.newValue) {
       alert('Please fill in all fields');
       return;
     }
     this.onSave.emit({
-      env: this.selectedEnv(),
+      env: this.targetEnv,
       key: this.newKey,
       value: this.newValue
     });

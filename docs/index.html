@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="RawRequest — a fast, scriptable desktop HTTP client for builders." />
+  <title>RawRequest — Ship requests faster</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="nav">
+      <div class="logo">RawRequest</div>
+      <nav class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#workflow">Workflow</a>
+        <a href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn ghost" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-text">
+          <p class="eyebrow">Desktop HTTP client</p>
+          <h1>Ship requests faster, stay in flow.</h1>
+          <p class="subhead">RawRequest is a code-first HTTP client with folding, linting, scripts, secrets, and portable history — built for people who live in text.</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
+            <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
+          </div>
+          <div class="hero-meta">
+            <span>macOS + Windows</span>
+            <span class="dot">•</span>
+            <span>CodeMirror 6 editor</span>
+            <span class="dot">•</span>
+            <span>Helper-based updater</span>
+          </div>
+        </div>
+        <div class="hero-card">
+          <div class="card-header">requests.http</div>
+          <pre class="code"><code># Environments
+@env.dev.baseUrl http://localhost:3000
+@env.prod.baseUrl https://api.example.com
+
+### Login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+{
+  "email": "dev@rawrequest.dev",
+  "password": "{{secret:password}}"
+}
+> {
+  setVar('token', response.json.token);
+}
+
+### Get Profile
+GET {{baseUrl}}/profile
+Authorization: Bearer {{token}}
+Accept: application/json
+</code></pre>
+        </div>
+      </section>
+
+      <section id="features" class="features">
+        <div class="section-title">
+          <h2>Built for builders</h2>
+          <p>Everything you need to move fast, nothing you don’t.</p>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h3>Code-first editor</h3>
+            <p>CodeMirror 6 with search, folding, linting, run-at-cursor, and smart variable diagnostics.</p>
+          </div>
+          <div class="card">
+            <h3>Secrets & envs</h3>
+            <p>Encrypted vault with global + per-environment keys. No accidental diff leaks.</p>
+          </div>
+          <div class="card">
+            <h3>Portable history</h3>
+            <p>History and responses live beside your .http file (or cwd). Predictable, reviewable.</p>
+          </div>
+          <div class="card">
+            <h3>Scripts & chaining</h3>
+            <p>Pre/post scripts with goja, setVar chaining, response parsing helpers.</p>
+          </div>
+          <div class="card">
+            <h3>Update-smart</h3>
+            <p>Helper-based updater for user-writable installs; release-page fallback in one click.</p>
+          </div>
+          <div class="card">
+            <h3>Tested & typed</h3>
+            <p>Go backend + Angular frontend with Jest + Testing Library, clear side-effect seams.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="workflow" class="workflow">
+        <div class="section-title">
+          <h2>A workflow that sticks</h2>
+          <p>Keep requests, history, and scripts in text — ready for git.</p>
+        </div>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div>
+              <h3>Author .http files</h3>
+              <p>Organize requests with headings, env placeholders, and scripts. Run any section instantly.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div>
+              <h3>Wire secrets + envs</h3>
+              <p>Pull from secure vaults and system env vars. Lint catches unknown keys early.</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div>
+              <h3>Keep history nearby</h3>
+              <p>Responses and history sit beside your file (or your run location for unsaved work).</p>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div>
+              <h3>Update safely</h3>
+              <p>Helper app applies updates for user-writable installs; releases page fallback is one click away.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="cta">
+        <div>
+          <h2>Ready to send better requests?</h2>
+          <p>Grab the latest release and stay in flow. macOS & Windows supported.</p>
+        </div>
+        <div class="cta-actions">
+          <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
+          <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">Source on GitHub</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="logo">RawRequest</div>
+      <div class="footer-links">
+        <a href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">GitHub</a>
+        <a href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Releases</a>
+        <a href="https://github.com/portablesheep/RawRequest/blob/main/LICENSE" target="_blank" rel="noreferrer">License</a>
+      </div>
+      <div class="footer-meta">Built with Go, Wails, and Angular.</div>
+    </footer>
+  </div>
+</body>
+</html>

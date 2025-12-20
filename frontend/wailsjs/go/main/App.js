@@ -46,6 +46,10 @@ export function GetEnvironments() {
   return window['go']['main']['App']['GetEnvironments']();
 }
 
+export function GetExamplesFile() {
+  return window['go']['main']['App']['GetExamplesFile']();
+}
+
 export function GetExamplesForFirstRun() {
   return window['go']['main']['App']['GetExamplesForFirstRun']();
 }
@@ -80,6 +84,14 @@ export function ListSecrets() {
 
 export function LoadFileHistory(arg1) {
   return window['go']['main']['App']['LoadFileHistory'](arg1);
+}
+
+export function LoadFileHistoryFromDir(arg1, arg2) {
+  return window['go']['main']['App']['LoadFileHistoryFromDir'](arg1, arg2);
+}
+
+export function LoadFileHistoryFromRunLocation(arg1) {
+  return window['go']['main']['App']['LoadFileHistoryFromRunLocation'](arg1);
 }
 
 export function LoadWindowState() {
@@ -130,8 +142,28 @@ export function RevealInFinder(arg1) {
   return window['go']['main']['App']['RevealInFinder'](arg1);
 }
 
+export function SaveFileContents(arg1, arg2) {
+  return window['go']['main']['App']['SaveFileContents'](arg1, arg2);
+}
+
 export function SaveFileHistory(arg1, arg2) {
   return window['go']['main']['App']['SaveFileHistory'](arg1, arg2);
+}
+
+export function SaveFileHistoryToDir(arg1, arg2, arg3) {
+  return window['go']['main']['App']['SaveFileHistoryToDir'](arg1, arg2, arg3);
+}
+
+export function SaveFileHistoryToRunLocation(arg1, arg2) {
+  return window['go']['main']['App']['SaveFileHistoryToRunLocation'](arg1, arg2);
+}
+
+export function SaveResponseFile(arg1, arg2) {
+  return window['go']['main']['App']['SaveResponseFile'](arg1, arg2);
+}
+
+export function SaveResponseFileToRunLocation(arg1, arg2) {
+  return window['go']['main']['App']['SaveResponseFileToRunLocation'](arg1, arg2);
 }
 
 export function SaveSecret(arg1, arg2, arg3) {
@@ -168,4 +200,12 @@ export function SetEnvironment(arg1) {
 
 export function SetVariable(arg1, arg2) {
   return window['go']['main']['App']['SetVariable'](arg1, arg2);
+}
+
+export function ShowSaveDialog(arg1) {
+  return window['go']['main']['App']['ShowSaveDialog'](arg1);
+}
+
+export function StartUpdateAndRestart(arg1) {
+  return window['go']['main']['App']['StartUpdateAndRestart'](arg1);
 }

@@ -19,12 +19,15 @@ import {
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry } from './models/http.models';
 import { HttpService } from './services/http.service';
-import { ParserService } from './services/parser.service';
 import { SecretService, SecretIndex, VaultInfo } from './services/secret.service';
 import { ScriptConsoleService } from './services/script-console.service';
 import { ToastService } from './services/toast.service';
 import { UpdateService } from './services/update.service';
 import { ScriptSnippet } from './services/script-snippet.service';
+import { basename } from './utils/path';
+import { generateFileId, normalizeFileTab } from './utils/file-tab-utils';
+import { HistoryStoreService } from './services/history-store.service';
+import { WorkspaceFacadeService } from './services/workspace-facade.service';
 import { Subject, takeUntil } from 'rxjs';
 
 type AlertType = 'info' | 'success' | 'warning' | 'danger';
@@ -57,11 +60,12 @@ export class AppComponent implements OnInit, OnDestroy {
   title = 'RawRequest';
 
   private httpService = inject(HttpService);
-  private parserService = inject(ParserService);
   private secretService = inject(SecretService);
   private scriptConsole = inject(ScriptConsoleService);
   private toast = inject(ToastService);
   private updateService = inject(UpdateService);
+  private historyStore = inject(HistoryStoreService);
+  private workspace = inject(WorkspaceFacadeService);
   private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
 
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
@@ -114,7 +118,7 @@ export class AppComponent implements OnInit, OnDestroy {
     startedAt: number;
   } | null = null;
   isCancellingActiveRequest = false;
-  private historyCache: { [fileId: string]: HistoryItem[] } = {};
+  // History is cached in HistoryStoreService
   // executeRequestTrigger = signal<number | null>(null);
 
   // UI state
@@ -174,15 +178,20 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private loadFiles(): void {
-    const savedFiles = this.httpService.loadFiles();
-    if (savedFiles.length > 0) {
-      const normalized = savedFiles.map(file => this.normalizeFile(file));
-      this.files = normalized;
-      this.filesSignal.set(normalized);
-      this.restoreSessionState();
-      this.syncCurrentEnvWithFile(this.currentFileIndex);
+    const initial = this.workspace.loadFromStorage(this.LAST_SESSION_KEY);
+    if (initial.files.length > 0) {
+      this.files = initial.files;
+      this.filesSignal.set(initial.files);
+      this.currentFileIndex = initial.currentFileIndex;
+      this.currentFileIndexSignal.set(initial.currentFileIndex);
+
+      const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
+      this.currentEnvSignal.set(synced.currentEnv || '');
+
       this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
-      this.persistSessionState();
+      this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
     } else {
       // Create default file with example content
       this.addNewTab();
@@ -210,14 +219,22 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // File management
   onFilesChange(files: FileTab[]) {
-    const normalized = files.map(file => this.normalizeFile(file));
+    const normalized = this.workspace.normalizeFiles(files);
     this.files = normalized;
     this.filesSignal.set(normalized);
-    this.syncCurrentEnvWithFile(this.currentFileIndex);
+
+    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+    if (synced.files !== this.files) {
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
+    }
+    this.currentEnvSignal.set(synced.currentEnv || '');
+
     const activeFile = this.files[this.currentFileIndex];
     if (activeFile) {
-      if (this.historyCache[activeFile.id]) {
-        this.history = this.historyCache[activeFile.id];
+      const cached = this.historyStore.get(activeFile.id);
+      if (cached) {
+        this.history = cached;
       } else {
         this.history = [];
         this.loadHistoryForFile(activeFile.id);
@@ -225,68 +242,42 @@ export class AppComponent implements OnInit, OnDestroy {
     } else {
       this.history = [];
     }
-    this.persistSessionState();
+    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
   }
 
   onCurrentFileIndexChange(index: number) {
     this.currentFileIndex = index;
     this.currentFileIndexSignal.set(index);
-    this.syncCurrentEnvWithFile(index);
+
+    const synced = this.workspace.syncCurrentEnvWithFile(this.files, index);
+    if (synced.files !== this.files) {
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
+    }
+    this.currentEnvSignal.set(synced.currentEnv || '');
+
     this.loadHistoryForFile(this.files[index]?.id);
-    this.persistSessionState();
+    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
   }
 
   onCurrentEnvChange(env: string) {
     const file = this.files[this.currentFileIndex];
     if (file) {
-      this.replaceFileAtIndex(this.currentFileIndex, { ...file, selectedEnv: env });
+      const updatedFiles = this.workspace.replaceFileAtIndex(this.files, this.currentFileIndex, { ...file, selectedEnv: env });
+      this.files = updatedFiles;
+      this.filesSignal.set(updatedFiles);
     }
     this.currentEnvSignal.set(env);
     this.httpService.saveFiles(this.files);
-    this.persistSessionState();
+    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
   }
 
   // Editor content change handler
   onEditorContentChange(content: string) {
-    const previousFile = this.files[this.currentFileIndex];
-    if (!previousFile) {
-      return;
-    }
-
-    // Parse the updated content
-    const parsed = this.parserService.parseHttpFile(content);
-    const fileDisplayName = parsed.fileDisplayName?.trim() || undefined;
-
-    const envNames = Object.keys(parsed.environments || {});
-    let selectedEnv = previousFile.selectedEnv || '';
-    if (selectedEnv && !envNames.includes(selectedEnv)) {
-      selectedEnv = envNames[0] || '';
-    } else if (!selectedEnv && envNames.length > 0) {
-      selectedEnv = envNames[0];
-    }
-
-    // Update the current file with parsed data
-    const updatedFile: FileTab = {
-      ...previousFile,
-      content,
-      requests: parsed.requests,
-      environments: parsed.environments,
-      variables: parsed.variables,
-      groups: parsed.groups,
-      selectedEnv,
-      displayName: fileDisplayName
-    };
-
-    const updatedFiles = [...this.files];
-    updatedFiles[this.currentFileIndex] = updatedFile;
-
-    // Update both legacy and signal state
-    this.files = updatedFiles;
-    this.filesSignal.set(updatedFiles);
-    this.currentEnvSignal.set(selectedEnv);
-
-    // Save files to localStorage
-    this.httpService.saveFiles(this.files);
+    const updated = this.workspace.updateFileContent(this.files, this.currentFileIndex, content);
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentEnvSignal.set(updated.currentEnv || '');
   }
 
   // Request execution
@@ -338,7 +329,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onHistoryUpdated(event: { fileId: string; history: HistoryItem[] }) {
-    this.historyCache[event.fileId] = event.history;
+    this.historyStore.set(event.fileId, event.history);
     const activeFile = this.files[this.currentFileIndex];
     if (activeFile && activeFile.id === event.fileId) {
       this.history = event.history;
@@ -375,32 +366,24 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   closeTab(index: number) {
-    if (this.files.length <= 1) return; // Keep at least one file
+    const updated = this.workspace.closeTab(this.LAST_SESSION_KEY, this.files, this.currentFileIndex, index);
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentFileIndex = updated.currentFileIndex;
+    this.currentFileIndexSignal.set(updated.currentFileIndex);
 
-    const removedFile = this.files[index];
-    if (removedFile) {
-      delete this.historyCache[removedFile.id];
-    }
-
-    this.files = this.files.filter((_, i) => i !== index);
-    this.filesSignal.set(this.files);
-
-    // Adjust current index if necessary
-    if (this.currentFileIndex >= this.files.length) {
-      this.currentFileIndex = this.files.length - 1;
-    } else if (this.currentFileIndex > index) {
-      this.currentFileIndex--;
-    }
-    this.currentFileIndexSignal.set(this.currentFileIndex);
     if (this.files.length) {
-      this.syncCurrentEnvWithFile(this.currentFileIndex);
+      const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+      if (synced.files !== this.files) {
+        this.files = synced.files;
+        this.filesSignal.set(synced.files);
+      }
+      this.currentEnvSignal.set(synced.currentEnv || '');
       this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
     } else {
       this.currentEnvSignal.set('');
       this.history = [];
     }
-    this.httpService.saveFiles(this.files);
-    this.persistSessionState();
   }
 
   async revealInFinder(index: number) {
@@ -420,50 +403,36 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   closeOtherTabs(keepIndex: number) {
-    if (this.files.length <= 1) return;
+    const updated = this.workspace.closeOtherTabs(this.LAST_SESSION_KEY, this.files, keepIndex);
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentFileIndex = updated.currentFileIndex;
+    this.currentFileIndexSignal.set(updated.currentFileIndex);
 
-    const fileToKeep = this.files[keepIndex];
-    if (!fileToKeep) return;
-
-    // Clean up history caches for closed files
-    this.files.forEach((file, i) => {
-      if (i !== keepIndex && file) {
-        delete this.historyCache[file.id];
-      }
-    });
-
-    this.files = [fileToKeep];
-    this.filesSignal.set(this.files);
-    this.currentFileIndex = 0;
-    this.currentFileIndexSignal.set(0);
-    this.syncCurrentEnvWithFile(0);
-    this.loadHistoryForFile(fileToKeep.id);
-    this.httpService.saveFiles(this.files);
-    this.persistSessionState();
+    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+    if (synced.files !== this.files) {
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
+    }
+    this.currentEnvSignal.set(synced.currentEnv || '');
+    this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
   }
 
   addNewTab() {
-    const newFile: FileTab = {
-      id: this.generateFileId(),
-      name: `Untitled-${this.files.length + 1}.http`,
-      content: '',
-      requests: [],
-      environments: {},
-      variables: {},
-      responseData: {},
-      groups: [],
-      selectedEnv: ''
-    };
-    const normalizedFile = this.normalizeFile(newFile);
-    this.files = [...this.files, normalizedFile];
-    this.filesSignal.set(this.files);
-    this.currentFileIndex = this.files.length - 1;
-    this.currentFileIndexSignal.set(this.currentFileIndex);
-    this.syncCurrentEnvWithFile(this.currentFileIndex);
-    this.historyCache[normalizedFile.id] = [];
+    const updated = this.workspace.addNewTab(this.LAST_SESSION_KEY, this.files);
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentFileIndex = updated.currentFileIndex;
+    this.currentFileIndexSignal.set(updated.currentFileIndex);
+
+    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+    if (synced.files !== this.files) {
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
+    }
+    this.currentEnvSignal.set(synced.currentEnv || '');
+
     this.history = [];
-    this.httpService.saveFiles(this.files);
-    this.persistSessionState();
   }
 
   async openFile() {
@@ -474,8 +443,13 @@ export class AppComponent implements OnInit, OnDestroy {
       
       if (filePaths && filePaths.length > 0) {
         for (const filePath of filePaths) {
+          const existingIndex = this.files.findIndex(file => file.filePath === filePath || file.id === filePath);
+          if (existingIndex >= 0) {
+            this.switchToFile(existingIndex);
+            continue;
+          }
           const content = await ReadFileContents(filePath);
-          const fileName = filePath.split('/').pop() || filePath.split('\\').pop() || 'Untitled.http';
+          const fileName = basename(filePath) || 'Untitled.http';
           this.addFileFromContent(fileName, content, filePath);
         }
       }
@@ -506,65 +480,39 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onTabsReordered(event: { fromIndex: number; toIndex: number }) {
-    const filesLength = this.files.length;
-    if (!filesLength) {
-      return;
-    }
+    const updated = this.workspace.reorderTabs(
+      this.LAST_SESSION_KEY,
+      this.files,
+      this.currentFileIndex,
+      event.fromIndex,
+      event.toIndex
+    );
 
-    const fromIndex = Math.max(0, Math.min(filesLength - 1, event.fromIndex));
-    const toIndex = Math.max(0, Math.min(filesLength - 1, event.toIndex));
-    if (fromIndex === toIndex) {
-      return;
-    }
-
-    const reordered = [...this.files];
-    const [moved] = reordered.splice(fromIndex, 1);
-    reordered.splice(toIndex, 0, moved);
-
-    const activeFileId = this.files[this.currentFileIndex]?.id;
-    this.files = reordered;
-    this.filesSignal.set(reordered);
-    if (activeFileId) {
-      const nextActiveIndex = reordered.findIndex(file => file.id === activeFileId);
-      if (nextActiveIndex !== -1) {
-        this.currentFileIndex = nextActiveIndex;
-        this.currentFileIndexSignal.set(nextActiveIndex);
-      }
-    }
-
-    this.httpService.saveFiles(this.files);
-    this.persistSessionState();
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentFileIndex = updated.currentFileIndex;
+    this.currentFileIndexSignal.set(updated.currentFileIndex);
   }
 
   private addFileFromContent(fileName: string, content: string, filePath?: string) {
-    // Parse the content to extract environments and variables
-    const parsed = this.parserService.parseHttpFile(content);
-    const envNames = Object.keys(parsed.environments || {});
-    const fileDisplayName = parsed.fileDisplayName?.trim() || undefined;
+    const updated = this.workspace.addFileFromContent(
+      this.LAST_SESSION_KEY,
+      this.files,
+      fileName,
+      content,
+      filePath
+    );
 
-    const newFile: FileTab = {
-      id: this.generateFileId(),
-      name: fileName,
-      content: content,
-      requests: parsed.requests,
-      environments: parsed.environments,
-      variables: parsed.variables,
-      responseData: {},
-      groups: parsed.groups,
-      selectedEnv: envNames[0] || '',
-      displayName: fileDisplayName,
-      filePath: filePath
-    };
-    const normalizedFile = this.normalizeFile(newFile);
-    this.files = [...this.files, normalizedFile];
-    this.filesSignal.set(this.files);
-    this.currentFileIndex = this.files.length - 1;
-    this.currentFileIndexSignal.set(this.currentFileIndex);
-    this.syncCurrentEnvWithFile(this.currentFileIndex);
-    this.historyCache[normalizedFile.id] = [];
-    this.loadHistoryForFile(normalizedFile.id);
-    this.httpService.saveFiles(this.files);
-    this.persistSessionState();
+    this.files = updated.files;
+    this.filesSignal.set(updated.files);
+    this.currentFileIndex = updated.currentFileIndex;
+    this.currentFileIndexSignal.set(updated.currentFileIndex);
+
+    this.currentEnvSignal.set(updated.currentEnv || '');
+    this.history = [];
+    if (updated.activeFileId) {
+      this.loadHistoryForFile(updated.activeFileId);
+    }
   }
 
   getEnvironments(): string[] {
@@ -572,7 +520,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get currentFile(): FileTab {
-    return this.files[this.currentFileIndex] || { id: this.generateFileId(), name: '', content: '', requests: [], environments: {}, variables: {}, responseData: {}, groups: [], selectedEnv: '' };
+    return this.files[this.currentFileIndex] || { id: generateFileId(), name: '', content: '', requests: [], environments: {}, variables: {}, responseData: {}, groups: [], selectedEnv: '' };
   }
 
   getActiveRequestDetails(): Request | null {
@@ -688,54 +636,17 @@ export class AppComponent implements OnInit, OnDestroy {
   //   localStorage.setItem('rawrequest_environment', this.currentEnv);
   // }
 
-  private normalizeFile(file: FileTab): FileTab {
-    const envNames = Object.keys(file.environments || {});
-    let selectedEnv = file.selectedEnv ?? '';
-
-    if (selectedEnv && !envNames.includes(selectedEnv)) {
-      selectedEnv = envNames[0] || '';
-    } else if (!selectedEnv && envNames.length > 0) {
-      selectedEnv = envNames[0];
-    } else if (!envNames.length) {
-      selectedEnv = '';
-    }
-
-    const id = file.id && file.id.length ? file.id : this.generateFileId();
-    const displayName = file.displayName?.trim();
-
-    return {
-      ...file,
-      id,
-      selectedEnv,
-      displayName: displayName || undefined
-    };
-  }
-
-  private generateFileId(): string {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID();
-    }
-    return `file-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  }
-
   private syncCurrentEnvWithFile(index: number): void {
-    const file = this.files[index];
-    if (!file) {
-      this.currentEnvSignal.set('');
-      return;
+    const synced = this.workspace.syncCurrentEnvWithFile(this.files, index);
+    if (synced.files !== this.files) {
+      this.files = synced.files;
+      this.filesSignal.set(synced.files);
     }
-
-    const normalized = this.normalizeFile(file);
-    if (normalized !== file) {
-      this.replaceFileAtIndex(index, normalized);
-    }
-
-    this.currentEnvSignal.set(normalized.selectedEnv || '');
+    this.currentEnvSignal.set(synced.currentEnv || '');
   }
 
   private replaceFileAtIndex(index: number, newFile: FileTab): void {
-    const updated = [...this.files];
-    updated[index] = newFile;
+    const updated = this.workspace.replaceFileAtIndex(this.files, index, newFile);
     this.files = updated;
     this.filesSignal.set(updated);
   }
@@ -745,6 +656,120 @@ export class AppComponent implements OnInit, OnDestroy {
     this.pendingRequestIndex = null;
     this.clearActiveRequestState();
     this.triggerQueuedRequestIfNeeded();
+  }
+
+  async saveCurrentFile(): Promise<void> {
+    const file = this.currentFile;
+    if (!file) return;
+
+    try {
+      const { SaveFileContents, ShowSaveDialog } = await import('../../wailsjs/go/main/App');
+
+      if (file.filePath && file.filePath.length) {
+        await SaveFileContents(file.filePath, file.content);
+        console.log('Saved file to', file.filePath);
+      } else {
+        const previousId = file.id;
+        // Ask for a location
+        const defaultName = file.name || file.displayName || 'untitled.http';
+        const path = await ShowSaveDialog(defaultName);
+        if (path && path.length) {
+          await SaveFileContents(path, file.content);
+          // Update file metadata to point to saved path
+          const updated = { ...file, filePath: path, id: path, name: basename(path) } as any;
+          const idx = this.currentFileIndex;
+          this.replaceFileAtIndex(idx, updated);
+          this.httpService.saveFiles(this.files);
+          console.log('Saved new file to', path);
+
+          // Migrate any existing (unsaved) history into the file directory
+          try {
+            const priorHistory = await this.httpService.loadHistory(previousId);
+            if (priorHistory?.length) {
+              await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
+              this.historyStore.delete(previousId);
+              this.historyStore.set(updated.id, priorHistory);
+              if (this.files[this.currentFileIndex]?.id === updated.id) {
+                this.history = priorHistory;
+              }
+            }
+          } catch (historyErr) {
+            console.warn('Failed to migrate history on first save:', historyErr);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Failed to save file:', err);
+    }
+  }
+
+  async saveCurrentFileAs(): Promise<void> {
+    const file = this.currentFile;
+    if (!file) return;
+
+    try {
+      const { SaveFileContents, ShowSaveDialog } = await import('../../wailsjs/go/main/App');
+
+      const previousId = file.id;
+      const previousPath = file.filePath;
+      const defaultName = basename(file.filePath || file.name || file.displayName || 'untitled.http');
+      const path = await ShowSaveDialog(defaultName);
+      if (!path || !path.length) {
+        return;
+      }
+
+      await SaveFileContents(path, file.content);
+      const updated = {
+        ...file,
+        filePath: path,
+        id: path,
+        name: basename(path)
+      } as any;
+
+      const idx = this.currentFileIndex;
+      this.replaceFileAtIndex(idx, updated);
+      this.httpService.saveFiles(this.files);
+      console.log('Saved file as', path);
+
+      try {
+        const priorHistory = await this.httpService.loadHistory(previousId, previousPath);
+        if (priorHistory?.length) {
+          await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
+        }
+        this.historyStore.delete(previousId);
+        this.historyStore.set(updated.id, priorHistory || []);
+        if (this.files[this.currentFileIndex]?.id === updated.id) {
+          this.history = this.historyStore.get(updated.id) || [];
+        }
+      } catch (historyErr) {
+        console.warn('Failed to migrate history on Save As:', historyErr);
+      }
+    } catch (err) {
+      console.error('Failed to save file as:', err);
+    }
+  }
+
+  async openExamplesFile(): Promise<void> {
+    try {
+      const { GetExamplesFile } = await import('../../wailsjs/go/main/App');
+      const result = await GetExamplesFile();
+      const content = result?.content || '';
+      const name = result?.filePath || 'Examples.http';
+
+      const updated = this.workspace.upsertExamplesTab(this.LAST_SESSION_KEY, this.files, content, name);
+      this.files = updated.files;
+      this.filesSignal.set(updated.files);
+      this.currentFileIndex = updated.currentFileIndex;
+      this.currentFileIndexSignal.set(updated.currentFileIndex);
+      this.currentEnvSignal.set(updated.currentEnv || '');
+
+      if (updated.activeFileId === '__examples__') {
+        this.history = [];
+      }
+    } catch (error) {
+      console.error('Failed to open examples file:', error);
+      this.toast.error('Failed to open examples file.');
+    }
   }
 
   private triggerQueuedRequestIfNeeded(): void {
@@ -765,59 +790,21 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    if (this.historyCache[fileId]) {
-      this.history = this.historyCache[fileId];
+    const filePath = this.files.find(file => file.id === fileId)?.filePath;
+
+    const cached = this.historyStore.get(fileId);
+    if (cached) {
+      this.history = cached;
       return;
     }
 
-    this.httpService.loadHistory(fileId)
+    this.historyStore.ensureLoaded(fileId, filePath)
       .then(history => {
-        this.historyCache[fileId] = history;
         if (this.files[this.currentFileIndex]?.id === fileId) {
           this.history = history;
         }
       })
       .catch(error => console.error('Failed to load history for file', fileId, error));
-  }
-
-  private persistSessionState(): void {
-    const activeFile = this.files[this.currentFileIndex];
-    if (!activeFile) {
-      localStorage.removeItem(this.LAST_SESSION_KEY);
-      return;
-    }
-
-    const payload = {
-      fileId: activeFile.id,
-      fileName: activeFile.name,
-      selectedEnv: activeFile.selectedEnv || ''
-    };
-
-    try {
-      localStorage.setItem(this.LAST_SESSION_KEY, JSON.stringify(payload));
-    } catch (error) {
-      console.error('Failed to persist session state', error);
-    }
-  }
-
-  private restoreSessionState(): void {
-    try {
-      const stored = localStorage.getItem(this.LAST_SESSION_KEY);
-      if (!stored) {
-        return;
-      }
-      const session = JSON.parse(stored) as { fileId?: string; fileName?: string; selectedEnv?: string };
-      const targetIndex = this.files.findIndex(file => file.id === session.fileId || file.name === session.fileName);
-      if (targetIndex >= 0) {
-        this.currentFileIndex = targetIndex;
-        this.currentFileIndexSignal.set(targetIndex);
-        if (session.selectedEnv && this.files[targetIndex].selectedEnv !== session.selectedEnv) {
-          this.replaceFileAtIndex(targetIndex, { ...this.files[targetIndex], selectedEnv: session.selectedEnv });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to restore session state', error);
-    }
   }
 
   donate(amount: number) {
@@ -948,23 +935,28 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.updateService.checkForUpdates();
     } catch (error) {
       // Silently fail - update check is non-critical
-      console.debug('Update check failed:', error);
+      console.warn('Update check failed:', error);
     }
   }
 
   private async checkFirstRun() {
     try {
-      console.log('checkFirstRun: Starting first run check');
       const { GetExamplesForFirstRun } = await import('../../wailsjs/go/main/App');
-      console.log('checkFirstRun: Imported GetExamplesForFirstRun');
-      const [content, filePath, isFirstRun] = await GetExamplesForFirstRun();
-      console.log('checkFirstRun: Called GetExamplesForFirstRun', { isFirstRun, hasContent: !!content, filePath });
-      
+      const resp = await GetExamplesForFirstRun();
+      const content = resp?.content || '';
+      const filePath = resp?.filePath || 'examples.http';
+      const isFirstRun = !!resp?.isFirstRun;
+
       if (isFirstRun && content) {
         // Open the examples file
         const fileName = 'examples.http';
         this.addFileFromContent(fileName, content, filePath);
-        console.log('First run detected - opened examples file');
+        try {
+          const { MarkFirstRunComplete } = await import('../../wailsjs/go/main/App');
+          await MarkFirstRunComplete();
+        } catch (err) {
+          console.warn('Failed to mark first run complete:', err);
+        }
       }
     } catch (error) {
       console.warn('Failed to check for first run:', error);
