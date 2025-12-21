@@ -5,7 +5,7 @@ import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, hoverTooltip, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
-import { foldGutter, foldKeymap, foldService } from '@codemirror/language';
+import { foldKeymap, foldService } from '@codemirror/language';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 
@@ -130,10 +130,10 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       extensions: [
         basicSetup,
         oneDark,
-        foldGutter(),
         this.createRequestFolding(),
         highlightSelectionMatches(),
         this.createRequestHighlighter(),
+        this.createDependsLinker(),
         this.autocompleteCompartment.of(this.createAutocomplete()),
         this.createVariableHoverTooltip(),
         this.lintCompartment.of(this.createLintExtensions()),
@@ -145,6 +145,27 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
+            // Click-to-jump for @depends targets
+            if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+              const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+              if (pos !== null) {
+                const line = view.state.doc.lineAt(pos);
+                const depends = extractDependsTarget(line.text);
+                if (depends) {
+                  const from = line.from + depends.start;
+                  const to = line.from + depends.end;
+                  if (pos >= from && pos <= to) {
+                    const jumped = this.jumpToRequestByName(view, depends.target);
+                    if (jumped) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      return true;
+                    }
+                  }
+                }
+              }
+            }
+
             if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
               const scrollTop = view.scrollDOM.scrollTop;
               const hadSelection = !view.state.selection.main.empty;
@@ -196,6 +217,69 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     });
 
     this.editorView.dom.style.height = '100%';
+  }
+
+  private createDependsLinker() {
+    const linkMark = Decoration.mark({ class: 'cm-depends-link' });
+    return ViewPlugin.fromClass(class {
+      decorations: DecorationSet;
+
+      constructor(view: EditorView) {
+        this.decorations = this.buildDecorations(view);
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged || update.viewportChanged) {
+          this.decorations = this.buildDecorations(update.view);
+        }
+      }
+
+      buildDecorations(view: EditorView): DecorationSet {
+        const builder = new RangeSetBuilder<Decoration>();
+        for (const range of view.visibleRanges) {
+          let pos = range.from;
+          while (pos <= range.to) {
+            const line = view.state.doc.lineAt(pos);
+            const depends = extractDependsTarget(line.text);
+            if (depends) {
+              const from = line.from + depends.start;
+              const to = line.from + depends.end;
+              if (to > from) {
+                builder.add(from, to, linkMark);
+              }
+            }
+            pos = line.to + 1;
+          }
+        }
+        return builder.finish();
+      }
+    }, {
+      decorations: v => v.decorations
+    });
+  }
+
+  private jumpToRequestByName(view: EditorView, targetName: string): boolean {
+    const target = targetName.trim();
+    if (!target) return false;
+
+    const state = view.state;
+    const escaped = target.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const nameRx = new RegExp(`^@name\\s+${escaped}\\s*$`, 'i');
+    const metaRx = new RegExp(`^###\\s*name:\\s*${escaped}\\s*###\\s*$`, 'i');
+
+    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
+      const line = state.doc.line(lineNo);
+      const trimmed = line.text.trim();
+      if (nameRx.test(trimmed) || metaRx.test(trimmed)) {
+        const anchor = line.from;
+        view.dispatch({
+          selection: { anchor },
+          effects: EditorView.scrollIntoView(anchor, { y: 'center' })
+        });
+        return true;
+      }
+    }
+    return false;
   }
 
   private createRequestHighlighter() {

@@ -12,7 +12,12 @@ class PlayGutterMarker extends GutterMarker {
 
   override toDOM() {
     const button = document.createElement('button');
-    button.innerHTML = '▶';
+    button.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M5 12h14" />
+        <path d="M13 5l7 7-7 7" />
+      </svg>
+    `;
     button.className = 'gutter-play-btn';
     button.dataset['requestIndex'] = this.requestIndex.toString();
     button.title = 'Send request';
@@ -28,7 +33,12 @@ class PlayGutterMarker extends GutterMarker {
 class ChainGutterMarker extends GutterMarker {
   override toDOM() {
     const icon = document.createElement('span');
-    icon.innerHTML = '🔗';
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M10 13a5 5 0 0 1 0-7l1.5-1.5a5 5 0 0 1 7 7L17 13" />
+        <path d="M14 11a5 5 0 0 1 0 7L12.5 19.5a5 5 0 0 1-7-7L7 11" />
+      </svg>
+    `;
     icon.className = 'gutter-chain-icon';
     icon.title = 'Chained request';
     return icon;
@@ -38,7 +48,11 @@ class ChainGutterMarker extends GutterMarker {
 class LightningGutterMarker extends GutterMarker {
   override toDOM() {
     const icon = document.createElement('span');
-    icon.innerHTML = '⚡️';
+    icon.innerHTML = `
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+      </svg>
+    `;
     icon.className = 'gutter-lightning-icon';
     icon.title = 'Load test';
     return icon;
