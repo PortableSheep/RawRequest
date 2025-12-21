@@ -19,19 +19,19 @@ jobs:
         run: |
           mkdir -p frontend/dist
           if [ ! -f frontend/dist/index.html ]; then
-            cat > frontend/dist/index.html <<'EOF'
-            <!doctype html>
-            <html lang="en">
-              <head>
-                <meta charset="utf-8" />
-                <meta name="viewport" content="width=device-width, initial-scale=1" />
-                <title>RawRequest</title>
-              </head>
-              <body>
-                <p>Placeholder for CI: frontend not built.</p>
-              </body>
-            </html>
-            EOF
+            printf '%s\n' \
+              '<!doctype html>' \
+              '<html lang="en">' \
+              '  <head>' \
+              '    <meta charset="utf-8" />' \
+              '    <meta name="viewport" content="width=device-width, initial-scale=1" />' \
+              '    <title>RawRequest</title>' \
+              '  </head>' \
+              '  <body>' \
+              '    <p>Placeholder for CI: frontend not built.</p>' \
+              '  </body>' \
+              '</html>' \
+              > frontend/dist/index.html
           fi
       - name: Go test
         run: go test ./...
