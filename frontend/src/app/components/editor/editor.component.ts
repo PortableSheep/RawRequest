@@ -51,6 +51,43 @@ const CONTENT_TYPES = [
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'];
 
+const LOAD_TEST_KEYS: Array<{ label: string; detail: string }> = [
+  // Concurrency / users
+  { label: 'concurrent', detail: 'active users (canonical)' },
+  { label: 'users', detail: 'active users (alias)' },
+  { label: 'concurrency', detail: 'active users (alias)' },
+
+  // Stop conditions
+  { label: 'iterations', detail: 'total requests (canonical)' },
+  { label: 'amount', detail: 'total requests (alias)' },
+  { label: 'requests', detail: 'total requests (alias)' },
+  { label: 'count', detail: 'total requests (alias)' },
+  { label: 'duration', detail: 'run time (e.g. 30s, 5m)' },
+  { label: 'runtime', detail: 'run time (alias)' },
+  { label: 'time', detail: 'run time (alias)' },
+
+  // Ramp/spawn
+  { label: 'start', detail: 'starting users' },
+  { label: 'max', detail: 'max users' },
+  { label: 'rampUp', detail: 'ramp duration (e.g. 30s, 2m)' },
+  { label: 'ramp', detail: 'ramp duration (alias)' },
+  { label: 'spawnRate', detail: 'users per second' },
+  { label: 'spawn_rate', detail: 'users per second (alias)' },
+
+  // Think time / pacing
+  { label: 'delay', detail: 'fixed per-user delay between requests' },
+  { label: 'wait', detail: 'fixed per-user delay (alias)' },
+  { label: 'thinkTime', detail: 'fixed per-user delay (alias)' },
+  { label: 'waitMin', detail: 'min random wait (e.g. 200ms)' },
+  { label: 'waitMax', detail: 'max random wait (e.g. 2s)' },
+  { label: 'minWait', detail: 'min random wait (alias)' },
+  { label: 'maxWait', detail: 'max random wait (alias)' },
+
+  // Throttle
+  { label: 'requestsPerSecond', detail: 'global RPS cap' },
+  { label: 'rps', detail: 'global RPS cap (alias)' },
+];
+
 @Component({
   selector: 'app-editor',
   standalone: true,
@@ -59,6 +96,7 @@ const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'];
   styleUrls: ['./editor.component.scss']
 })
 export class EditorComponent implements AfterViewInit, OnDestroy {
+  @ViewChild('wrapper', { static: true }) wrapperContainer!: ElementRef<HTMLElement>;
   @ViewChild('editor', { static: true }) editorContainer!: ElementRef;
 
   content = input.required<string>();
@@ -308,10 +346,25 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               }
             }
 
+            const anchorPos = pos ?? view.state.selection.main.head;
+            const caretCoords = view.coordsAtPos(anchorPos);
+            let desiredX = caretCoords?.left ?? event.clientX;
+            let desiredY = caretCoords?.bottom ?? event.clientY;
+
+            // Clamp to viewport so the menu doesn't fall off-screen.
+            const menuWidth = 220;
+            const menuHeight = 190;
+            desiredX = Math.max(8, Math.min(desiredX, window.innerWidth - menuWidth - 8));
+            desiredY = Math.max(8, Math.min(desiredY, window.innerHeight - menuHeight - 8));
+
+            const wrapperRect = this.wrapperContainer?.nativeElement?.getBoundingClientRect();
+            const localX = wrapperRect ? desiredX - wrapperRect.left : desiredX;
+            const localY = wrapperRect ? desiredY - wrapperRect.top : desiredY;
+
             this.editorContextMenu = {
               show: true,
-              x: event.clientX,
-              y: event.clientY
+              x: Math.max(0, localX),
+              y: Math.max(0, localY)
             };
             event.preventDefault();
             event.stopPropagation();
@@ -419,6 +472,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       buildDecorations(view: EditorView): DecorationSet {
         // Collect all decorations, then sort, then build
         const decorations: Array<{ from: number; to: number; cls: string }> = [];
+        const lineDecorations: Array<{ at: number; cls: string }> = [];
         let inScript = false;
         let scriptBraceDepth = 0;
 
@@ -543,25 +597,51 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               to: line.from + leadingWhitespace + annotationMatch[0].length,
               cls: 'cm-annotation'
             });
+
+            // If this is an @load line, also highlight key names in key=value pairs
+            if (LOAD_LINE_REGEX.test(trimmedText)) {
+              const loadIdx = text.indexOf('@load');
+              if (loadIdx >= 0) {
+                const rest = text.slice(loadIdx + '@load'.length);
+                const keyRx = /(^|[\s,])([A-Za-z_][\w-]*)\s*=/g;
+                let m: RegExpExecArray | null;
+                while ((m = keyRx.exec(rest)) !== null) {
+                  const prefixLen = (m[1] || '').length;
+                  const key = m[2];
+                  const keyStartInRest = m.index + prefixLen;
+                  const keyEndInRest = keyStartInRest + key.length;
+                  decorations.push({
+                    from: line.from + loadIdx + '@load'.length + keyStartInRest,
+                    to: line.from + loadIdx + '@load'.length + keyEndInRest,
+                    cls: 'cm-load-key'
+                  });
+                }
+              }
+            }
           }
 
           // Highlight separators
           if (SEPARATOR_PREFIX_REGEX.test(trimmedText)) {
-            decorations.push({
-              from: line.from,
-              to: line.to,
-              cls: 'cm-separator'
-            });
+            lineDecorations.push({ at: line.from, cls: 'cm-separator' });
           }
         }
 
         // Sort by position (required by RangeSetBuilder)
         decorations.sort((a, b) => a.from - b.from || a.to - b.to);
 
-        // Build the final decoration set
-        const builder = new RangeSetBuilder<Decoration>();
+        // Build the final decoration set (must be added in ascending doc order)
+        const entries: Array<{ from: number; to: number; deco: Decoration }> = [];
         for (const d of decorations) {
-          builder.add(d.from, d.to, Decoration.mark({ class: d.cls }));
+          entries.push({ from: d.from, to: d.to, deco: Decoration.mark({ class: d.cls }) });
+        }
+        for (const d of lineDecorations) {
+          entries.push({ from: d.at, to: d.at, deco: Decoration.line({ class: d.cls }) });
+        }
+        entries.sort((a, b) => a.from - b.from || a.to - b.to);
+
+        const builder = new RangeSetBuilder<Decoration>();
+        for (const e of entries) {
+          builder.add(e.from, e.to, e.deco);
         }
         return builder.finish();
       }
@@ -628,6 +708,37 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     const lineText = line.text;
     const cursorPos = context.pos - line.from;
     const textBeforeCursor = lineText.slice(0, cursorPos);
+
+    // @load key completion (when typing key names)
+    // Examples:
+    //   @load con|
+    //   @load users=10 dur|
+    const trimmedLine = lineText.trimStart();
+    if (trimmedLine.toLowerCase().startsWith('@load')) {
+      const before = textBeforeCursor.trimStart();
+      const loadMatch = before.match(/^@load\s+([\s\S]*)$/i);
+      if (loadMatch) {
+        const afterLoad = loadMatch[1] ?? '';
+        // Token is the last chunk separated by whitespace or commas
+        const tokenMatch = afterLoad.match(/(?:^|[\s,])([A-Za-z_][\w-]*)$/);
+        if (tokenMatch) {
+          const token = tokenMatch[1];
+          const tokenStart = before.lastIndexOf(token);
+          const from = line.from + tokenStart;
+          const options = LOAD_TEST_KEYS
+            .filter(k => k.label.toLowerCase().startsWith(token.toLowerCase()))
+            .map(k => ({
+              label: k.label,
+              type: 'property',
+              detail: k.detail,
+              apply: `${k.label}=`
+            } as Completion));
+          if (options.length) {
+            return { from, options, validFor: /^[A-Za-z_][\w-]*$/ };
+          }
+        }
+      }
+    }
 
     // Check for secret completion: {{secret:
     const secretMatch = textBeforeCursor.match(/\{\{\s*secret:([a-zA-Z0-9_\-\.]*)$/);

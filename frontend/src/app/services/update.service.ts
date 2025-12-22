@@ -1,5 +1,5 @@
 import { Injectable, signal, computed } from '@angular/core';
-import { CheckForUpdates, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
+import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
 
 export interface UpdateInfo {
@@ -14,6 +14,7 @@ export interface UpdateInfo {
 
 const DISMISSED_VERSION_KEY = 'rawrequest_dismissed_update_version';
 const LAST_CHECK_KEY = 'rawrequest_last_update_check';
+const UPDATE_READY_VERSION_KEY = 'rawrequest_update_ready_version';
 const CHECK_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
 
 @Injectable({
@@ -27,6 +28,8 @@ export class UpdateService {
 
   private _appVersion = signal<string>('');
   private _isUpdating = signal<boolean>(false);
+  private _isUpdateReady = signal<boolean>(false);
+  private _updateReadyVersion = signal<string | null>(null);
   private _updateStatus = signal<string>('');
   private _updateProgress = signal<number | null>(null);
   private initialized = false;
@@ -40,6 +43,8 @@ export class UpdateService {
 
   readonly appVersion = computed(() => this._appVersion());
   readonly isUpdating = computed(() => this._isUpdating());
+  readonly isUpdateReady = computed(() => this._isUpdateReady());
+  readonly updateReadyVersion = computed(() => this._updateReadyVersion());
   readonly updateStatus = computed(() => this._updateStatus());
   readonly updateProgress = computed(() => this._updateProgress());
 
@@ -61,6 +66,12 @@ export class UpdateService {
       this._appVersion.set('unknown');
     }
 
+    const readyVersion = localStorage.getItem(UPDATE_READY_VERSION_KEY);
+    if (readyVersion) {
+      this._isUpdateReady.set(true);
+      this._updateReadyVersion.set(readyVersion);
+    }
+
     this.unsubscribers.push(
       EventsOn('update:status', (payload: any) => {
         const msg = payload?.message;
@@ -73,6 +84,18 @@ export class UpdateService {
         } else {
           this._updateProgress.set(null);
         }
+      }),
+      EventsOn('update:ready', (payload: any) => {
+        const version = payload?.version;
+        if (typeof version === 'string' && version.trim()) {
+          localStorage.setItem(UPDATE_READY_VERSION_KEY, version);
+          this._updateReadyVersion.set(version);
+          this._isUpdateReady.set(true);
+        } else {
+          this._isUpdateReady.set(true);
+        }
+        this._isUpdating.set(false);
+        this._updateProgress.set(1);
       }),
       EventsOn('update:error', (payload: any) => {
         const msg = payload?.message;
@@ -146,6 +169,10 @@ export class UpdateService {
 		this._updateStatus.set('Preparing update…');
 		this._updateProgress.set(null);
       await StartUpdateAndRestart(info.latestVersion);
+		// In the new flow, this call may finish without quitting (download-only).
+		if (!this._isUpdateReady()) {
+			this._isUpdating.set(false);
+		}
       return true;
     } catch (err) {
       console.error('Failed to start updater:', err);
@@ -153,6 +180,18 @@ export class UpdateService {
 		this._isUpdating.set(false);
       return false;
     }
+  }
+
+  clearPreparedUpdate(): void {
+    localStorage.removeItem(UPDATE_READY_VERSION_KEY);
+    this._isUpdateReady.set(false);
+    this._updateReadyVersion.set(null);
+  try {
+    // Best-effort: also clear on-disk prepared artifact/state.
+    void ClearPreparedUpdate();
+  } catch {
+    // ignore
+  }
   }
 
   dispose(): void {

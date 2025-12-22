@@ -38,13 +38,17 @@
             </button>
             <button 
                 class="update-notification__btn update-notification__btn--primary"
-                (click)="download()"
+                (click)="downloadOrRestart()"
                 [disabled]="updateService.isUpdating()"
             >
                 @if (updateService.isUpdating()) {
                     Working…
                 } @else {
-                    Download
+                    @if (updateService.isUpdateReady()) {
+                        Restart to update
+                    } @else {
+                        Download
+                    }
                 }
             </button>
         </div>

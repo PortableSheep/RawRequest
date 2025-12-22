@@ -6,7 +6,8 @@ import {
   HistoryItem,
   LoadTestResults,
   LoadTestMetrics,
-  RequestPreview
+  RequestPreview,
+  ActiveRunProgress
 } from '../models/http.models';
 import { cleanScriptContent } from '../utils/script-cleaner.generated';
 import { dirname } from '../utils/path';
@@ -659,6 +660,7 @@ export class HttpService {
     waitMinMs: number | null;
     waitMaxMs: number | null;
     requestsPerSecond: number | null;
+    failureRateThreshold: number | null; // fraction 0..1
   } {
     const toInt = (v: any): number | null => {
       const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
@@ -689,6 +691,28 @@ export class HttpService {
 
     const rps = toInt(config?.requestsPerSecond);
 
+    const parseFailureRateThreshold = (value: unknown): number | null => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        const frac = value > 1 ? value / 100 : value;
+        return Math.min(1, Math.max(0, frac));
+      }
+      const s = String(value).trim();
+      if (!s) return null;
+      const percent = s.match(/^(-?\d+(?:\.\d+)?)\s*%$/);
+      if (percent) {
+        const p = parseFloat(percent[1]);
+        if (!Number.isFinite(p) || p < 0) return null;
+        return Math.min(1, Math.max(0, p / 100));
+      }
+      const n = parseFloat(s);
+      if (!Number.isFinite(n) || n < 0) return null;
+      const frac = n > 1 ? n / 100 : n;
+      return Math.min(1, Math.max(0, frac));
+    };
+
+    const failureRateThreshold = parseFailureRateThreshold(config?.failureRateThreshold);
+
     let normalizedIterations = iterations && iterations > 0 ? iterations : null;
     const normalizedDurationMs = durationMs && durationMs > 0 ? durationMs : null;
     if (normalizedIterations === null && normalizedDurationMs === null) {
@@ -706,6 +730,7 @@ export class HttpService {
       waitMinMs: waitMinMs !== null ? Math.max(0, waitMinMs) : null,
       waitMaxMs: waitMaxMs !== null ? Math.max(0, waitMaxMs) : null,
       requestsPerSecond: rps && rps > 0 ? rps : null,
+      failureRateThreshold,
     };
   }
 
@@ -714,7 +739,8 @@ export class HttpService {
     request: Request,
     variables: { [key: string]: string } = {},
     env?: string,
-    requestId?: string
+    requestId?: string,
+    onProgress?: (progress: ActiveRunProgress) => void
   ): Promise<LoadTestResults> {
     const startTime = Date.now();
     const envName = this.normalizeEnvName(env);
@@ -739,20 +765,60 @@ export class HttpService {
     }
 
     const cfg = this.normalizeLoadTestConfig(request.loadTest);
+    results.plannedDurationMs = cfg.durationMs;
     const stopAt = cfg.durationMs ? (startTime + cfg.durationMs) : Number.POSITIVE_INFINITY;
 
-    const isCancelled = (): boolean => {
-      return !!(requestId && this.loadTestCancelled.has(requestId));
+    let cancelled = false;
+    let aborted = false;
+    let abortReason: string | undefined;
+
+    let activeUsers = 0;
+
+    let lastProgressEmitAt = 0;
+    const emitProgress = (patch: Partial<ActiveRunProgress> = {}, force = false) => {
+      if (!requestId || !onProgress) return;
+      const now = Date.now();
+      if (!force && now - lastProgressEmitAt < 200) return;
+      lastProgressEmitAt = now;
+      onProgress({
+        requestId,
+        type: 'load',
+        startedAt: startTime,
+        plannedDurationMs: cfg.durationMs,
+        activeUsers,
+        maxUsers: cfg.maxUsers,
+        totalSent: results.totalRequests,
+        successful: results.successfulRequests,
+        failed: results.failedRequests,
+        cancelled,
+        aborted,
+        abortReason,
+        ...patch
+      });
     };
 
-    const throwIfLoadTestCancelled = () => {
-      if (isCancelled()) {
-        this.loadTestCancelled.delete(requestId!);
-        const cancellationError: any = new Error('Load test cancelled');
-        cancellationError.cancelled = true;
-        throw cancellationError;
+    const markCancelledIfRequested = () => {
+      if (cancelled) return;
+      if (requestId && this.loadTestCancelled.has(requestId)) {
+        cancelled = true;
+        this.loadTestCancelled.delete(requestId);
       }
     };
+
+    const maybeAbortForFailureRate = () => {
+      if (aborted || cancelled) return;
+      if (cfg.failureRateThreshold === null) return;
+      const minSamples = 20;
+      if (results.totalRequests < minSamples) return;
+      if (results.totalRequests <= 0) return;
+      const rate = results.failedRequests / results.totalRequests;
+      if (rate >= cfg.failureRateThreshold) {
+        aborted = true;
+        abortReason = `Failure rate ${(rate * 100).toFixed(1)}% exceeded threshold ${(cfg.failureRateThreshold * 100).toFixed(1)}%`;
+      }
+    };
+
+    emitProgress({}, true);
 
     let issuedRequests = 0;
     const reserveRequestSlot = (): boolean => {
@@ -798,7 +864,10 @@ export class HttpService {
 
     const runUser = async () => {
       while (true) {
-        throwIfLoadTestCancelled();
+        markCancelledIfRequested();
+        if (cancelled || aborted) {
+          return;
+        }
 
         const now = Date.now();
         if (now >= stopAt) {
@@ -810,10 +879,14 @@ export class HttpService {
         }
 
         results.totalRequests++;
+        emitProgress();
 
         try {
           await throttleIfNeeded();
-          throwIfLoadTestCancelled();
+          markCancelledIfRequested();
+          if (cancelled || aborted) {
+            return;
+          }
 
           const response = await this.sendRequest(request, variables, undefined, envName);
 
@@ -830,25 +903,45 @@ export class HttpService {
           }
           results.responseTimes.push(response.responseTime);
         } catch (error: any) {
-          if (error?.cancelled) {
-            throw error;
-          }
           results.failedRequests++;
           bumpFailureStatus(typeof error?.status === 'number' ? error.status : 0);
           results.errors.push(error);
         }
 
+        maybeAbortForFailureRate();
+        if (aborted) {
+          emitProgress({}, true);
+          return;
+        }
+
+        emitProgress();
+
         const waitMs = getPerUserWaitMs();
         if (waitMs > 0) {
+          markCancelledIfRequested();
+          if (cancelled || aborted) {
+            return;
+          }
           await this.sleep(waitMs);
         }
+      }
+    };
+
+    const runUserTracked = async () => {
+      activeUsers++;
+      emitProgress({ activeUsers }, true);
+      try {
+        await runUser();
+      } finally {
+        activeUsers = Math.max(0, activeUsers - 1);
+        emitProgress({ activeUsers }, true);
       }
     };
 
     // Spawn users (optionally ramping up)
     const userTasks: Promise<void>[] = [];
     const spawnUser = () => {
-      userTasks.push(runUser());
+      userTasks.push(runUserTracked());
     };
 
     for (let i = 0; i < cfg.startUsers; i++) {
@@ -869,7 +962,8 @@ export class HttpService {
       if (!rate || rate <= 0) {
         // No ramp parameters: spawn all immediately
         for (let i = 0; i < remainingUsers; i++) {
-          throwIfLoadTestCancelled();
+          markCancelledIfRequested();
+          if (cancelled || aborted) return;
           spawnUser();
         }
         return;
@@ -877,7 +971,8 @@ export class HttpService {
 
       const intervalMs = Math.max(1, Math.floor(1000 / rate));
       for (let i = 0; i < remainingUsers; i++) {
-        throwIfLoadTestCancelled();
+        markCancelledIfRequested();
+        if (cancelled || aborted) return;
         if (Date.now() >= stopAt) return;
         spawnUser();
         await this.sleep(intervalMs);
@@ -889,6 +984,11 @@ export class HttpService {
       await Promise.all(userTasks);
     } finally {
       results.endTime = Date.now();
+      markCancelledIfRequested();
+      results.cancelled = cancelled;
+      results.aborted = aborted;
+      results.abortReason = abortReason;
+      emitProgress({ done: true }, true);
     }
 
     return results;
@@ -912,7 +1012,11 @@ export class HttpService {
       minResponseTime: sortedTimes[0] || 0,
       maxResponseTime: sortedTimes[sortedTimes.length - 1] || 0,
       errorRate: (results.failedRequests / results.totalRequests) * 100 || 0,
-      duration
+      duration,
+      cancelled: results.cancelled,
+      aborted: results.aborted,
+      abortReason: results.abortReason,
+      plannedDuration: results.plannedDurationMs ? results.plannedDurationMs / 1000 : undefined
     };
   }
 

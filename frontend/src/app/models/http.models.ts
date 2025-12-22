@@ -73,6 +73,10 @@ export interface LoadTestConfig {
   waitMin?: string | number;    // random wait lower bound
   waitMax?: string | number;    // random wait upper bound
   requestsPerSecond?: number;   // global RPS cap
+  
+  // Early abort
+  // Example: failureRateThreshold=99% (or 0.99)
+  failureRateThreshold?: string | number;
 }
 
 export interface LoadTestResults {
@@ -84,6 +88,12 @@ export interface LoadTestResults {
   failureStatusCounts?: { [statusCode: string]: number };
   startTime: number;
   endTime: number;
+  
+  // Run state
+  cancelled?: boolean;
+  aborted?: boolean;
+  abortReason?: string;
+  plannedDurationMs?: number | null;
 }
 
 export interface LoadTestMetrics {
@@ -100,6 +110,28 @@ export interface LoadTestMetrics {
   maxResponseTime: number;
   errorRate: number;
   duration: number;
+  
+  // Run state
+  cancelled?: boolean;
+  aborted?: boolean;
+  abortReason?: string;
+  plannedDuration?: number; // seconds, if duration-based test
+}
+ 
+export interface ActiveRunProgress {
+  requestId: string;
+  type: 'load' | 'single' | 'chain';
+  startedAt: number;
+  plannedDurationMs?: number | null;
+  activeUsers?: number;
+  maxUsers?: number;
+  totalSent?: number;
+  successful?: number;
+  failed?: number;
+  done?: boolean;
+  cancelled?: boolean;
+  aborted?: boolean;
+  abortReason?: string;
 }
 
 export interface ResponseData {

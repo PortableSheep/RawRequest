@@ -10,7 +10,8 @@ import {
   HistoryItem,
   RequestPreview,
   ChainEntryPreview,
-  ResponsePreview
+  ResponsePreview,
+  ActiveRunProgress
 } from '../../models/http.models';
 
 @Component({
@@ -35,6 +36,7 @@ export class RequestManagerComponent {
   currentFileIndexChange = output<number>();
   currentEnvChange = output<string>();
   requestExecuted = output<{ requestIndex: number; response: ResponseData }>();
+  requestProgress = output<ActiveRunProgress>();
   historyUpdated = output<{ fileId: string; history: HistoryItem[] }>();
 
   private history: HistoryItem[] = [];
@@ -347,13 +349,25 @@ export class RequestManagerComponent {
     const variables = this.getCombinedVariables();
 
     try {
-      const results = await this.httpService.executeLoadTest(request, variables, envName, requestId);
+      const results = await this.httpService.executeLoadTest(
+        request,
+        variables,
+        envName,
+        requestId,
+        progress => this.requestProgress.emit(progress)
+      );
       const metrics = this.httpService.calculateLoadTestMetrics(results);
+
+      const statusText = results.cancelled
+        ? 'Load Test Cancelled'
+        : results.aborted
+          ? 'Load Test Aborted'
+          : 'Load Test Complete';
 
       // Create a summary response
       const summaryResponse: ResponseData = {
         status: 200,
-        statusText: 'Load Test Complete',
+        statusText,
         headers: {},
         body: JSON.stringify(metrics, null, 2),
         loadTestMetrics: metrics as any,
@@ -376,7 +390,7 @@ export class RequestManagerComponent {
         method: request.method + ' (Load Test)',
         url: request.url,
         status: 200,
-        statusText: 'Load Test Complete',
+        statusText,
         responseTime: results.endTime - results.startTime,
         responseData: summaryResponse
       };

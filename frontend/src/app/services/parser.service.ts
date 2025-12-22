@@ -325,6 +325,16 @@ export class ParserService {
         // global throttle
         rps: 'requestsPerSecond',
         requestspersecond: 'requestsPerSecond',
+
+        // early abort
+        failureratethreshold: 'failureRateThreshold',
+        failurethreshold: 'failureRateThreshold',
+        failthreshold: 'failureRateThreshold',
+        failrate: 'failureRateThreshold',
+        maxfailurerate: 'failureRateThreshold',
+        maxfailure: 'failureRateThreshold',
+        failpct: 'failureRateThreshold',
+        failurepct: 'failureRateThreshold',
       };
       return map[k] || raw.trim();
     };

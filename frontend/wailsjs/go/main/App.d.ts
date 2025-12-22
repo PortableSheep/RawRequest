@@ -8,6 +8,8 @@ export function CancelRequest(arg1:string):Promise<void>;
 
 export function CheckForUpdates():Promise<main.UpdateInfo>;
 
+export function ClearPreparedUpdate():Promise<void>;
+
 export function ClearScriptLogs():Promise<void>;
 
 export function DeleteSecret(arg1:string,arg2:string):Promise<Record<string, Array<string>>>;

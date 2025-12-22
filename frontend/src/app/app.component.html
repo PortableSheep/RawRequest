@@ -35,6 +35,7 @@
                     (currentFileIndexChange)="onCurrentFileIndexChange($event)"
                     (currentEnvChange)="onCurrentEnvChange($event)"
                     (requestExecuted)="onRequestExecuted($event)"
+                    (requestProgress)="onRequestProgress($event)"
                     (historyUpdated)="onHistoryUpdated($event)">
             </app-request-manager>
 
@@ -118,6 +119,41 @@
                                 {{ active.type === 'load' ? 'Load test running' : active.type === 'chain' ? 'Chained request running' : 'Request running' }}
                             </span>
                         </div>
+
+                                                @if (active.type === 'load') {
+                                                    <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
+                                                        <div class="text-[11px] text-zinc-400 whitespace-nowrap">Users</div>
+                                                        <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
+                                                            <polyline
+                                                                [attr.points]="loadUsersSparklinePoints()"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.5"
+                                                                class="text-blue-400"
+                                                            ></polyline>
+                                                        </svg>
+                                                        <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
+                                                            {{ activeRunProgressView?.activeUsers ?? 0 }}/{{ activeRunProgressView?.maxUsers ?? '—' }}
+                                                        </div>
+                                                    </div>
+
+                                                    <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
+                                                        <div class="text-[11px] text-zinc-400 whitespace-nowrap">RPS</div>
+                                                        <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
+                                                            <polyline
+                                                                [attr.points]="loadRpsSparklinePoints()"
+                                                                fill="none"
+                                                                stroke="currentColor"
+                                                                stroke-width="1.5"
+                                                                class="text-emerald-400"
+                                                            ></polyline>
+                                                        </svg>
+                                                        <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
+                                                            {{ currentLoadRpsView | number:'1.0-0' }}
+                                                        </div>
+                                                    </div>
+                                                }
+
                         <div class="px-3 py-2 border-b border-zinc-800 text-[11px] text-zinc-300 truncate">
                             {{ activeRequest?.name || 'Waiting for request selection' }}
                         </div>

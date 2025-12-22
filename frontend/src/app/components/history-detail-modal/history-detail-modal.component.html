@@ -126,6 +126,17 @@
           @if (isLoadTest() && activeTab === 'summary') {
             <div id="tabpanel-summary" role="tabpanel" aria-labelledby="tab-summary" class="absolute inset-0 overflow-auto p-6 bg-zinc-950">
               @if (getLoadTestMetrics(); as m) {
+                @if (m.cancelled || m.aborted) {
+                  <div class="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+                    <div class="text-sm font-semibold text-zinc-100">
+                      {{ m.cancelled ? 'Cancelled' : 'Aborted early' }}
+                    </div>
+                    @if (m.abortReason) {
+                      <div class="mt-1 text-xs text-zinc-400">{{ m.abortReason }}</div>
+                    }
+                  </div>
+                }
+
                 <!-- Summary Cards (copied from load-test-results-modal) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">

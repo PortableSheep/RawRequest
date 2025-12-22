@@ -12,7 +12,7 @@ import { UpdateService } from '../../services/update.service';
 export class UpdateNotificationComponent {
   protected updateService = inject(UpdateService);
 
-  async download(): Promise<void> {
+  async downloadOrRestart(): Promise<void> {
     const started = await this.updateService.startUpdateAndRestart();
     if (!started) {
       await this.updateService.openReleasePage();
@@ -21,6 +21,9 @@ export class UpdateNotificationComponent {
   }
 
   dismiss(): void {
+    if (this.updateService.isUpdateReady()) {
+      this.updateService.clearPreparedUpdate();
+    }
     this.updateService.dismissUpdate();
   }
 

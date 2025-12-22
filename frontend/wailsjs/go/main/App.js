@@ -14,6 +14,10 @@ export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
 
+export function ClearPreparedUpdate() {
+  return window['go']['main']['App']['ClearPreparedUpdate']();
+}
+
 export function ClearScriptLogs() {
   return window['go']['main']['App']['ClearScriptLogs']();
 }

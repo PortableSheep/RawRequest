@@ -17,7 +17,7 @@ import {
   ScriptSnippetModalComponent
 } from './components';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
-import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry } from './models/http.models';
+import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress } from './models/http.models';
 import { HttpService } from './services/http.service';
 import { SecretService, SecretIndex, VaultInfo } from './services/secret.service';
 import { ScriptConsoleService } from './services/script-console.service';
@@ -109,6 +109,16 @@ export class AppComponent implements OnInit, OnDestroy {
   isRequestRunning = false;
   pendingRequestIndex: number | null = null;
   private queuedRequestIndex: number | null = null;
+  private activeRunTickHandle: any = null;
+  private activeRunNowMs = Date.now();
+  private activeRunProgress: ActiveRunProgress | null = null;
+  private loadUsersSeries: number[] = [];
+  private readonly loadUsersSeriesMaxPoints = 120;
+
+  private loadRpsSeries: number[] = [];
+  private readonly loadRpsSeriesMaxPoints = 120;
+  private lastRpsSampleAtMs: number | null = null;
+  private lastRpsTotalSent: number | null = null;
   activeRequestInfo: {
     id?: string;
     label: string;
@@ -312,6 +322,12 @@ export class AppComponent implements OnInit, OnDestroy {
       startedAt: Date.now()
     };
     this.isCancellingActiveRequest = false;
+    this.activeRunProgress = null;
+    this.loadUsersSeries = [];
+    this.loadRpsSeries = [];
+    this.lastRpsSampleAtMs = null;
+    this.lastRpsTotalSent = null;
+    this.startActiveRunTick();
 
     const execution = this.requestManager.executeRequestByIndex(requestIndex, requestId);
     execution?.catch(error => {
@@ -328,6 +344,22 @@ export class AppComponent implements OnInit, OnDestroy {
     if ((result.response as any).loadTestMetrics) {
       this.loadTestMetrics = (result.response as any).loadTestMetrics;
       this.showLoadTestResults = true;
+    }
+  }
+
+  onRequestProgress(progress: ActiveRunProgress) {
+    if (!this.activeRequestInfo?.id) {
+      return;
+    }
+    if (progress.requestId !== this.activeRequestInfo.id) {
+      return;
+    }
+    this.activeRunProgress = progress;
+    if (progress.type === 'load') {
+      const sample = typeof progress.activeUsers === 'number' ? progress.activeUsers : 0;
+      this.pushLoadUsersSample(sample);
+
+      this.sampleLoadRps();
     }
   }
 
@@ -547,6 +579,10 @@ export class AppComponent implements OnInit, OnDestroy {
     return body ? `${method} ${url}\n\n${body}` : `${method} ${url}`;
   }
 
+  get activeRunProgressView(): ActiveRunProgress | null {
+    return this.activeRunProgress;
+  }
+
   getActiveRequestMeta(): string {
     if (!this.activeRequestInfo) {
       return 'Awaiting request';
@@ -557,7 +593,30 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     if (this.isRequestRunning) {
-      return 'Streaming response';
+      const elapsedMs = Math.max(0, this.activeRunNowMs - this.activeRequestInfo.startedAt);
+      const elapsed = this.formatClock(elapsedMs);
+
+      if (this.activeRequestInfo.type === 'load') {
+        const total = this.activeRunProgress?.totalSent ?? 0;
+        const ok = this.activeRunProgress?.successful ?? 0;
+        const failed = this.activeRunProgress?.failed ?? 0;
+        const planned = this.activeRunProgress?.plannedDurationMs ?? null;
+        if (planned && planned > 0) {
+          const remainingMs = Math.max(0, (this.activeRequestInfo.startedAt + planned) - this.activeRunNowMs);
+          const remaining = this.formatClock(remainingMs);
+          return `Load test running · ${total} sent · ${ok} ok · ${failed} failed · ${elapsed} elapsed · ${remaining} remaining`;
+        }
+        return `Load test running · ${total} sent · ${ok} ok · ${failed} failed · ${elapsed} elapsed`;
+      }
+
+      const timeoutMs = this.getActiveRequestTimeoutMs();
+      if (timeoutMs && timeoutMs > 0) {
+        const remainingMs = Math.max(0, (this.activeRequestInfo.startedAt + timeoutMs) - this.activeRunNowMs);
+        const remaining = this.formatClock(remainingMs);
+        return `Request running · ${elapsed} elapsed · ${remaining} remaining`;
+      }
+
+      return `Request running · ${elapsed} elapsed`;
     }
 
     const request = this.getActiveRequestDetails();
@@ -657,6 +716,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private resetPendingRequestState(): void {
     this.isRequestRunning = false;
     this.pendingRequestIndex = null;
+    this.stopActiveRunTick();
+    this.activeRunProgress = null;
+    this.loadUsersSeries = [];
+    this.loadRpsSeries = [];
+    this.lastRpsSampleAtMs = null;
+    this.lastRpsTotalSent = null;
     this.clearActiveRequestState();
     this.triggerQueuedRequestIfNeeded();
   }
@@ -908,6 +973,127 @@ export class AppComponent implements OnInit, OnDestroy {
   private clearActiveRequestState(): void {
     this.activeRequestInfo = null;
     this.isCancellingActiveRequest = false;
+  }
+
+  private startActiveRunTick(): void {
+    this.stopActiveRunTick();
+    this.activeRunNowMs = Date.now();
+    this.activeRunTickHandle = setInterval(() => {
+      this.activeRunNowMs = Date.now();
+      if (this.isRequestRunning && this.activeRequestInfo?.type === 'load') {
+        const sample = this.activeRunProgress?.activeUsers ?? 0;
+        this.pushLoadUsersSample(sample);
+        this.sampleLoadRps();
+      }
+    }, 250);
+  }
+
+  private pushLoadUsersSample(value: number): void {
+    const v = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
+    this.loadUsersSeries.push(v);
+    if (this.loadUsersSeries.length > this.loadUsersSeriesMaxPoints) {
+      this.loadUsersSeries.splice(0, this.loadUsersSeries.length - this.loadUsersSeriesMaxPoints);
+    }
+  }
+
+  loadUsersSparklinePoints(): string {
+    const series = this.loadUsersSeries;
+    if (!series.length) {
+      return '';
+    }
+
+    const width = Math.max(1, series.length - 1);
+    const height = 20;
+    const maxUsers = this.activeRunProgress?.maxUsers;
+    const localMax = Math.max(1, ...series);
+    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
+
+    return series
+      .map((v, i) => {
+        const x = series.length === 1 ? 0 : (i * (100 / width));
+        const y = height - (Math.min(denom, v) / denom) * height;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  }
+
+  private sampleLoadRps(): void {
+    const now = this.activeRunNowMs;
+    const totalSent = this.activeRunProgress?.totalSent;
+    if (typeof totalSent !== 'number') {
+      return;
+    }
+
+    if (this.lastRpsSampleAtMs === null || this.lastRpsTotalSent === null) {
+      this.lastRpsSampleAtMs = now;
+      this.lastRpsTotalSent = totalSent;
+      return;
+    }
+
+    const dtMs = now - this.lastRpsSampleAtMs;
+    if (dtMs < 200) {
+      return;
+    }
+
+    const dCount = totalSent - this.lastRpsTotalSent;
+    const rps = dtMs > 0 ? Math.max(0, dCount) / (dtMs / 1000) : 0;
+
+    this.lastRpsSampleAtMs = now;
+    this.lastRpsTotalSent = totalSent;
+    this.pushLoadRpsSample(rps);
+  }
+
+  private pushLoadRpsSample(value: number): void {
+    const v = Number.isFinite(value) ? Math.max(0, value) : 0;
+    this.loadRpsSeries.push(v);
+    if (this.loadRpsSeries.length > this.loadRpsSeriesMaxPoints) {
+      this.loadRpsSeries.splice(0, this.loadRpsSeries.length - this.loadRpsSeriesMaxPoints);
+    }
+  }
+
+  loadRpsSparklinePoints(): string {
+    const series = this.loadRpsSeries;
+    if (!series.length) {
+      return '';
+    }
+
+    const width = Math.max(1, series.length - 1);
+    const height = 20;
+    const denom = Math.max(1, ...series);
+
+    return series
+      .map((v, i) => {
+        const x = series.length === 1 ? 0 : (i * (100 / width));
+        const y = height - (Math.min(denom, v) / denom) * height;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  }
+
+  get currentLoadRpsView(): number {
+    const series = this.loadRpsSeries;
+    if (!series.length) return 0;
+    return series[series.length - 1] ?? 0;
+  }
+
+  private stopActiveRunTick(): void {
+    if (this.activeRunTickHandle) {
+      clearInterval(this.activeRunTickHandle);
+      this.activeRunTickHandle = null;
+    }
+  }
+
+  private formatClock(ms: number): string {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  private getActiveRequestTimeoutMs(): number | null {
+    const req = this.getActiveRequestDetails();
+    const timeout = req?.options?.timeout;
+    return typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0 ? timeout : null;
   }
 
   private buildRequestLabel(request: Request): string {

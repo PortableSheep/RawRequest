@@ -238,9 +238,22 @@ body::after {
   font-weight: 600;
 }
 
-.cm-separator {
+.cm-load-key {
+  color: var(--rr-prose-bold);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* Separator lines: use a line-level decoration to avoid search-highlighting splitting */
+.cm-line.cm-separator {
   border-bottom: 1px dashed var(--rr-text-secondary);
-  display: block;
+  color: var(--rr-separator) !important;
+}
+
+/* Back-compat (if any mark-based separators remain elsewhere) */
+.cm-separator {
   color: var(--rr-separator) !important;
 }
 
