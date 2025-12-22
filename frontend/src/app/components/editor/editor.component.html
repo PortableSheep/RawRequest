@@ -1,1 +1,34 @@
-<div #editor class="h-full font-mono text-[13px] leading-relaxed bg-zinc-900 overflow-auto"></div>
+<div class="relative h-full">
+	<div #editor class="h-full font-mono text-[13px] leading-relaxed bg-zinc-900 overflow-auto"></div>
+
+	@if (editorContextMenu.show) {
+		<div class="fixed inset-0 z-100" (click)="closeEditorContextMenu()" (contextmenu)="$event.preventDefault(); closeEditorContextMenu()"></div>
+		<div
+			class="fixed z-101 min-w-40 py-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl"
+			[style.left.px]="editorContextMenu.x"
+			[style.top.px]="editorContextMenu.y"
+		>
+			<button type="button"
+							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+							(click)="cutSelection()">
+				<span>Cut</span>
+			</button>
+			<button type="button"
+							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+							(click)="copySelection()">
+				<span>Copy</span>
+			</button>
+			<button type="button"
+							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+							(click)="pasteFromClipboard()">
+				<span>Paste</span>
+			</button>
+			<div class="border-t border-zinc-700 my-1"></div>
+			<button type="button"
+							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+							(click)="selectAll()">
+				<span>Select All</span>
+			</button>
+		</div>
+	}
+</div>

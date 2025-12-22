@@ -15,6 +15,7 @@ export class HeaderComponent {
   currentFileIndex = input<number>(0);
   environments = input<string[]>([]);
   selectedEnv = input<string>('');
+  appVersion = input<string>('');
 
   // Signal outputs
   onFileSelect = output<number>();

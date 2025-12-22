@@ -623,6 +623,92 @@ export class HttpService {
     }
   }
 
+  private sleep(ms: number): Promise<void> {
+    const safe = Number.isFinite(ms) ? Math.max(0, ms) : 0;
+    return new Promise(resolve => setTimeout(resolve, safe));
+  }
+
+  private parseDurationMs(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      // Bare numbers are treated as milliseconds for delay-like fields.
+      return Math.max(0, value);
+    }
+
+    const raw = String(value).trim();
+    if (!raw.length) return null;
+
+    // Accept forms like: 250ms, 2s, 1.5m, 1h
+    const m = raw.match(/^(-?\d+(?:\.\d+)?)\s*(ms|s|m|h)?$/i);
+    if (!m) return null;
+    const n = parseFloat(m[1]);
+    if (!Number.isFinite(n) || n < 0) return null;
+    const unit = (m[2] || 'ms').toLowerCase();
+    const mult = unit === 'h' ? 3600000 : unit === 'm' ? 60000 : unit === 's' ? 1000 : 1;
+    return Math.round(n * mult);
+  }
+
+  private normalizeLoadTestConfig(config: any): {
+    iterations: number | null;
+    durationMs: number | null;
+    startUsers: number;
+    maxUsers: number;
+    spawnRate: number | null;
+    rampUpMs: number | null;
+    delayMs: number;
+    waitMinMs: number | null;
+    waitMaxMs: number | null;
+    requestsPerSecond: number | null;
+  } {
+    const toInt = (v: any): number | null => {
+      const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
+      if (!Number.isFinite(n)) return null;
+      return Math.trunc(n);
+    };
+
+    const iterations = toInt(config?.iterations);
+    const durationMs = this.parseDurationMs(config?.duration);
+
+    const concurrent = toInt(config?.concurrent);
+    const users = toInt(config?.users);
+    const start = toInt(config?.start);
+    const startUsers = toInt(config?.startUsers);
+    const max = toInt(config?.max);
+    const maxUsers = toInt(config?.maxUsers);
+
+    const startU = Math.max(0, startUsers ?? start ?? concurrent ?? users ?? 1);
+    const maxU = Math.max(1, maxUsers ?? max ?? concurrent ?? users ?? 1);
+    const normalizedStartUsers = Math.min(startU, maxU);
+
+    const spawnRate = toInt(config?.spawnRate);
+    const rampUpMs = this.parseDurationMs(config?.rampUp);
+
+    const delayMs = this.parseDurationMs(config?.delay) ?? 0;
+    const waitMinMs = this.parseDurationMs(config?.waitMin);
+    const waitMaxMs = this.parseDurationMs(config?.waitMax);
+
+    const rps = toInt(config?.requestsPerSecond);
+
+    let normalizedIterations = iterations && iterations > 0 ? iterations : null;
+    const normalizedDurationMs = durationMs && durationMs > 0 ? durationMs : null;
+    if (normalizedIterations === null && normalizedDurationMs === null) {
+      normalizedIterations = 10;
+    }
+
+    return {
+      iterations: normalizedIterations,
+      durationMs: normalizedDurationMs,
+      startUsers: normalizedStartUsers,
+      maxUsers: maxU,
+      spawnRate: spawnRate && spawnRate > 0 ? spawnRate : null,
+      rampUpMs: rampUpMs && rampUpMs > 0 ? rampUpMs : null,
+      delayMs: Math.max(0, delayMs),
+      waitMinMs: waitMinMs !== null ? Math.max(0, waitMinMs) : null,
+      waitMaxMs: waitMaxMs !== null ? Math.max(0, waitMaxMs) : null,
+      requestsPerSecond: rps && rps > 0 ? rps : null,
+    };
+  }
+
   // Execute load test
   async executeLoadTest(
     request: Request,
@@ -651,55 +737,152 @@ export class HttpService {
       throw new Error('No load test configuration');
     }
 
-    const config = request.loadTest;
-    const iterations = config.iterations || 10;
-    const concurrent = config.concurrent || 1;
+    const cfg = this.normalizeLoadTestConfig(request.loadTest);
+    const stopAt = cfg.durationMs ? (startTime + cfg.durationMs) : Number.POSITIVE_INFINITY;
 
-    // Execute requests in batches
-    const batches = Math.ceil(iterations / concurrent);
+    const isCancelled = (): boolean => {
+      return !!(requestId && this.loadTestCancelled.has(requestId));
+    };
 
-    for (let batch = 0; batch < batches; batch++) {
-      // Check for cancellation before each batch
-      if (requestId && this.loadTestCancelled.has(requestId)) {
-        this.loadTestCancelled.delete(requestId);
+    const throwIfLoadTestCancelled = () => {
+      if (isCancelled()) {
+        this.loadTestCancelled.delete(requestId!);
         const cancellationError: any = new Error('Load test cancelled');
         cancellationError.cancelled = true;
         throw cancellationError;
       }
+    };
 
-      const batchSize = Math.min(concurrent, iterations - batch * concurrent);
-      const promises: Promise<any>[] = [];
-
-      for (let i = 0; i < batchSize; i++) {
-        const promise = this.sendRequest(request, variables, undefined, envName)
-          .then(response => {
-            // Check if response indicates an error (status 0 means network/connection error)
-            if (response.status === 0 || response.status >= 400) {
-              results.failedRequests++;
-              results.errors.push({
-                status: response.status,
-                statusText: response.statusText,
-                body: response.body
-              });
-            } else {
-              results.successfulRequests++;
-            }
-            results.responseTimes.push(response.responseTime);
-          })
-          .catch(error => {
-            if (!error?.cancelled) {
-              results.failedRequests++;
-              results.errors.push(error);
-            }
-          });
-        promises.push(promise);
-        results.totalRequests++;
+    let issuedRequests = 0;
+    const reserveRequestSlot = (): boolean => {
+      if (cfg.iterations === null) {
+        return true;
       }
+      if (issuedRequests >= cfg.iterations) {
+        return false;
+      }
+      issuedRequests++;
+      return true;
+    };
 
-      await Promise.all(promises);
+    // Global RPS limiter (simple spacing limiter)
+    const rpsIntervalMs = cfg.requestsPerSecond ? (1000 / cfg.requestsPerSecond) : null;
+    let nextAllowedAt = startTime;
+    const throttleIfNeeded = async () => {
+      if (!rpsIntervalMs) return;
+      const now = Date.now();
+      const waitMs = Math.max(0, nextAllowedAt - now);
+      nextAllowedAt = Math.max(nextAllowedAt, now) + rpsIntervalMs;
+      if (waitMs > 0) {
+        await this.sleep(waitMs);
+      }
+    };
+
+    const getPerUserWaitMs = (): number => {
+      if (cfg.waitMinMs !== null || cfg.waitMaxMs !== null) {
+        const min = cfg.waitMinMs ?? 0;
+        const max = cfg.waitMaxMs ?? min;
+        const low = Math.min(min, max);
+        const high = Math.max(min, max);
+        if (high <= low) return low;
+        return low + Math.floor(Math.random() * (high - low + 1));
+      }
+      return cfg.delayMs;
+    };
+
+    const runUser = async () => {
+      while (true) {
+        throwIfLoadTestCancelled();
+
+        const now = Date.now();
+        if (now >= stopAt) {
+          return;
+        }
+
+        if (!reserveRequestSlot()) {
+          return;
+        }
+
+        results.totalRequests++;
+
+        try {
+          await throttleIfNeeded();
+          throwIfLoadTestCancelled();
+
+          const response = await this.sendRequest(request, variables, undefined, envName);
+
+          if (response.status === 0 || response.status >= 400) {
+            results.failedRequests++;
+            results.errors.push({
+              status: response.status,
+              statusText: response.statusText,
+              body: response.body
+            });
+          } else {
+            results.successfulRequests++;
+          }
+          results.responseTimes.push(response.responseTime);
+        } catch (error: any) {
+          if (error?.cancelled) {
+            throw error;
+          }
+          results.failedRequests++;
+          results.errors.push(error);
+        }
+
+        const waitMs = getPerUserWaitMs();
+        if (waitMs > 0) {
+          await this.sleep(waitMs);
+        }
+      }
+    };
+
+    // Spawn users (optionally ramping up)
+    const userTasks: Promise<void>[] = [];
+    const spawnUser = () => {
+      userTasks.push(runUser());
+    };
+
+    for (let i = 0; i < cfg.startUsers; i++) {
+      spawnUser();
     }
 
-    results.endTime = Date.now();
+    const remainingUsers = cfg.maxUsers - cfg.startUsers;
+    const rampPromise = (async () => {
+      if (remainingUsers <= 0) return;
+
+      // Prefer explicit spawnRate; else derive from rampUp duration.
+      let rate = cfg.spawnRate;
+      if (!rate && cfg.rampUpMs && cfg.rampUpMs > 0) {
+        const seconds = cfg.rampUpMs / 1000;
+        rate = seconds > 0 ? Math.ceil(remainingUsers / seconds) : remainingUsers;
+      }
+
+      if (!rate || rate <= 0) {
+        // No ramp parameters: spawn all immediately
+        for (let i = 0; i < remainingUsers; i++) {
+          throwIfLoadTestCancelled();
+          spawnUser();
+        }
+        return;
+      }
+
+      const intervalMs = Math.max(1, Math.floor(1000 / rate));
+      for (let i = 0; i < remainingUsers; i++) {
+        throwIfLoadTestCancelled();
+        if (Date.now() >= stopAt) return;
+        spawnUser();
+        await this.sleep(intervalMs);
+      }
+    })();
+
+    try {
+      await rampPromise;
+      await Promise.all(userTasks);
+    } finally {
+      results.endTime = Date.now();
+    }
+
     return results;
   }
 
@@ -712,7 +895,7 @@ export class HttpService {
       totalRequests: results.totalRequests,
       successfulRequests: results.successfulRequests,
       failedRequests: results.failedRequests,
-      requestsPerSecond: results.totalRequests / duration,
+      requestsPerSecond: duration > 0 ? (results.totalRequests / duration) : 0,
       averageResponseTime: sortedTimes.reduce((a, b) => a + b, 0) / sortedTimes.length || 0,
       p50: sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0,
       p95: sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0,

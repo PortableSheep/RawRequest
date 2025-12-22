@@ -1,23 +1,5 @@
 import { Component, input, output, HostListener } from '@angular/core';
-
-
-interface ResponseData {
-  status: number;
-  statusText: string;
-  headers: { [key: string]: string };
-  body: string;
-  responseTime: number;
-}
-
-interface HistoryItem {
-  timestamp: Date;
-  method: string;
-  url: string;
-  status: number;
-  statusText: string;
-  responseTime: number;
-  responseData: ResponseData;
-}
+import type { HistoryItem } from '../../models/http.models';
 
 @Component({
   selector: 'app-history-sidebar',

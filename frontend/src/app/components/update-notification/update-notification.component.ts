@@ -16,8 +16,8 @@ export class UpdateNotificationComponent {
     const started = await this.updateService.startUpdateAndRestart();
     if (!started) {
       await this.updateService.openReleasePage();
+		this.updateService.remindLater();
     }
-    this.updateService.remindLater();
   }
 
   dismiss(): void {

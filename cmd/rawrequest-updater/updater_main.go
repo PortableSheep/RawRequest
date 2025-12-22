@@ -23,6 +23,7 @@ type options struct {
 	pid             int
 	installPath     string
 	artifactURL     string
+	artifactPath    string
 	expectedSHA     string
 	relaunch        bool
 	waitTimeout     time.Duration
@@ -36,6 +37,7 @@ func main() {
 	flag.IntVar(&opts.pid, "pid", 0, "PID of RawRequest process to wait for before swapping")
 	flag.StringVar(&opts.installPath, "install-path", "", "Install path to update (macOS: /path/RawRequest.app, Windows: install directory)")
 	flag.StringVar(&opts.artifactURL, "artifact-url", "", "URL to the release artifact (macOS: .tar.gz containing RawRequest.app, Windows: .zip)")
+	flag.StringVar(&opts.artifactPath, "artifact-path", "", "Path to a local release artifact (skips download).")
 	flag.StringVar(&opts.expectedSHA, "sha256", "", "Expected SHA-256 of the downloaded artifact (hex). Optional in MVP")
 	flag.BoolVar(&opts.relaunch, "relaunch", true, "Relaunch after successful update")
 	flag.DurationVar(&opts.waitTimeout, "wait-timeout", 2*time.Minute, "Max time to wait for the main app to exit")
@@ -45,8 +47,11 @@ func main() {
 	if opts.installPath == "" {
 		die("missing --install-path")
 	}
-	if opts.artifactURL == "" {
-		die("missing --artifact-url")
+	if opts.artifactURL == "" && opts.artifactPath == "" {
+		die("missing --artifact-url (or --artifact-path)")
+	}
+	if opts.artifactURL != "" && opts.artifactPath != "" {
+		die("provide only one of --artifact-url or --artifact-path")
 	}
 
 	installPath, err := filepath.Abs(opts.installPath)
@@ -81,9 +86,19 @@ func main() {
 	}()
 
 	artifactPath := filepath.Join(tmpDir, "artifact")
-	fmt.Printf("Downloading %s...\n", opts.artifactURL)
-	if err := downloadFile(opts.artifactURL, artifactPath, opts.downloadTimeout); err != nil {
-		dief("download failed: %v", err)
+	artifactLabel := opts.artifactURL
+	if opts.artifactPath != "" {
+		artifactLabel = opts.artifactPath
+		fmt.Printf("Using local artifact %s...\n", opts.artifactPath)
+		if err := copyFile(opts.artifactPath, artifactPath); err != nil {
+			dief("copy artifact failed: %v", err)
+		}
+		_ = os.Remove(opts.artifactPath)
+	} else {
+		fmt.Printf("Downloading %s...\n", opts.artifactURL)
+		if err := downloadFile(opts.artifactURL, artifactPath, opts.downloadTimeout); err != nil {
+			dief("download failed: %v", err)
+		}
 	}
 
 	if opts.expectedSHA != "" {
@@ -96,7 +111,7 @@ func main() {
 	}
 
 	fmt.Printf("Extracting to staging...\n")
-	artifactLower := strings.ToLower(opts.artifactURL)
+	artifactLower := strings.ToLower(artifactLabel)
 	switch {
 	case strings.HasSuffix(artifactLower, ".tar.gz") || strings.HasSuffix(artifactLower, ".tgz"):
 		if err := extractTarGz(artifactPath, stagingDir); err != nil {
@@ -192,6 +207,23 @@ func downloadFile(url, dst string, timeout time.Duration) error {
 	defer out.Close()
 
 	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
 	return err
 }
 

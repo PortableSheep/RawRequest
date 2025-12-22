@@ -78,6 +78,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private autocompleteCompartment = new Compartment();
   private lintCompartment = new Compartment();
 
+  editorContextMenu = {
+    show: false,
+    x: 0,
+    y: 0
+  };
+
   constructor() {
     effect(() => {
       const newContent = this.content();
@@ -124,6 +130,96 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  closeEditorContextMenu(): void {
+    this.editorContextMenu.show = false;
+  }
+
+  private getSelectionRange(): { from: number; to: number } {
+    const sel = this.editorView?.state?.selection?.main;
+    if (!sel) {
+      return { from: 0, to: 0 };
+    }
+    return { from: sel.from, to: sel.to };
+  }
+
+  private getSelectedText(): string {
+    if (!this.editorView) return '';
+    const { from, to } = this.getSelectionRange();
+    if (from === to) return '';
+    return this.editorView.state.sliceDoc(from, to);
+  }
+
+  async copySelection(): Promise<void> {
+    if (!this.editorView) return;
+    const text = this.getSelectedText();
+    if (!text) {
+      this.closeEditorContextMenu();
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // Best-effort fallback for restricted clipboard environments
+      try {
+        document.execCommand('copy');
+      } catch {
+        // ignore
+      }
+    } finally {
+      this.closeEditorContextMenu();
+    }
+  }
+
+  async cutSelection(): Promise<void> {
+    if (!this.editorView) return;
+    const { from, to } = this.getSelectionRange();
+    if (from === to) {
+      this.closeEditorContextMenu();
+      return;
+    }
+    const text = this.editorView.state.sliceDoc(from, to);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      // ignore
+    }
+    this.editorView.dispatch({
+      changes: { from, to, insert: '' },
+      selection: { anchor: from }
+    });
+    this.closeEditorContextMenu();
+  }
+
+  async pasteFromClipboard(): Promise<void> {
+    if (!this.editorView) return;
+    let text = '';
+    try {
+      text = await navigator.clipboard.readText();
+    } catch {
+      this.closeEditorContextMenu();
+      return;
+    }
+    if (!text) {
+      this.closeEditorContextMenu();
+      return;
+    }
+    const { from, to } = this.getSelectionRange();
+    this.editorView.dispatch({
+      changes: { from, to, insert: text },
+      selection: { anchor: from + text.length }
+    });
+    this.closeEditorContextMenu();
+  }
+
+  selectAll(): void {
+    if (!this.editorView) return;
+    this.editorView.dispatch({
+      selection: { anchor: 0, head: this.editorView.state.doc.length }
+    });
+    this.closeEditorContextMenu();
+  }
+
   private initializeEditor() {
     const state = EditorState.create({
       doc: this.content(),
@@ -145,6 +241,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
+            if (this.editorContextMenu.show) {
+              this.closeEditorContextMenu();
+            }
             // Click-to-jump for @depends targets
             if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
               const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -196,6 +295,27 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               }, 0);
             }
             return false; // Don't prevent default handling
+          },
+
+          contextmenu: (event, view) => {
+            // Many desktop webviews disable the native context menu; provide our own for copy/paste.
+            const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
+            if (pos !== null) {
+              const sel = view.state.selection.main;
+              const insideSelection = !sel.empty && pos >= sel.from && pos <= sel.to;
+              if (sel.empty || !insideSelection) {
+                view.dispatch({ selection: { anchor: pos } });
+              }
+            }
+
+            this.editorContextMenu = {
+              show: true,
+              x: event.clientX,
+              y: event.clientY
+            };
+            event.preventDefault();
+            event.stopPropagation();
+            return true;
           }
         }),
         EditorView.updateListener.of((update) => {

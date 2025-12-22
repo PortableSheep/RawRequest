@@ -51,13 +51,28 @@ export interface ChainEntryPreview {
 }
 
 export interface LoadTestConfig {
+  // Locust-ish terminology support (parsed from @load ...)
+  // Concurrency / users
   concurrent?: number;
-  duration?: string;
-  iterations?: number;  // Total number of requests to make
-  start?: number;
-  max?: number;
-  rampUp?: string;
-  requestsPerSecond?: number;
+  users?: number;
+  start?: number;       // starting users (legacy)
+  startUsers?: number;
+  max?: number;         // max users (legacy)
+  maxUsers?: number;
+
+  // Stop conditions
+  duration?: string;    // e.g. 30s, 2m
+  iterations?: number;  // total number of requests to make (aka amount/requests)
+
+  // Ramp up / spawn
+  rampUp?: string;      // duration (e.g. 10s) OR users/sec when used as a number-like string
+  spawnRate?: number;   // users per second
+
+  // Pacing / throttling
+  delay?: string | number;      // fixed delay between requests per user
+  waitMin?: string | number;    // random wait lower bound
+  waitMax?: string | number;    // random wait upper bound
+  requestsPerSecond?: number;   // global RPS cap
 }
 
 export interface LoadTestResults {
@@ -91,6 +106,7 @@ export interface ResponseData {
   headers: { [key: string]: string };
   body: string;
   json?: any;
+  loadTestMetrics?: LoadTestMetrics;
   responseTime: number;
   timing?: TimingBreakdown;
   size?: number;  // Response body size in bytes

@@ -272,18 +272,92 @@ export class ParserService {
 
   private parseLoadConfig(configStr: string): any {
     const config: any = {};
+    const source = (configStr || '').trim();
+    if (!source.length) {
+      return config;
+    }
 
-    // Parse key=value pairs
-    const pairs = configStr.match(/(\w+)=(\S+)/g);
-    if (pairs) {
-      pairs.forEach(pair => {
-        const [key, value] = pair.split('=');
-        if (key === 'concurrent' || key === 'iterations' || key === 'start' || key === 'max' || key === 'requestsPerSecond') {
-          config[key] = parseInt(value, 10);
+    const normalizeKey = (raw: string): string => {
+      const k = (raw || '').trim().toLowerCase();
+      const map: Record<string, string> = {
+        // concurrency
+        concurrency: 'concurrent',
+        concurrent: 'concurrent',
+        users: 'concurrent',
+        user: 'concurrent',
+        u: 'concurrent',
+
+        // total work
+        amount: 'iterations',
+        requests: 'iterations',
+        requestcount: 'iterations',
+        iterations: 'iterations',
+        count: 'iterations',
+
+        // runtime
+        runtime: 'duration',
+        duration: 'duration',
+        time: 'duration',
+
+        // pacing
+        delay: 'delay',
+        wait: 'delay',
+        waittime: 'delay',
+        thinktime: 'delay',
+        minwait: 'waitMin',
+        waitmin: 'waitMin',
+        maxwait: 'waitMax',
+        waitmax: 'waitMax',
+
+        // ramp
+        ramp: 'rampUp',
+        rampup: 'rampUp',
+        spawnrate: 'spawnRate',
+        spawn_rate: 'spawnRate',
+        r: 'spawnRate',
+
+        // users range
+        start: 'start',
+        startusers: 'startUsers',
+        max: 'max',
+        maxusers: 'maxUsers',
+
+        // global throttle
+        rps: 'requestsPerSecond',
+        requestspersecond: 'requestsPerSecond',
+      };
+      return map[k] || raw.trim();
+    };
+
+    const shouldParseInt = (key: string): boolean => {
+      return ['concurrent', 'iterations', 'start', 'max', 'spawnRate', 'requestsPerSecond'].includes(key);
+    };
+
+    // Match key=value pairs where value may be quoted or unquoted.
+    // Examples:
+    //   users=10 iterations=200 duration=30s delay=250ms
+    //   waitMin="100ms" waitMax='500ms'
+    const pairRx = /([A-Za-z_][\w-]*)\s*=\s*("[^"]*"|'[^']*'|[^\s,]+)\s*(?:,|\s|$)/g;
+    let match: RegExpExecArray | null;
+    while ((match = pairRx.exec(source)) !== null) {
+      const rawKey = match[1];
+      let rawValue = match[2] ?? '';
+      rawValue = rawValue.trim();
+      if ((rawValue.startsWith('"') && rawValue.endsWith('"')) || (rawValue.startsWith("'") && rawValue.endsWith("'"))) {
+        rawValue = rawValue.substring(1, rawValue.length - 1);
+      }
+
+      const key = normalizeKey(rawKey);
+      if (shouldParseInt(key)) {
+        const n = parseInt(rawValue, 10);
+        if (!isNaN(n)) {
+          config[key] = n;
         } else {
-          config[key] = value;
+          config[key] = rawValue;
         }
-      });
+      } else {
+        config[key] = rawValue;
+      }
     }
 
     return config;

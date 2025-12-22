@@ -262,23 +262,40 @@ response.json.url contains "httpbun.com/get"
 # Use @load to configure load tests
 # Lightning icon (⚡) appears in the gutter for load test requests
 
-### Basic load test - 5 concurrent requests for 10 seconds
+# RawRequest load testing is intentionally "Locust-ish": it supports core knobs like
+# users/concurrency, spawn rate/ramp-up, wait time (think time), duration vs total
+# request count, and an optional global RPS cap.
+#
+# Supported @load keys (canonical + common aliases):
+#   - Concurrency: concurrent, users, concurrency
+#   - Total requests: iterations, amount, requests, count
+#   - Duration: duration, runtime, time
+#   - Ramp/spawn: start, max, rampUp, spawnRate
+#   - Wait/think time: delay, waitMin, waitMax
+#   - Throughput cap: requestsPerSecond, rps
+#
+# Notes:
+#   - If neither duration nor iterations/amount is provided, RawRequest defaults to 10 total requests.
+#   - "delay" is a fixed per-user pause between requests.
+#   - "waitMin/waitMax" enables a random per-user pause (uniform) between requests.
+
+### Basic load test (Locust-style: users + duration)
 @name loadTestBasic
-@load concurrent=5 duration=10s
+@load users=5 duration=10s
 GET https://httpbun.com/get
 
 ###
 
-### Load test with iterations
+### Total request count (alias: amount) + concurrency (alias: concurrency)
 @name loadTestIterations
-@load concurrent=10 iterations=100
+@load concurrency=10 amount=100
 GET https://httpbun.com/delay/1
 
 ###
 
-### Advanced load test with ramp-up
+### Ramp users over time using spawn rate (users/sec)
 @name loadTestAdvanced
-@load start=1 max=20 rampUp=30s duration=60s
+@load start=1 max=20 spawnRate=4 duration=20s
 POST https://httpbun.com/post
 Content-Type: application/json
 
@@ -288,9 +305,30 @@ Content-Type: application/json
 
 ###
 
-### Load test with rate limiting
+### Ramp users using rampUp duration (spawnRate derived automatically)
+@name loadTestRampUpDuration
+@load start=2 max=25 rampUp=10s duration=25s
+GET https://httpbun.com/get
+
+###
+
+### Wait/think time (random per-user wait between requests)
+@name loadTestWaitRange
+@load users=10 duration=20s waitMin=100ms waitMax=500ms
+GET https://httpbun.com/get
+
+###
+
+### Fixed delay between requests (per-user pacing)
+@name loadTestDelay
+@load users=8 duration=15s delay=250ms
+GET https://httpbun.com/get
+
+###
+
+### Global RPS cap (alias: rps) with concurrent users
 @name loadTestRate
-@load requestsPerSecond=50 duration=30s
+@load users=25 duration=20s rps=30
 GET https://httpbun.com/get
 
 ###

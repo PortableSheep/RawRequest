@@ -82,6 +82,11 @@
     }
 
     <div class="flex items-center gap-2">
+        @if (appVersion()) {
+            <span class="hidden sm:inline-flex items-center h-8 px-2.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-medium">
+                v{{ appVersion() }}
+            </span>
+        }
         <!-- Environment selector -->
         <div class="relative flex items-center">
             @if(environments().length > 0) {

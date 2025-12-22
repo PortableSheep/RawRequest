@@ -6,6 +6,7 @@
             [currentFileIndex]="currentFileIndex"
             [environments]="getEnvironments()"
             [selectedEnv]="currentEnv()"
+            [appVersion]="updateService.appVersion()"
             (onFileSelect)="switchToFile($event)"
             (onNewFile)="addNewTab()"
             (onOpenFile)="openFile()"

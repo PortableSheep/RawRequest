@@ -356,6 +356,7 @@ export class RequestManagerComponent {
         statusText: 'Load Test Complete',
         headers: {},
         body: JSON.stringify(metrics, null, 2),
+        loadTestMetrics: metrics as any,
         responseTime: results.endTime - results.startTime
       };
 

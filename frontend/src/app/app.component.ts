@@ -63,7 +63,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private secretService = inject(SecretService);
   private scriptConsole = inject(ScriptConsoleService);
   private toast = inject(ToastService);
-  private updateService = inject(UpdateService);
+  protected updateService = inject(UpdateService);
   private historyStore = inject(HistoryStoreService);
   private workspace = inject(WorkspaceFacadeService);
   private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
@@ -154,6 +154,9 @@ export class AppComponent implements OnInit, OnDestroy {
     // this.loadEnvironmentPreference();
     this.loadFiles();
     this.refreshSecrets(true);
+
+    // Wire update events + fetch app version (non-blocking)
+    this.updateService.init();
 
     // Check for updates (non-blocking)
     this.checkForUpdates();
