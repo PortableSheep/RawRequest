@@ -125,24 +125,24 @@
         <div class="flex-1 overflow-auto p-0 relative">
           @if (isLoadTest() && activeTab === 'summary') {
             <div id="tabpanel-summary" role="tabpanel" aria-labelledby="tab-summary" class="absolute inset-0 overflow-auto p-6 bg-zinc-950">
-              @if (getLoadTestMetrics()) {
+              @if (getLoadTestMetrics(); as m) {
                 <!-- Summary Cards (copied from load-test-results-modal) -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                     <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Total Requests</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{getLoadTestMetrics()!.totalRequests}}</div>
+                    <div class="text-2xl font-bold text-zinc-100">{{m.totalRequests}}</div>
                   </div>
                   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                     <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Success Rate</div>
-                    <div class="text-2xl font-bold text-emerald-400">{{(100 - getLoadTestMetrics()!.errorRate).toFixed(1)}}%</div>
+                    <div class="text-2xl font-bold text-emerald-400">{{(100 - m.errorRate).toFixed(1)}}%</div>
                   </div>
                   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                     <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Req/sec</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{getLoadTestMetrics()!.requestsPerSecond.toFixed(2)}}</div>
+                    <div class="text-2xl font-bold text-zinc-100">{{m.requestsPerSecond.toFixed(2)}}</div>
                   </div>
                   <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
                     <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Duration</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{getLoadTestMetrics()!.duration.toFixed(2)}}s</div>
+                    <div class="text-2xl font-bold text-zinc-100">{{m.duration.toFixed(2)}}s</div>
                   </div>
                 </div>
 
@@ -162,27 +162,27 @@
                       <tbody class="divide-y divide-zinc-800 bg-transparent">
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">Average</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.averageResponseTime.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.averageResponseTime.toFixed(2)}}ms</td>
                         </tr>
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">50th Percentile (Median)</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.p50.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p50.toFixed(2)}}ms</td>
                         </tr>
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">95th Percentile</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.p95.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p95.toFixed(2)}}ms</td>
                         </tr>
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">99th Percentile</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.p99.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p99.toFixed(2)}}ms</td>
                         </tr>
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">Min</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.minResponseTime.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.minResponseTime.toFixed(2)}}ms</td>
                         </tr>
                         <tr class="hover:bg-zinc-800/50 transition-colors">
                           <td class="px-6 py-3 text-sm text-zinc-300">Max</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{getLoadTestMetrics()!.maxResponseTime.toFixed(2)}}ms</td>
+                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.maxResponseTime.toFixed(2)}}ms</td>
                         </tr>
                       </tbody>
                     </table>
@@ -198,17 +198,41 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
                         <span class="text-sm text-zinc-400">Successful</span>
-                        <span class="text-sm font-mono font-bold text-emerald-400">{{getLoadTestMetrics()!.successfulRequests}}</span>
+                        <span class="text-sm font-mono font-bold text-emerald-400">{{m.successfulRequests}}</span>
                       </div>
                       <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
                         <span class="text-sm text-zinc-400">Failed</span>
-                        <span class="text-sm font-mono font-bold text-red-400">{{getLoadTestMetrics()!.failedRequests}}</span>
+                        <span class="text-sm font-mono font-bold text-red-400">{{m.failedRequests}}</span>
                       </div>
                       <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
                         <span class="text-sm text-zinc-400">Total</span>
-                        <span class="text-sm font-mono font-bold text-zinc-200">{{getLoadTestMetrics()!.totalRequests}}</span>
+                        <span class="text-sm font-mono font-bold text-zinc-200">{{m.totalRequests}}</span>
                       </div>
                     </div>
+
+                    @if (m.failedRequests > 0 && m.failureStatusCounts && (m.failureStatusCounts | keyvalue).length > 0) {
+                      <div class="mt-4 rounded-lg border border-zinc-800 overflow-hidden">
+                        <div class="border-b border-zinc-800 px-4 py-2 bg-zinc-900/50">
+                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Failure breakdown (status)</div>
+                        </div>
+                        <table class="min-w-full divide-y divide-zinc-800">
+                          <thead class="bg-zinc-900">
+                            <tr>
+                              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
+                              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Count</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-zinc-800 bg-transparent">
+                            @for (kv of (m.failureStatusCounts | keyvalue); track kv.key) {
+                              <tr class="hover:bg-zinc-800/50 transition-colors">
+                                <td class="px-4 py-2 text-xs font-mono text-zinc-200">{{kv.key}}</td>
+                                <td class="px-4 py-2 text-xs font-mono text-zinc-300">{{kv.value}}</td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                    }
                   </div>
                 </div>
               }

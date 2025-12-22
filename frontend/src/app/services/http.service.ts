@@ -724,6 +724,7 @@ export class HttpService {
       failedRequests: 0,
       responseTimes: [],
       errors: [],
+      failureStatusCounts: {},
       startTime,
       endTime: 0
     };
@@ -763,6 +764,11 @@ export class HttpService {
       }
       issuedRequests++;
       return true;
+    };
+
+    const bumpFailureStatus = (status: number) => {
+      const key = String(status);
+      results.failureStatusCounts![key] = (results.failureStatusCounts![key] || 0) + 1;
     };
 
     // Global RPS limiter (simple spacing limiter)
@@ -813,6 +819,7 @@ export class HttpService {
 
           if (response.status === 0 || response.status >= 400) {
             results.failedRequests++;
+            bumpFailureStatus(response.status);
             results.errors.push({
               status: response.status,
               statusText: response.statusText,
@@ -827,6 +834,7 @@ export class HttpService {
             throw error;
           }
           results.failedRequests++;
+          bumpFailureStatus(typeof error?.status === 'number' ? error.status : 0);
           results.errors.push(error);
         }
 
@@ -895,6 +903,7 @@ export class HttpService {
       totalRequests: results.totalRequests,
       successfulRequests: results.successfulRequests,
       failedRequests: results.failedRequests,
+      failureStatusCounts: results.failureStatusCounts || {},
       requestsPerSecond: duration > 0 ? (results.totalRequests / duration) : 0,
       averageResponseTime: sortedTimes.reduce((a, b) => a + b, 0) / sortedTimes.length || 0,
       p50: sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0,

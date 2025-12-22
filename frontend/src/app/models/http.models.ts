@@ -81,6 +81,7 @@ export interface LoadTestResults {
   failedRequests: number;
   responseTimes: number[];
   errors: any[];
+  failureStatusCounts?: { [statusCode: string]: number };
   startTime: number;
   endTime: number;
 }
@@ -89,6 +90,7 @@ export interface LoadTestMetrics {
   totalRequests: number;
   successfulRequests: number;
   failedRequests: number;
+  failureStatusCounts?: { [statusCode: string]: number };
   requestsPerSecond: number;
   averageResponseTime: number;
   p50: number;
