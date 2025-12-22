@@ -114,9 +114,11 @@ export class AppComponent implements OnInit, OnDestroy {
   private activeRunProgress: ActiveRunProgress | null = null;
   private loadUsersSeries: number[] = [];
   private readonly loadUsersSeriesMaxPoints = 120;
+  loadUsersSparklinePointsView = '';
 
   private loadRpsSeries: number[] = [];
   private readonly loadRpsSeriesMaxPoints = 120;
+  loadRpsSparklinePointsView = '';
   private lastRpsSampleAtMs: number | null = null;
   private lastRpsTotalSent: number | null = null;
   activeRequestInfo: {
@@ -985,7 +987,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.pushLoadUsersSample(sample);
         this.sampleLoadRps();
       }
-    }, 250);
+    }, 100);
   }
 
   private pushLoadUsersSample(value: number): void {
@@ -994,23 +996,26 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.loadUsersSeries.length > this.loadUsersSeriesMaxPoints) {
       this.loadUsersSeries.splice(0, this.loadUsersSeries.length - this.loadUsersSeriesMaxPoints);
     }
+	this.loadUsersSparklinePointsView = this.buildLoadUsersSparklinePoints();
   }
 
-  loadUsersSparklinePoints(): string {
+  private buildLoadUsersSparklinePoints(): string {
     const series = this.loadUsersSeries;
-    if (!series.length) {
-      return '';
-    }
+    if (!series.length) return '';
 
-    const width = Math.max(1, series.length - 1);
     const height = 20;
     const maxUsers = this.activeRunProgress?.maxUsers;
     const localMax = Math.max(1, ...series);
     const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
 
+    // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
+    const slots = this.loadUsersSeriesMaxPoints;
+    const step = slots > 1 ? 100 / (slots - 1) : 100;
+    const start = Math.max(0, slots - series.length);
+
     return series
       .map((v, i) => {
-        const x = series.length === 1 ? 0 : (i * (100 / width));
+        const x = (start + i) * step;
         const y = height - (Math.min(denom, v) / denom) * height;
         return `${x.toFixed(2)},${y.toFixed(2)}`;
       })
@@ -1049,21 +1054,24 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.loadRpsSeries.length > this.loadRpsSeriesMaxPoints) {
       this.loadRpsSeries.splice(0, this.loadRpsSeries.length - this.loadRpsSeriesMaxPoints);
     }
+	this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints();
   }
 
-  loadRpsSparklinePoints(): string {
+  private buildLoadRpsSparklinePoints(): string {
     const series = this.loadRpsSeries;
-    if (!series.length) {
-      return '';
-    }
+    if (!series.length) return '';
 
-    const width = Math.max(1, series.length - 1);
     const height = 20;
     const denom = Math.max(1, ...series);
 
+    // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
+    const slots = this.loadRpsSeriesMaxPoints;
+    const step = slots > 1 ? 100 / (slots - 1) : 100;
+    const start = Math.max(0, slots - series.length);
+
     return series
       .map((v, i) => {
-        const x = series.length === 1 ? 0 : (i * (100 / width));
+        const x = (start + i) * step;
         const y = height - (Math.min(denom, v) / denom) * height;
         return `${x.toFixed(2)},${y.toFixed(2)}`;
       })
