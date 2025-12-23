@@ -2,7 +2,13 @@
 
 A modern, lightweight HTTP client for developers. Built with [Wails](https://wails.io/) and Angular.
 
-![RawRequest Screenshot](screenshot.png)
+## Screenshots
+
+![Main window](MainWindow.png)
+
+![Load test in progress](LoadTestInProgress.png)
+
+![Load test results](LoadTestResult.png)
 
 ## Features
 
@@ -25,17 +31,17 @@ curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scrip
 #### Homebrew
 ```bash
 # Tap this repository
-brew tap portablesheep/rawrequest https://github.com/portablesheep/RawRequest
+brew tap portablesheep/rawrequest https://github.com/portablesheep/homebrew-rawrequest
 
 # Install
-brew install rawrequest
+brew install --cask rawrequest
 
 # Link to Applications (optional)
 ln -sf $(brew --prefix)/opt/rawrequest/RawRequest.app /Applications/
 ```
 
 #### Manual Install
-1. Download the latest `.dmg` or `.tar.gz` from [Releases](https://github.com/portablesheep/RawRequest/releases)
+1. Download the latest macOS artifact from [Releases](https://github.com/portablesheep/RawRequest/releases) (e.g. `.dmg` or `RawRequest-v*-macos-universal.tar.gz`)
 2. Open the DMG and drag RawRequest to Applications, or extract the tarball
 3. On first launch, right-click and select "Open" to bypass Gatekeeper
 
