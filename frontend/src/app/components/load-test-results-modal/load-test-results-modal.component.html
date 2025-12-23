@@ -5,7 +5,12 @@
       <!-- Header -->
       <div class="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900 shrink-0">
         <h5 id="loadtest-modal-title" class="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-          <span class="text-amber-400">⚡</span> Load Test Results
+          <span class="text-amber-400" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+            </svg>
+          </span>
+          Load Test Results
         </h5>
         <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors" (click)="onClose.emit()" aria-label="Close modal">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -103,6 +103,11 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		if err != nil {
 			return err
 		}
+		if err := ensureInstallParentDirWritable(installPath); err != nil {
+			msg := fmt.Sprintf("Install location not writable: %v", err)
+			wailsruntime.EventsEmit(a.ctx, "update:error", map[string]any{"message": msg})
+			return errors.New(msg)
+		}
 
 		updaterPath, err := determineUpdaterPath(exePath)
 		if err != nil {
@@ -119,8 +124,17 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 			"--sha256", st.Sha256,
 			"--relaunch=true",
 		)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
+		// App stdout/stderr are often not visible in GUI builds; capture helper logs.
+		logPath := filepath.Join(filepath.Dir(a.preparedUpdateStatePath()), "updater.log")
+		if f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); ferr == nil {
+			cmd.Stdout = f
+			cmd.Stderr = f
+			// Best-effort close after start.
+			defer f.Close()
+		} else {
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+		}
 
 		if err := cmd.Start(); err != nil {
 			return fmt.Errorf("failed to launch updater: %w", err)
@@ -199,6 +213,7 @@ func (a *App) ClearPreparedUpdate() {
 }
 
 func downloadUpdateArtifact(url string, destDir string, onProgress func(written, total int64)) (path string, sha256Hex string, err error) {
+	pattern := "rawrequest-update-artifact-*" + archiveSuffixFromURL(url)
 	client := &http.Client{Timeout: 5 * time.Minute}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -219,7 +234,7 @@ func downloadUpdateArtifact(url string, destDir string, onProgress func(written,
 	if strings.TrimSpace(destDir) == "" {
 		destDir = ""
 	}
-	tmp, err := os.CreateTemp(destDir, "rawrequest-update-artifact-*")
+	tmp, err := os.CreateTemp(destDir, pattern)
 	if err != nil {
 		return "", "", err
 	}
@@ -261,6 +276,37 @@ func downloadUpdateArtifact(url string, destDir string, onProgress func(written,
 
 	sha256Hex = hex.EncodeToString(h.Sum(nil))
 	return tmp.Name(), sha256Hex, nil
+}
+
+func archiveSuffixFromURL(url string) string {
+	lower := strings.ToLower(strings.TrimSpace(url))
+	switch {
+	case strings.HasSuffix(lower, ".tar.gz"):
+		return ".tar.gz"
+	case strings.HasSuffix(lower, ".tgz"):
+		return ".tgz"
+	case strings.HasSuffix(lower, ".zip"):
+		return ".zip"
+	default:
+		return ""
+	}
+}
+
+func ensureInstallParentDirWritable(installPath string) error {
+	parent := installPath
+	if strings.HasSuffix(strings.ToLower(installPath), ".app") {
+		parent = filepath.Dir(installPath)
+	}
+	if parent == "" {
+		return errors.New("could not determine install parent directory")
+	}
+	probe := filepath.Join(parent, ".rawrequest-write-probe")
+	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_ = f.Close()
+	return os.Remove(probe)
 }
 
 func determineInstallPath(exePath string) (string, error) {

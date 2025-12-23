@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EditorComponent } from './components/editor/editor.component';
@@ -116,11 +116,18 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly loadUsersSeriesMaxPoints = 120;
   loadUsersSparklinePointsView = '';
 
+  private sparklineRafHandle: number | null = null;
+  private sparklineLastFrameAtMs: number | null = null;
+  private sparklineLastRenderedAtMs: number | null = null;
+
   private loadRpsSeries: number[] = [];
-  private readonly loadRpsSeriesMaxPoints = 120;
+  private readonly loadRpsSeriesMaxPoints = 80;
   loadRpsSparklinePointsView = '';
   private lastRpsSampleAtMs: number | null = null;
   private lastRpsTotalSent: number | null = null;
+  private lastRpsSmoothed: number | null = null;
+  private rpsRenderValue: number | null = null;
+  private rpsRenderTarget: number | null = null;
   activeRequestInfo: {
     id?: string;
     label: string;
@@ -329,6 +336,9 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadRpsSeries = [];
     this.lastRpsSampleAtMs = null;
     this.lastRpsTotalSent = null;
+  	this.lastRpsSmoothed = null;
+  	this.rpsRenderValue = null;
+  	this.rpsRenderTarget = null;
     this.startActiveRunTick();
 
     const execution = this.requestManager.executeRequestByIndex(requestIndex, requestId);
@@ -360,8 +370,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (progress.type === 'load') {
       const sample = typeof progress.activeUsers === 'number' ? progress.activeUsers : 0;
       this.pushLoadUsersSample(sample);
-
-      this.sampleLoadRps();
     }
   }
 
@@ -386,6 +394,26 @@ export class AppComponent implements OnInit, OnDestroy {
   closeHistoryModal() {
     this.showHistoryModal = false;
     this.selectedHistoryItem = null;
+  }
+
+  @HostListener('document:keydown', ['$event'])
+  onGlobalKeydown(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+
+    // Close only the topmost layer.
+    if (this.showHistoryModal) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.closeHistoryModal();
+      return;
+    }
+
+    if (this.showHistory) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.toggleHistory();
+      return;
+    }
   }
 
   openSecretsModal() {
@@ -987,7 +1015,57 @@ export class AppComponent implements OnInit, OnDestroy {
         this.pushLoadUsersSample(sample);
         this.sampleLoadRps();
       }
-    }, 100);
+
+      // Kick the animation loop while a run is active.
+      if (this.isRequestRunning && this.activeRequestInfo?.type === 'load') {
+        this.ensureSparklineAnimation();
+      }
+    }, 200);
+
+    this.ensureSparklineAnimation();
+  }
+
+  private ensureSparklineAnimation(): void {
+    if (this.sparklineRafHandle !== null) return;
+    this.sparklineLastFrameAtMs = null;
+    this.sparklineLastRenderedAtMs = null;
+
+    const step = (t: number) => {
+      this.sparklineRafHandle = requestAnimationFrame(step);
+
+      // Only animate during an active load run.
+      if (!this.isRequestRunning || this.activeRequestInfo?.type !== 'load') {
+        return;
+      }
+
+      const now = Date.now();
+      this.activeRunNowMs = now;
+
+      const last = this.sparklineLastFrameAtMs;
+      this.sparklineLastFrameAtMs = now;
+      const dt = last === null ? 0 : Math.max(0, now - last);
+
+      // Throttle rendering to ~30fps to keep CPU down.
+      const lastRender = this.sparklineLastRenderedAtMs;
+      if (lastRender !== null && now - lastRender < 33) {
+        return;
+      }
+      this.sparklineLastRenderedAtMs = now;
+
+      // Interpolate RPS last point toward latest target.
+      if (this.rpsRenderTarget !== null) {
+        if (this.rpsRenderValue === null) {
+          this.rpsRenderValue = this.rpsRenderTarget;
+        } else {
+          // Exponential smoothing per-frame; dt-aware.
+          const k = 1 - Math.pow(0.02, dt / 16.67);
+          this.rpsRenderValue = this.rpsRenderValue + (this.rpsRenderTarget - this.rpsRenderValue) * k;
+        }
+        this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints(this.rpsRenderValue);
+      }
+    };
+
+    this.sparklineRafHandle = requestAnimationFrame(step);
   }
 
   private pushLoadUsersSample(value: number): void {
@@ -1036,16 +1114,19 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const dtMs = now - this.lastRpsSampleAtMs;
-    if (dtMs < 200) {
+    if (dtMs < 300) {
       return;
     }
 
     const dCount = totalSent - this.lastRpsTotalSent;
     const rps = dtMs > 0 ? Math.max(0, dCount) / (dtMs / 1000) : 0;
+  const alpha = 0.25;
+  const smoothed = this.lastRpsSmoothed === null ? rps : (alpha * rps + (1 - alpha) * this.lastRpsSmoothed);
+  this.lastRpsSmoothed = smoothed;
 
     this.lastRpsSampleAtMs = now;
     this.lastRpsTotalSent = totalSent;
-    this.pushLoadRpsSample(rps);
+    this.pushLoadRpsSample(smoothed);
   }
 
   private pushLoadRpsSample(value: number): void {
@@ -1054,15 +1135,20 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.loadRpsSeries.length > this.loadRpsSeriesMaxPoints) {
       this.loadRpsSeries.splice(0, this.loadRpsSeries.length - this.loadRpsSeriesMaxPoints);
     }
-	this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints();
+	this.rpsRenderTarget = v;
+	if (this.rpsRenderValue === null) {
+		this.rpsRenderValue = v;
+	}
+	this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints(this.rpsRenderValue);
   }
 
-  private buildLoadRpsSparklinePoints(): string {
+  private buildLoadRpsSparklinePoints(renderLastValue?: number): string {
     const series = this.loadRpsSeries;
     if (!series.length) return '';
 
     const height = 20;
-    const denom = Math.max(1, ...series);
+    const lastValue = renderLastValue !== undefined ? renderLastValue : series[series.length - 1] ?? 0;
+    const denom = Math.max(1, ...series, lastValue);
 
     // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
     const slots = this.loadRpsSeriesMaxPoints;
@@ -1072,7 +1158,8 @@ export class AppComponent implements OnInit, OnDestroy {
     return series
       .map((v, i) => {
         const x = (start + i) * step;
-        const y = height - (Math.min(denom, v) / denom) * height;
+        const value = i === series.length - 1 ? lastValue : v;
+        const y = height - (Math.min(denom, value) / denom) * height;
         return `${x.toFixed(2)},${y.toFixed(2)}`;
       })
       .join(' ');
@@ -1089,6 +1176,12 @@ export class AppComponent implements OnInit, OnDestroy {
       clearInterval(this.activeRunTickHandle);
       this.activeRunTickHandle = null;
     }
+	if (this.sparklineRafHandle !== null) {
+		cancelAnimationFrame(this.sparklineRafHandle);
+		this.sparklineRafHandle = null;
+	}
+	this.sparklineLastFrameAtMs = null;
+	this.sparklineLastRenderedAtMs = null;
   }
 
   private formatClock(ms: number): string {

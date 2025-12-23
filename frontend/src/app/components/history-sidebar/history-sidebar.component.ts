@@ -1,4 +1,4 @@
-import { Component, input, output, HostListener } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import type { HistoryItem } from '../../models/http.models';
 
 @Component({
@@ -17,13 +17,6 @@ export class HistorySidebarComponent {
   onItemClick = output<HistoryItem>();
 
   constructor() {}
-
-  @HostListener('document:keydown.escape')
-  onEscapeKey(): void {
-    if (this.isOpen()) {
-      this.onClose.emit();
-    }
-  }
 
   formatTime(date: Date): string {
     const now = new Date();

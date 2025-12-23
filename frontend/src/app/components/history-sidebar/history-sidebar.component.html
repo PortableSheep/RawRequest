@@ -1,4 +1,4 @@
-<div class="fixed inset-y-0 right-0 w-[420px] max-w-[90vw] bg-zinc-900 border-l border-zinc-800 shadow-2xl z-50 transform transition-transform duration-300 ease-in-out"
+<div class="fixed inset-y-0 right-0 w-[420px] max-w-[90vw] bg-zinc-900 border-l border-zinc-800 shadow-2xl z-30 transform transition-transform duration-300 ease-in-out"
      [class.translate-x-0]="isOpen()"
      [class.translate-x-full]="!isOpen()"
      tabindex="-1">
@@ -73,5 +73,5 @@
 </div>
 
 @if (isOpen()) {
-  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+  <div class="fixed inset-0 bg-black/50 backdrop-blur-sm z-20 transition-opacity" (click)="onClose.emit()"></div>
 }

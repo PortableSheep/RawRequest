@@ -89,4 +89,5 @@ export class HistoryDetailModalComponent {
     // Fallback: show response body (pretty-printed if JSON)
     return this.getFormattedResponse();
   }
+
 }

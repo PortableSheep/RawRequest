@@ -122,6 +122,13 @@ func main() {
 			dief("failed to extract zip: %v", err)
 		}
 	default:
+		// Fallback: artifact may be a local temp file without an extension.
+		if err := extractZip(artifactPath, stagingDir); err == nil {
+			break
+		}
+		if err := extractTarGz(artifactPath, stagingDir); err == nil {
+			break
+		}
 		die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 	}
 
