@@ -318,6 +318,10 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
+    // Clear the response panel immediately so stale results don't linger while the
+    // new request is running. The response panel will show its loading state.
+    this.lastExecutedRequestIndex = null;
+
     this.isRequestRunning = true;
     this.pendingRequestIndex = requestIndex;
     const request = activeFile.requests[requestIndex];
