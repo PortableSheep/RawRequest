@@ -77,6 +77,28 @@ export interface LoadTestConfig {
   // Early abort
   // Example: failureRateThreshold=99% (or 0.99)
   failureRateThreshold?: string | number;
+
+  // Adaptive mode (ramp → back off until stable → stop)
+  adaptive?: boolean | string | number;
+  adaptiveFailureRate?: string | number; // failure fraction (0..1) or percent ("1%" or 1)
+  adaptiveWindow?: string | number;      // window length (e.g. "10s")
+  adaptiveStable?: string | number;      // stable duration required (e.g. "20s")
+  adaptiveCooldown?: string | number;    // min time between adjustments
+  adaptiveBackoffStep?: number | string; // users to drop per step
+}
+
+export interface AdaptiveLoadTestSummary {
+  enabled: boolean;
+  stabilized?: boolean;
+  phase?: 'ramping' | 'backing_off' | 'stable' | 'exhausted' | 'disabled';
+  peakUsers?: number;
+  stableUsers?: number;
+  timeToFirstFailureMs?: number;
+  backoffSteps?: number;
+  peakWindowFailureRate?: number;
+  stableWindowFailureRate?: number;
+  peakWindowRps?: number;
+  stableWindowRps?: number;
 }
 
 export interface LoadTestResults {
@@ -94,6 +116,8 @@ export interface LoadTestResults {
   aborted?: boolean;
   abortReason?: string;
   plannedDurationMs?: number | null;
+
+  adaptive?: AdaptiveLoadTestSummary;
 }
 
 export interface LoadTestMetrics {
@@ -116,6 +140,8 @@ export interface LoadTestMetrics {
   aborted?: boolean;
   abortReason?: string;
   plannedDuration?: number; // seconds, if duration-based test
+
+  adaptive?: AdaptiveLoadTestSummary;
 }
  
 export interface ActiveRunProgress {

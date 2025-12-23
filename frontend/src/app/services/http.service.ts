@@ -661,6 +661,13 @@ export class HttpService {
     waitMaxMs: number | null;
     requestsPerSecond: number | null;
     failureRateThreshold: number | null; // fraction 0..1
+
+    adaptiveEnabled: boolean;
+    adaptiveFailureRate: number | null; // fraction 0..1
+    adaptiveWindowSec: number;
+    adaptiveStableSec: number;
+    adaptiveCooldownMs: number;
+    adaptiveBackoffStepUsers: number;
   } {
     const toInt = (v: any): number | null => {
       const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
@@ -713,6 +720,38 @@ export class HttpService {
 
     const failureRateThreshold = parseFailureRateThreshold(config?.failureRateThreshold);
 
+    const parseBool = (value: unknown): boolean => {
+      if (value === true) return true;
+      if (value === false) return false;
+      if (typeof value === 'number') return value !== 0;
+      const s = String(value ?? '').trim().toLowerCase();
+      if (!s) return false;
+      return ['1', 'true', 'yes', 'y', 'on', 'enable', 'enabled'].includes(s);
+    };
+
+    const adaptiveEnabled = parseBool(config?.adaptive);
+    const adaptiveFailureRateRaw = parseFailureRateThreshold(config?.adaptiveFailureRate);
+    const adaptiveFailureRate = adaptiveEnabled
+      ? (adaptiveFailureRateRaw ?? 0.01)
+      : null;
+
+    const parseSeconds = (value: unknown, fallbackSec: number): number => {
+      const ms = this.parseDurationMs(value);
+      if (ms !== null && ms > 0) {
+        return Math.max(1, Math.round(ms / 1000));
+      }
+      const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
+      if (Number.isFinite(n) && n > 0) {
+        return Math.max(1, Math.trunc(n));
+      }
+      return fallbackSec;
+    };
+
+    const adaptiveWindowSec = parseSeconds(config?.adaptiveWindow, 15);
+    const adaptiveStableSec = parseSeconds(config?.adaptiveStable, 20);
+    const adaptiveCooldownMs = parseSeconds(config?.adaptiveCooldown, 5) * 1000;
+    const adaptiveBackoffStepUsers = Math.max(1, toInt(config?.adaptiveBackoffStep) ?? 2);
+
     let normalizedIterations = iterations && iterations > 0 ? iterations : null;
     const normalizedDurationMs = durationMs && durationMs > 0 ? durationMs : null;
     if (normalizedIterations === null && normalizedDurationMs === null) {
@@ -731,6 +770,13 @@ export class HttpService {
       waitMaxMs: waitMaxMs !== null ? Math.max(0, waitMaxMs) : null,
       requestsPerSecond: rps && rps > 0 ? rps : null,
       failureRateThreshold,
+
+      adaptiveEnabled,
+      adaptiveFailureRate,
+      adaptiveWindowSec,
+      adaptiveStableSec,
+      adaptiveCooldownMs,
+      adaptiveBackoffStepUsers,
     };
   }
 
@@ -766,13 +812,58 @@ export class HttpService {
 
     const cfg = this.normalizeLoadTestConfig(request.loadTest);
     results.plannedDurationMs = cfg.durationMs;
-    const stopAt = cfg.durationMs ? (startTime + cfg.durationMs) : Number.POSITIVE_INFINITY;
+    let stopAt = cfg.durationMs ? (startTime + cfg.durationMs) : Number.POSITIVE_INFINITY;
 
     let cancelled = false;
     let aborted = false;
     let abortReason: string | undefined;
 
     let activeUsers = 0;
+
+    // Adaptive backoff summary (stored on results and copied into metrics later)
+    results.adaptive = {
+      enabled: cfg.adaptiveEnabled,
+      phase: cfg.adaptiveEnabled ? 'ramping' : 'disabled',
+    };
+
+    type WindowBucket = { sec: number; sent: number; failed: number };
+    const windowBuckets: WindowBucket[] = [];
+    const recordWindow = (nowMs: number, isFailure: boolean) => {
+      if (!cfg.adaptiveEnabled) return;
+      const sec = Math.floor(nowMs / 1000);
+      const last = windowBuckets.length ? windowBuckets[windowBuckets.length - 1] : null;
+      if (!last || last.sec !== sec) {
+        windowBuckets.push({ sec, sent: 0, failed: 0 });
+      }
+      const bucket = windowBuckets[windowBuckets.length - 1];
+      bucket.sent++;
+      if (isFailure) bucket.failed++;
+
+      const cutoff = sec - cfg.adaptiveWindowSec - 2;
+      while (windowBuckets.length && windowBuckets[0].sec < cutoff) {
+        windowBuckets.shift();
+      }
+    };
+
+    const getWindowStats = (nowMs: number): { sent: number; failed: number; failureRate: number | null; rps: number | null } => {
+      if (!cfg.adaptiveEnabled) return { sent: 0, failed: 0, failureRate: null, rps: null };
+      const nowSec = Math.floor(nowMs / 1000);
+      const minSec = nowSec - cfg.adaptiveWindowSec + 1;
+      let sent = 0;
+      let failed = 0;
+      for (const b of windowBuckets) {
+        if (b.sec >= minSec && b.sec <= nowSec) {
+          sent += b.sent;
+          failed += b.failed;
+        }
+      }
+      if (sent <= 0) {
+        return { sent, failed, failureRate: null, rps: null };
+      }
+      const failureRate = failed / sent;
+      const rps = sent / cfg.adaptiveWindowSec;
+      return { sent, failed, failureRate, rps };
+    };
 
     let lastProgressEmitAt = 0;
     const emitProgress = (patch: Partial<ActiveRunProgress> = {}, force = false) => {
@@ -862,10 +953,16 @@ export class HttpService {
       return cfg.delayMs;
     };
 
-    const runUser = async () => {
+    const runUser = async (userNumber: number) => {
       while (true) {
         markCancelledIfRequested();
         if (cancelled || aborted) {
+          return;
+        }
+
+        // Adaptive downscale: users with a higher index than the current target exit.
+        // (This keeps the control logic simple and avoids forcibly killing requests mid-flight.)
+        if (cfg.adaptiveEnabled && userNumber > targetUsers) {
           return;
         }
 
@@ -890,7 +987,10 @@ export class HttpService {
 
           const response = await this.sendRequest(request, variables, undefined, envName);
 
-          if (response.status === 0 || response.status >= 400) {
+          const isFailure = response.status === 0 || response.status >= 400;
+          recordWindow(Date.now(), isFailure);
+
+          if (isFailure) {
             results.failedRequests++;
             bumpFailureStatus(response.status);
             results.errors.push({
@@ -903,6 +1003,7 @@ export class HttpService {
           }
           results.responseTimes.push(response.responseTime);
         } catch (error: any) {
+          recordWindow(Date.now(), true);
           results.failedRequests++;
           bumpFailureStatus(typeof error?.status === 'number' ? error.status : 0);
           results.errors.push(error);
@@ -927,11 +1028,11 @@ export class HttpService {
       }
     };
 
-    const runUserTracked = async () => {
+    const runUserTracked = async (userNumber: number) => {
       activeUsers++;
       emitProgress({ activeUsers }, true);
       try {
-        await runUser();
+        await runUser(userNumber);
       } finally {
         activeUsers = Math.max(0, activeUsers - 1);
         emitProgress({ activeUsers }, true);
@@ -940,8 +1041,11 @@ export class HttpService {
 
     // Spawn users (optionally ramping up)
     const userTasks: Promise<void>[] = [];
+    let nextUserNumber = 0;
+    let targetUsers = cfg.adaptiveEnabled ? cfg.startUsers : cfg.maxUsers;
     const spawnUser = () => {
-      userTasks.push(runUserTracked());
+      const userNumber = ++nextUserNumber;
+      userTasks.push(runUserTracked(userNumber));
     };
 
     for (let i = 0; i < cfg.startUsers; i++) {
@@ -949,6 +1053,7 @@ export class HttpService {
     }
 
     const remainingUsers = cfg.maxUsers - cfg.startUsers;
+    let allowRamping = true;
     const rampPromise = (async () => {
       if (remainingUsers <= 0) return;
 
@@ -960,10 +1065,14 @@ export class HttpService {
       }
 
       if (!rate || rate <= 0) {
-        // No ramp parameters: spawn all immediately
+        // No ramp parameters: spawn all immediately (unless adaptive stops ramping).
         for (let i = 0; i < remainingUsers; i++) {
           markCancelledIfRequested();
           if (cancelled || aborted) return;
+          if (!allowRamping) return;
+          if (cfg.adaptiveEnabled) {
+            targetUsers = Math.min(cfg.maxUsers, targetUsers + 1);
+          }
           spawnUser();
         }
         return;
@@ -973,14 +1082,105 @@ export class HttpService {
       for (let i = 0; i < remainingUsers; i++) {
         markCancelledIfRequested();
         if (cancelled || aborted) return;
+        if (!allowRamping) return;
         if (Date.now() >= stopAt) return;
+
+        if (cfg.adaptiveEnabled) {
+          targetUsers = Math.min(cfg.maxUsers, targetUsers + 1);
+        }
         spawnUser();
         await this.sleep(intervalMs);
       }
     })();
 
+    // Adaptive controller loop: ramp until failure threshold hit, then back off until stable.
+    let lastAdjustAt = 0;
+    let stableSince: number | null = null;
+    let sawInstability = false;
+    const adaptiveController = (async () => {
+      if (!cfg.adaptiveEnabled || cfg.adaptiveFailureRate === null) return;
+      const minWindowSamples = 20;
+
+      while (true) {
+        markCancelledIfRequested();
+        if (cancelled || aborted) return;
+        const now = Date.now();
+        if (now >= stopAt) return;
+
+        const stats = getWindowStats(now);
+        if (stats.failureRate === null || stats.sent < minWindowSamples) {
+          await this.sleep(500);
+          continue;
+        }
+
+        if (!sawInstability) {
+          if (stats.failureRate > cfg.adaptiveFailureRate) {
+            sawInstability = true;
+            allowRamping = false;
+            results.adaptive = {
+              ...(results.adaptive || { enabled: true }),
+              enabled: true,
+              phase: 'backing_off',
+              peakUsers: targetUsers,
+              timeToFirstFailureMs: now - startTime,
+              backoffSteps: 0,
+              peakWindowFailureRate: stats.failureRate,
+              peakWindowRps: stats.rps ?? undefined,
+            };
+            stableSince = null;
+            lastAdjustAt = now;
+          }
+          await this.sleep(500);
+          continue;
+        }
+
+        // backing off
+        if (stats.failureRate > cfg.adaptiveFailureRate) {
+          stableSince = null;
+          if (now - lastAdjustAt >= cfg.adaptiveCooldownMs) {
+            const prev = targetUsers;
+            targetUsers = Math.max(1, targetUsers - cfg.adaptiveBackoffStepUsers);
+            if (results.adaptive) {
+              results.adaptive.backoffSteps = (results.adaptive.backoffSteps ?? 0) + (targetUsers < prev ? 1 : 0);
+              results.adaptive.phase = 'backing_off';
+            }
+            lastAdjustAt = now;
+            if (targetUsers <= 1) {
+              // Can't back off further; mark as exhausted and stop.
+              if (results.adaptive) {
+                results.adaptive.phase = 'exhausted';
+              }
+              stopAt = now;
+              return;
+            }
+          }
+          await this.sleep(500);
+          continue;
+        }
+
+        // currently healthy in window
+        if (stableSince === null) {
+          stableSince = now;
+        }
+        if (now - stableSince >= cfg.adaptiveStableSec * 1000) {
+          if (results.adaptive) {
+            results.adaptive.stabilized = true;
+            results.adaptive.phase = 'stable';
+            results.adaptive.stableUsers = targetUsers;
+            results.adaptive.stableWindowFailureRate = stats.failureRate;
+            results.adaptive.stableWindowRps = stats.rps ?? undefined;
+          }
+          // Stop once stable (per your request).
+          stopAt = now;
+          return;
+        }
+
+        await this.sleep(500);
+      }
+    })();
+
     try {
-      await rampPromise;
+      await Promise.all([rampPromise, adaptiveController]);
       await Promise.all(userTasks);
     } finally {
       results.endTime = Date.now();
@@ -1016,7 +1216,8 @@ export class HttpService {
       cancelled: results.cancelled,
       aborted: results.aborted,
       abortReason: results.abortReason,
-      plannedDuration: results.plannedDurationMs ? results.plannedDurationMs / 1000 : undefined
+      plannedDuration: results.plannedDurationMs ? results.plannedDurationMs / 1000 : undefined,
+      adaptive: results.adaptive,
     };
   }
 

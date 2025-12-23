@@ -157,6 +157,51 @@
                   </div>
                 </div>
 
+                @if (m.adaptive; as a) {
+                @if (a.enabled) {
+                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
+                    <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">
+                      <h6 class="text-sm font-semibold text-zinc-100">Adaptive backoff</h6>
+                      @if (a.phase) {
+                        <div class="mt-1 text-xs text-zinc-400">Phase: {{a.phase}}</div>
+                      }
+                    </div>
+                    <div class="p-4">
+                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
+                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Peak (first unstable)</div>
+                          <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div class="text-zinc-400">Users</div>
+                            <div class="text-zinc-200 font-mono">{{a.peakUsers ?? '—'}}</div>
+                            <div class="text-zinc-400">Window fail rate</div>
+                            <div class="text-zinc-200 font-mono">{{a.peakWindowFailureRate != null ? (a.peakWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
+                            <div class="text-zinc-400">Window RPS</div>
+                            <div class="text-zinc-200 font-mono">{{a.peakWindowRps != null ? a.peakWindowRps.toFixed(2) : '—'}}</div>
+                            <div class="text-zinc-400">Time to first failure</div>
+                            <div class="text-zinc-200 font-mono">{{a.timeToFirstFailureMs != null ? (a.timeToFirstFailureMs / 1000).toFixed(2) + 's' : '—'}}</div>
+                          </div>
+                        </div>
+                        <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
+                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Stabilized</div>
+                          <div class="grid grid-cols-2 gap-2 text-sm">
+                            <div class="text-zinc-400">Stable</div>
+                            <div class="text-zinc-200 font-mono">{{a.stabilized ? 'yes' : 'no'}}</div>
+                            <div class="text-zinc-400">Users</div>
+                            <div class="text-zinc-200 font-mono">{{a.stableUsers ?? '—'}}</div>
+                            <div class="text-zinc-400">Window fail rate</div>
+                            <div class="text-zinc-200 font-mono">{{a.stableWindowFailureRate != null ? (a.stableWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
+                            <div class="text-zinc-400">Window RPS</div>
+                            <div class="text-zinc-200 font-mono">{{a.stableWindowRps != null ? a.stableWindowRps.toFixed(2) : '—'}}</div>
+                            <div class="text-zinc-400">Backoff steps</div>
+                            <div class="text-zinc-200 font-mono">{{a.backoffSteps ?? '—'}}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                }
+                }
+
                 <!-- Response Time Statistics -->
                 <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
                   <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">

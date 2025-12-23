@@ -120,12 +120,8 @@ Content-Type: application/json
   "field": "value"
 }
 
-###
-
 ### HEAD request (gets headers only, no body)
 HEAD https://httpbun.com/get
-
-###
 
 ### OPTIONS request (check available methods)
 OPTIONS https://httpbun.com/get
@@ -278,20 +274,19 @@ response.json.url contains "httpbun.com/get"
 #   - If neither duration nor iterations/amount is provided, RawRequest defaults to 10 total requests.
 #   - "delay" is a fixed per-user pause between requests.
 #   - "waitMin/waitMax" enables a random per-user pause (uniform) between requests.
+#   - "failureRateThreshold" aborts the run early once total failure rate exceeds the threshold.
+#   - Adaptive mode: ramp up, detect failures in a sliding window, back off until stable, then stop.
+#     (See the examples below.)
 
 ### Basic load test (Locust-style: users + duration)
 @name loadTestBasic
 @load users=5 duration=10s
 GET https://httpbun.com/get
 
-###
-
 ### Total request count (alias: amount) + concurrency (alias: concurrency)
 @name loadTestIterations
 @load concurrency=10 amount=100
 GET https://httpbun.com/delay/1
-
-###
 
 ### Ramp users over time using spawn rate (users/sec)
 @name loadTestAdvanced
@@ -303,35 +298,38 @@ Content-Type: application/json
   "testData": "load-test-payload"
 }
 
-###
-
 ### Ramp users using rampUp duration (spawnRate derived automatically)
 @name loadTestRampUpDuration
 @load start=2 max=25 rampUp=10s duration=25s
 GET https://httpbun.com/get
-
-###
 
 ### Wait/think time (random per-user wait between requests)
 @name loadTestWaitRange
 @load users=10 duration=20s waitMin=100ms waitMax=500ms
 GET https://httpbun.com/get
 
-###
-
 ### Fixed delay between requests (per-user pacing)
 @name loadTestDelay
 @load users=8 duration=15s delay=250ms
 GET https://httpbun.com/get
-
-###
 
 ### Global RPS cap (alias: rps) with concurrent users
 @name loadTestRate
 @load users=25 duration=20s rps=30
 GET https://httpbun.com/get
 
+### Early abort on failure-rate threshold
+@name loadTestAbortOnFailureRate
+@load users=10 duration=30s failureRateThreshold=5%
+GET https://httpbun.com/status/503
+
 ###
+
+### Adaptive backoff (ramp up, then back off until stable, then stop)
+@name loadTestAdaptiveBackoff
+@load start=1 max=50 spawnRate=5 duration=2m rps=100 \
+  adaptive=true adaptiveFailureRate=1% adaptiveWindow=15s adaptiveStable=20s adaptiveCooldown=5s adaptiveBackoffStep=2
+GET https://httpbun.com/delay/1
 
 ###############################################################################
 # 8. SECRETS USAGE
@@ -1144,34 +1142,20 @@ response.json != null
 ###############################################################################
 # END OF EXAMPLES
 ###############################################################################
-# This file demonstrates ALL features of RawRequest:
+# This file is a "kitchen sink" playground for the app. It’s meant to be runnable
+# out-of-the-box (default env points at https://httpbun.com) and demonstrate common
+# patterns RawRequest supports:
 #
 # ✓ Environment variables (@env.{env}.{key})
-# ✓ Global variables (@variableName)
-# ✓ All HTTP methods (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+# ✓ Global variables (@varName)
+# ✓ Common HTTP methods + headers + bodies
 # ✓ Request naming (@name)
-# ✓ Request chaining & dependencies (@depends) with chain icons (🔗)
-# ✓ Pre-request scripts (< { ... })
-# ✓ Post-request scripts (> { ... })
+# ✓ Request chains (@depends)
+# ✓ Pre/post scripts (< { ... } / > { ... }) + helper APIs
 # ✓ Assertions (### Assert)
-# ✓ Load testing (@load) with lightning icons (⚡)
-# ✓ Secrets management ({{secret:key}})
-# ✓ Complex multi-step workflows
-# ✓ Error handling & recovery
-# ✓ GraphQL queries
-# ✓ File uploads (multipart/form-data)
-# ✓ Authentication methods (Basic, Bearer, API Key)
-# ✓ Multiple content types (JSON, XML, form-data, plain text)
-# ✓ Query parameters & dynamic URLs
-# ✓ JavaScript expressions in variables ({{Math.random()}}, {{new Date()}})
-# ✓ Conditional logic in scripts
-# ✓ Response data extraction & transformation
-# ✓ Script helper APIs (setHeader, updateRequest, assert, delay) + live console
-# ✓ Batch operations
-# ✓ Retry logic
-# ✓ Data validation & testing
-# ✓ Performance monitoring
-# ✓ Debugging utilities
+# ✓ Load testing (@load), including ramping, wait time, RPS caps, early aborts,
+#   and adaptive backoff (ramp → back off → stable → stop)
+# ✓ Secrets usage ({{secret:key}})
 #
 # SCRIPT API REFERENCE:
 # - setVar(key, value)     → Set a variable

@@ -335,12 +335,43 @@ export class ParserService {
         maxfailure: 'failureRateThreshold',
         failpct: 'failureRateThreshold',
         failurepct: 'failureRateThreshold',
+
+        // adaptive backoff
+        adaptive: 'adaptive',
+        autobackoff: 'adaptive',
+        autoadjust: 'adaptive',
+        autotune: 'adaptive',
+        backoff: 'adaptive',
+        stablebackoff: 'adaptive',
+
+        adaptivefailurerate: 'adaptiveFailureRate',
+        adaptivefailrate: 'adaptiveFailureRate',
+        adaptivefailure: 'adaptiveFailureRate',
+        adaptivefailurethreshold: 'adaptiveFailureRate',
+        adaptive_threshold: 'adaptiveFailureRate',
+
+        adaptivewindow: 'adaptiveWindow',
+        window: 'adaptiveWindow',
+        windowsec: 'adaptiveWindow',
+        windows: 'adaptiveWindow',
+
+        adaptivestable: 'adaptiveStable',
+        stablesec: 'adaptiveStable',
+        stablefor: 'adaptiveStable',
+        stable: 'adaptiveStable',
+
+        adaptivecooldown: 'adaptiveCooldown',
+        cooldown: 'adaptiveCooldown',
+
+        adaptivebackoffstep: 'adaptiveBackoffStep',
+        backoffstep: 'adaptiveBackoffStep',
+        backoffusers: 'adaptiveBackoffStep',
       };
       return map[k] || raw.trim();
     };
 
     const shouldParseInt = (key: string): boolean => {
-      return ['concurrent', 'iterations', 'start', 'max', 'spawnRate', 'requestsPerSecond'].includes(key);
+      return ['concurrent', 'iterations', 'start', 'max', 'spawnRate', 'requestsPerSecond', 'adaptiveBackoffStep'].includes(key);
     };
 
     // Match key=value pairs where value may be quoted or unquoted.
