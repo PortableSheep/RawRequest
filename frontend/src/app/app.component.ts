@@ -402,6 +402,19 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent): void {
+    // Save shortcuts
+    if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.shiftKey) {
+        void this.saveCurrentFileAs();
+      } else {
+        void this.saveCurrentFile();
+      }
+      return;
+    }
+
+    // Overlay close
     if (event.key !== 'Escape') return;
 
     // Close only the topmost layer.

@@ -1114,6 +1114,10 @@ export class HttpService {
         }
 
         if (!sawInstability) {
+          // If we haven't hit instability yet, keep ramping. Two outcomes are possible:
+          // 1) We exceed the failure threshold → enter backing-off.
+          // 2) We reach max users and remain healthy for adaptiveStableSec → consider "stable" without backoff.
+
           if (stats.failureRate > cfg.adaptiveFailureRate) {
             sawInstability = true;
             allowRamping = false;
@@ -1129,7 +1133,37 @@ export class HttpService {
             };
             stableSince = null;
             lastAdjustAt = now;
+            await this.sleep(500);
+            continue;
           }
+
+          // Healthy window: only mark stable once we've reached the intended peak.
+          if (targetUsers >= cfg.maxUsers) {
+            if (stableSince === null) {
+              stableSince = now;
+            }
+            if (now - stableSince >= cfg.adaptiveStableSec * 1000) {
+              results.adaptive = {
+                ...(results.adaptive || { enabled: true }),
+                enabled: true,
+                stabilized: true,
+                phase: 'stable',
+                peakUsers: cfg.maxUsers,
+                stableUsers: cfg.maxUsers,
+                backoffSteps: 0,
+                peakWindowFailureRate: stats.failureRate,
+                stableWindowFailureRate: stats.failureRate,
+                peakWindowRps: stats.rps ?? undefined,
+                stableWindowRps: stats.rps ?? undefined,
+              };
+              stopAt = now;
+              return;
+            }
+          } else {
+            // Still ramping → don't let a "stable" timer run at lower user counts.
+            stableSince = null;
+          }
+
           await this.sleep(500);
           continue;
         }
