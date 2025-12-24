@@ -39,10 +39,14 @@
                     (historyUpdated)="onHistoryUpdated($event)">
             </app-request-manager>
 
-            <!-- Two-column main layout -->
-            <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] gap-4 h-full">
+            <!-- Two-column main layout (resizable on large screens) -->
+            <div
+                #mainSplit
+                class="grid grid-cols-1 gap-4 lg:gap-0 h-full"
+                [style.gridTemplateColumns]="splitGridTemplateColumns"
+            >
                 <!-- Editor column -->
-                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-blue-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col">
+                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-blue-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col lg:pr-2">
                     <div class="flex items-center justify-between px-3 py-1 border-b border-zinc-800 bg-zinc-950/50">
                         <span class="text-xs text-zinc-500">Editor</span>
                         <button
@@ -72,7 +76,23 @@
                     </app-editor>
                 </div>
 
-                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-emerald-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col">
+                @if (isSplitLayout) {
+                    <div
+                        class="hidden lg:flex items-stretch justify-center"
+                        (mousedown)="onSplitMouseDown($event)"
+                        (dblclick)="resetSplit()"
+                        title="Drag to resize (double-click to reset)"
+                        role="separator"
+                        aria-orientation="vertical"
+                        [attr.aria-valuenow]="editorPaneWidthPx"
+                    >
+                        <div class="w-2.5 cursor-col-resize flex items-stretch justify-center">
+                            <div class="w-px bg-zinc-800"></div>
+                        </div>
+                    </div>
+                }
+
+                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-emerald-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col lg:pl-2">
                     <app-response-panel
                         class="flex-1 overflow-hidden"
                         [responseData]="lastExecutedRequestIndex !== null ? currentFile.responseData[lastExecutedRequestIndex] : null"
@@ -124,13 +144,22 @@
                                                     <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
                                                         <div class="text-[11px] text-zinc-400 whitespace-nowrap">Users</div>
                                                         <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
-                                                            <polyline
-                                                                [attr.points]="loadUsersSparklinePointsView"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                stroke-width="1.5"
-                                                                class="text-blue-400"
-                                                            ></polyline>
+                                                            <defs>
+                                                                <clipPath id="usersSparklineClip">
+                                                                    <rect x="0" y="0" width="100" height="20"></rect>
+                                                                </clipPath>
+                                                            </defs>
+                                                            <g [attr.transform]="loadUsersSparklineTransformView || null" [attr.clip-path]="'url(#usersSparklineClip)'">
+                                                                <path
+                                                                    [attr.d]="loadUsersSparklinePathDView"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    stroke-width="1.5"
+                                                                    stroke-linecap="round"
+                                                                    stroke-linejoin="round"
+                                                                    class="text-blue-400"
+                                                                ></path>
+                                                            </g>
                                                         </svg>
                                                         <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
                                                             {{ activeRunProgressView?.activeUsers ?? 0 }}/{{ activeRunProgressView?.maxUsers ?? '—' }}
@@ -140,13 +169,22 @@
                                                     <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
                                                         <div class="text-[11px] text-zinc-400 whitespace-nowrap">RPS</div>
                                                         <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
-                                                            <polyline
-                                                                [attr.points]="loadRpsSparklinePointsView"
-                                                                fill="none"
-                                                                stroke="currentColor"
-                                                                stroke-width="1.5"
-                                                                class="text-emerald-400"
-                                                            ></polyline>
+                                                            <defs>
+                                                                <clipPath id="rpsSparklineClip">
+                                                                    <rect x="0" y="0" width="100" height="20"></rect>
+                                                                </clipPath>
+                                                            </defs>
+                                                            <g [attr.transform]="loadRpsSparklineTransformView || null" [attr.clip-path]="'url(#rpsSparklineClip)'">
+                                                                <path
+                                                                    [attr.d]="loadRpsSparklinePathDView"
+                                                                    fill="none"
+                                                                    stroke="currentColor"
+                                                                    stroke-width="1.5"
+                                                                    stroke-linecap="round"
+                                                                    stroke-linejoin="round"
+                                                                    class="text-emerald-400"
+                                                                ></path>
+                                                            </g>
                                                         </svg>
                                                         <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
                                                             {{ currentLoadRpsView | number:'1.0-0' }}
@@ -170,7 +208,6 @@
             [logs]="scriptLogs()"
             [latestLog]="latestConsoleEntry()"
             [status]="footerStatus()"
-            version="Raw Request v1"
             (onToggle)="toggleConsole()"
             (onClear)="clearConsole()">
     </app-console-drawer>

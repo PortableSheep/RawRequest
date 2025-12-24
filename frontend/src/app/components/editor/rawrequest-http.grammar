@@ -1,0 +1,35 @@
+@top File { (RequestBlock | SeparatorLine)* }
+
+// This is a pragmatic (not fully strict) grammar for RawRequest .http files.
+// It exists primarily to enable Lezer-backed folding, selection, and context-aware UX.
+//
+// Approach:
+// - Tokenize by whole lines (each token includes an optional trailing newline).
+// - Recognize request blocks by optional leading separator/annotations, then a method line.
+// - Treat everything that isn't the start of a new block as body/other content.
+
+RequestBlock { MethodLine RequestLine* }
+
+RequestLine { AnnotationLine | HeaderLine | BodyLine | BlankLine }
+
+@tokens {
+  // newline(s)
+  BlankLine { "\n"+ }
+
+  // ### / separators
+  SeparatorLine { $[ \t]* "###" ![\n]* "\n"? }
+
+  // @name, @depends, @load, etc
+  AnnotationLine { $[ \t]* "@" ![\n]* "\n"? }
+
+  // HTTP methods
+  MethodLine { $[ \t]* ("GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS") ![\n]* "\n"? }
+
+  // Header: Key: value
+  HeaderLine { $[ \t]* $[A-Za-z0-9] $[A-Za-z0-9-]* ":" ![\n]* "\n"? }
+
+  // Anything else (including JSON bodies, scripts, comments)
+  BodyLine { ![\n]+ "\n"? }
+
+  @precedence { SeparatorLine, AnnotationLine, MethodLine, HeaderLine, BlankLine, BodyLine }
+}

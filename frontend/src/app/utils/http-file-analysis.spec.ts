@@ -47,4 +47,22 @@ setVar(dynamicName, 1);
     expect(keys.has('userId')).toBe(true);
     expect(keys.has('dynamicName')).toBe(false);
   });
+
+  it('does not extract setVar keys from // comments', () => {
+    const script = `
+// setVar('token', 'abc');
+setVar('real', 'ok');
+`;
+    const keys = extractSetVarKeys(script);
+    expect(keys.has('token')).toBe(false);
+    expect(keys.has('real')).toBe(true);
+  });
+
+  it('does not treat // inside strings as comments', () => {
+    const script = `
+const u = "http://example.com"; setVar('token', 'abc');
+`;
+    const keys = extractSetVarKeys(script);
+    expect(keys.has('token')).toBe(true);
+  });
 });

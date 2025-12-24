@@ -69,8 +69,67 @@ export function extractSetVarKeys(script: string): Set<string> {
   const rx = /\bsetVar\s*\(\s*(['"])([^'"\\]+)\1/g;
   let match: RegExpExecArray | null;
   while ((match = rx.exec(script)) !== null) {
+    if (isInJsLineComment(script, match.index)) {
+      continue;
+    }
     const key = match[2].trim();
     if (key) keys.add(key);
   }
   return keys;
+}
+
+function isInJsLineComment(text: string, index: number): boolean {
+  // Detect whether `index` is inside a `// ...` comment, accounting for strings.
+  // This is a best-effort heuristic for editor features (autocomplete/diagnostics).
+  const lineStart = text.lastIndexOf('\n', index - 1) + 1;
+  let inSingle = false;
+  let inDouble = false;
+  let inTemplate = false;
+  let escaped = false;
+
+  for (let i = lineStart; i < index; i++) {
+    const ch = text[i];
+    const next = i + 1 < index ? text[i + 1] : '';
+
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+
+    if (inSingle) {
+      if (ch === "'") inSingle = false;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '"') inDouble = false;
+      continue;
+    }
+    if (inTemplate) {
+      if (ch === '`') inTemplate = false;
+      continue;
+    }
+
+    if (ch === "'") {
+      inSingle = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      continue;
+    }
+    if (ch === '`') {
+      inTemplate = true;
+      continue;
+    }
+
+    if (ch === '/' && next === '/') {
+      return true;
+    }
+  }
+
+  return false;
 }

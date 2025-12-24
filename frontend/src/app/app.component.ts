@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, HostListener } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, HostListener, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { EditorComponent } from './components/editor/editor.component';
@@ -29,6 +29,7 @@ import { generateFileId, normalizeFileTab } from './utils/file-tab-utils';
 import { HistoryStoreService } from './services/history-store.service';
 import { WorkspaceFacadeService } from './services/workspace-facade.service';
 import { Subject, takeUntil } from 'rxjs';
+import { gsap } from 'gsap';
 
 type AlertType = 'info' | 'success' | 'warning' | 'danger';
 
@@ -67,6 +68,17 @@ export class AppComponent implements OnInit, OnDestroy {
   private historyStore = inject(HistoryStoreService);
   private workspace = inject(WorkspaceFacadeService);
   private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
+  private readonly EDITOR_SPLIT_WIDTH_KEY = 'rawrequest_editor_pane_width_px';
+
+  @ViewChild('mainSplit') mainSplitEl?: ElementRef<HTMLElement>;
+
+  isSplitLayout = false;
+  editorPaneWidthPx = 520;
+  splitGridTemplateColumns: string | null = null;
+
+  private isSplitDragging = false;
+  private splitDragStartX = 0;
+  private splitDragStartWidth = 0;
 
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
   @ViewChild('editorComponent') editorComponent!: EditorComponent;
@@ -113,16 +125,28 @@ export class AppComponent implements OnInit, OnDestroy {
   private activeRunNowMs = Date.now();
   private activeRunProgress: ActiveRunProgress | null = null;
   private loadUsersSeries: number[] = [];
-  private readonly loadUsersSeriesMaxPoints = 120;
-  loadUsersSparklinePointsView = '';
+	private readonly loadUsersSeriesMaxPoints = 160;
+	loadUsersSparklinePathDView = '';
+	loadUsersSparklineTransformView = '';
+  private loadUsersQueue: number[] = [];
+  private loadUsersScrollPhase = 0;
+  private loadUsersNextValue: number | null = null;
+  private readonly loadUsersScrollMs = 80;
+  private readonly loadUsersRampSteps = 36;
 
   private sparklineRafHandle: number | null = null;
   private sparklineLastFrameAtMs: number | null = null;
   private sparklineLastRenderedAtMs: number | null = null;
 
   private loadRpsSeries: number[] = [];
-  private readonly loadRpsSeriesMaxPoints = 80;
-  loadRpsSparklinePointsView = '';
+	private readonly loadRpsSeriesMaxPoints = 160;
+	loadRpsSparklinePathDView = '';
+  loadRpsSparklineTransformView = '';
+  private loadRpsQueue: number[] = [];
+  private loadRpsScrollPhase = 0;
+  private loadRpsNextValue: number | null = null;
+  private readonly loadRpsScrollMs = 80;
+  private readonly loadRpsRampSteps = 36;
   private lastRpsSampleAtMs: number | null = null;
   private lastRpsTotalSent: number | null = null;
   private lastRpsSmoothed: number | null = null;
@@ -169,6 +193,9 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor() {}
 
   ngOnInit() {
+    this.restoreSplitState();
+    this.refreshSplitLayoutState();
+
     // Load initial data
     // this.loadEnvironmentPreference();
     this.loadFiles();
@@ -189,6 +216,107 @@ export class AppComponent implements OnInit, OnDestroy {
       .subscribe(({ env, key }) => {
         // this.showAlert(`Secret "${key}" is missing in environment "${env}"`, 'warning');
       });
+  }
+
+  @HostListener('window:resize')
+  onWindowResize() {
+    this.refreshSplitLayoutState();
+    this.clampSplitWidthToContainer();
+  }
+
+  @HostListener('document:mousemove', ['$event'])
+  onDocumentMouseMove(event: MouseEvent) {
+    if (!this.isSplitDragging) return;
+    if (!this.isSplitLayout) return;
+    event.preventDefault();
+    const container = this.mainSplitEl?.nativeElement;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const splitterColWidth = 10;
+    const minLeft = 340;
+    const minRight = 420;
+    const maxLeft = Math.max(minLeft, rect.width - minRight - splitterColWidth);
+
+    const dx = event.clientX - this.splitDragStartX;
+    const next = Math.max(minLeft, Math.min(maxLeft, this.splitDragStartWidth + dx));
+    this.editorPaneWidthPx = Math.round(next);
+    this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }
+
+  @HostListener('document:mouseup')
+  onDocumentMouseUp() {
+    if (!this.isSplitDragging) return;
+    this.isSplitDragging = false;
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    try {
+      localStorage.setItem(this.EDITOR_SPLIT_WIDTH_KEY, String(this.editorPaneWidthPx));
+    } catch {
+      // ignore
+    }
+  }
+
+  onSplitMouseDown(event: MouseEvent) {
+    if (!this.isSplitLayout) return;
+    this.isSplitDragging = true;
+    this.splitDragStartX = event.clientX;
+    this.splitDragStartWidth = this.editorPaneWidthPx;
+    event.preventDefault();
+  }
+
+  resetSplit() {
+    this.editorPaneWidthPx = 520;
+    this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
+    try {
+      localStorage.setItem(this.EDITOR_SPLIT_WIDTH_KEY, String(this.editorPaneWidthPx));
+    } catch {
+      // ignore
+    }
+  }
+
+  private restoreSplitState(): void {
+    try {
+      const raw = localStorage.getItem(this.EDITOR_SPLIT_WIDTH_KEY);
+      const n = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(n) && n > 0) {
+        this.editorPaneWidthPx = n;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  private refreshSplitLayoutState(): void {
+    // Tailwind `lg` breakpoint is 1024px.
+    this.isSplitLayout = typeof window !== 'undefined' && window.innerWidth >= 1024;
+    this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
+  }
+
+  private computeSplitGridTemplateColumns(): string | null {
+    if (!this.isSplitLayout) {
+      return null;
+    }
+    // editor | splitter | response
+    return `minmax(0, ${this.editorPaneWidthPx}px) 10px minmax(0, 1fr)`;
+  }
+
+  private clampSplitWidthToContainer(): void {
+    if (!this.isSplitLayout) return;
+    const container = this.mainSplitEl?.nativeElement;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const splitterColWidth = 10;
+    const minLeft = 340;
+    const minRight = 420;
+    const maxLeft = Math.max(minLeft, rect.width - minRight - splitterColWidth);
+    const clamped = Math.max(minLeft, Math.min(maxLeft, this.editorPaneWidthPx));
+    if (clamped !== this.editorPaneWidthPx) {
+      this.editorPaneWidthPx = Math.round(clamped);
+      this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
+    }
   }
 
   ngOnDestroy() {
@@ -336,8 +464,19 @@ export class AppComponent implements OnInit, OnDestroy {
     };
     this.isCancellingActiveRequest = false;
     this.activeRunProgress = null;
-    this.loadUsersSeries = [];
-    this.loadRpsSeries = [];
+    this.loadUsersSeries = Array(this.loadUsersSeriesMaxPoints).fill(0);
+		this.loadUsersQueue = [];
+		this.loadUsersScrollPhase = 0;
+		this.loadUsersNextValue = null;
+    this.loadUsersSparklineTransformView = '';
+		this.loadUsersSparklinePathDView = this.buildLoadUsersSparklinePathD(this.loadUsersSeries);
+
+		this.loadRpsSeries = Array(this.loadRpsSeriesMaxPoints).fill(0);
+		this.loadRpsQueue = [];
+		this.loadRpsScrollPhase = 0;
+		this.loadRpsNextValue = null;
+    this.loadRpsSparklineTransformView = '';
+    this.loadRpsSparklinePathDView = this.buildLoadRpsSparklinePathD(undefined, this.loadRpsSeries);
     this.lastRpsSampleAtMs = null;
     this.lastRpsTotalSent = null;
   	this.lastRpsSmoothed = null;
@@ -1055,31 +1194,26 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       }
 
-      const now = Date.now();
-      this.activeRunNowMs = now;
-
+      // Use rAF's high-resolution timestamp for stable frame deltas.
       const last = this.sparklineLastFrameAtMs;
-      this.sparklineLastFrameAtMs = now;
-      const dt = last === null ? 0 : Math.max(0, now - last);
+      this.sparklineLastFrameAtMs = t;
+      const dt = last === null ? 0 : Math.max(0, Math.min(50, t - last));
 
-      // Throttle rendering to ~30fps to keep CPU down.
-      const lastRender = this.sparklineLastRenderedAtMs;
-      if (lastRender !== null && now - lastRender < 33) {
-        return;
-      }
-      this.sparklineLastRenderedAtMs = now;
+      // Keep lastRenderedAt for debugging/telemetry (not throttling).
+      this.sparklineLastRenderedAtMs = t;
 
-      // Interpolate RPS last point toward latest target.
+      // Smooth the RPS readout every frame; the RPS sparkline also uses this value.
       if (this.rpsRenderTarget !== null) {
         if (this.rpsRenderValue === null) {
           this.rpsRenderValue = this.rpsRenderTarget;
         } else {
-          // Exponential smoothing per-frame; dt-aware.
           const k = 1 - Math.pow(0.02, dt / 16.67);
           this.rpsRenderValue = this.rpsRenderValue + (this.rpsRenderTarget - this.rpsRenderValue) * k;
         }
-        this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints(this.rpsRenderValue);
       }
+
+      this.tickUsersSparkline(dt);
+      this.tickRpsSparkline(dt);
     };
 
     this.sparklineRafHandle = requestAnimationFrame(step);
@@ -1087,34 +1221,113 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private pushLoadUsersSample(value: number): void {
     const v = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
-    this.loadUsersSeries.push(v);
-    if (this.loadUsersSeries.length > this.loadUsersSeriesMaxPoints) {
-      this.loadUsersSeries.splice(0, this.loadUsersSeries.length - this.loadUsersSeriesMaxPoints);
+    const slots = this.loadUsersSeriesMaxPoints;
+    const current = this.loadUsersQueue.length
+      ? (this.loadUsersQueue[this.loadUsersQueue.length - 1] ?? 0)
+      : (this.loadUsersNextValue ?? this.loadUsersSeries[slots - 1] ?? 0);
+    this.enqueueRamp(this.loadUsersQueue, current, v, this.loadUsersRampSteps, true);
+    const maxQueue = slots * 4;
+    if (this.loadUsersQueue.length > maxQueue) {
+      this.loadUsersQueue = this.loadUsersQueue.slice(-maxQueue);
     }
-	this.loadUsersSparklinePointsView = this.buildLoadUsersSparklinePoints();
   }
 
-  private buildLoadUsersSparklinePoints(): string {
-    const series = this.loadUsersSeries;
-    if (!series.length) return '';
+  private buildLoadUsersSparklinePoints(series: number[], nextValue?: number): string {
+    const slots = this.loadUsersSeriesMaxPoints;
+    if (!series.length || slots <= 0) return '';
 
     const height = 20;
     const maxUsers = this.activeRunProgress?.maxUsers;
-    const localMax = Math.max(1, ...series);
+    const localMax = Math.max(1, ...series, nextValue ?? 0);
     const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
 
-    // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
-    const slots = this.loadUsersSeriesMaxPoints;
-    const step = slots > 1 ? 100 / (slots - 1) : 100;
-    const start = Math.max(0, slots - series.length);
+    // Use step=100/slots so we can place the "next" point at x=100 without
+    // drawing any segment beyond the viewBox (prevents a persistent right-edge blob).
+    const step = slots > 1 ? 100 / slots : 100;
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < slots; i++) {
+      const x = i * step;
+      const value = series[i] ?? 0;
+      const y = height - (Math.min(denom, value) / denom) * height;
+      points.push({ x, y });
+    }
 
-    return series
-      .map((v, i) => {
-        const x = (start + i) * step;
-        const y = height - (Math.min(denom, v) / denom) * height;
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(' ');
+    if (nextValue !== undefined) {
+      const x = 100;
+      const y = height - (Math.min(denom, nextValue) / denom) * height;
+      points.push({ x, y });
+    }
+
+    return this.pointsToString(points);
+  }
+
+  private buildLoadUsersSparklinePathD(series: number[], nextValue?: number): string {
+    const slots = this.loadUsersSeriesMaxPoints;
+    if (!series.length || slots <= 0) return '';
+
+    const height = 20;
+    const maxUsers = this.activeRunProgress?.maxUsers;
+    const localMax = Math.max(1, ...series, nextValue ?? 0);
+    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
+
+    const step = slots > 1 ? 100 / slots : 100;
+    const points: Array<{ x: number; y: number }> = [];
+    const firstValue = series[0] ?? 0;
+    const firstY = height - (Math.min(denom, firstValue) / denom) * height;
+    points.push({ x: -2 * step, y: firstY });
+    points.push({ x: -1 * step, y: firstY });
+    for (let i = 0; i < slots; i++) {
+      const x = i * step;
+      const value = series[i] ?? 0;
+      const y = height - (Math.min(denom, value) / denom) * height;
+      points.push({ x, y });
+    }
+
+    if (nextValue !== undefined) {
+      const y = height - (Math.min(denom, nextValue) / denom) * height;
+      points.push({ x: slots * step, y });
+      points.push({ x: (slots + 1) * step, y });
+    }
+
+    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.55);
+  }
+
+  private buildScrollingUsersSparklinePathD(series: number[], nextValue: number, phase: number): string {
+    const slots = this.loadUsersSeriesMaxPoints;
+    if (!series.length || slots <= 0) return '';
+
+    const height = 20;
+    const maxUsers = this.activeRunProgress?.maxUsers;
+    const localMax = Math.max(1, ...series, nextValue);
+    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
+
+    // Build a stable curve and scroll it via translate().
+    // We include two extra points past x=100 and clip in the SVG, so the line
+    // enters/exits smoothly without the "top-to-bottom" shimmer of reindexing.
+    const step = slots > 1 ? 100 / slots : 100;
+    const t = Math.max(0, Math.min(1, phase));
+    const last = series[slots - 1] ?? 0;
+    const lerpedLast = last + (nextValue - last) * t;
+
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < slots; i++) {
+      const x = i * step;
+      const value = series[i] ?? 0;
+      const y = height - (Math.min(denom, value) / denom) * height;
+      points.push({ x, y });
+    }
+    // Point at x=100 eases from last->next during the phase.
+    points.push({
+      x: slots * step,
+      y: height - (Math.min(denom, lerpedLast) / denom) * height
+    });
+    // One more point past the viewBox.
+    points.push({
+      x: (slots + 1) * step,
+      y: height - (Math.min(denom, nextValue) / denom) * height
+    });
+
+    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.75);
   }
 
   private sampleLoadRps(): void {
@@ -1131,15 +1344,15 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     const dtMs = now - this.lastRpsSampleAtMs;
-    if (dtMs < 300) {
+    if (dtMs < 150) {
       return;
     }
 
     const dCount = totalSent - this.lastRpsTotalSent;
     const rps = dtMs > 0 ? Math.max(0, dCount) / (dtMs / 1000) : 0;
-  const alpha = 0.25;
-  const smoothed = this.lastRpsSmoothed === null ? rps : (alpha * rps + (1 - alpha) * this.lastRpsSmoothed);
-  this.lastRpsSmoothed = smoothed;
+		const alpha = 0.18;
+		const smoothed = this.lastRpsSmoothed === null ? rps : (alpha * rps + (1 - alpha) * this.lastRpsSmoothed);
+		this.lastRpsSmoothed = smoothed;
 
     this.lastRpsSampleAtMs = now;
     this.lastRpsTotalSent = totalSent;
@@ -1148,38 +1361,239 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private pushLoadRpsSample(value: number): void {
     const v = Number.isFinite(value) ? Math.max(0, value) : 0;
-    this.loadRpsSeries.push(v);
-    if (this.loadRpsSeries.length > this.loadRpsSeriesMaxPoints) {
-      this.loadRpsSeries.splice(0, this.loadRpsSeries.length - this.loadRpsSeriesMaxPoints);
+    const slots = this.loadRpsSeriesMaxPoints;
+    const current = this.loadRpsQueue.length
+      ? (this.loadRpsQueue[this.loadRpsQueue.length - 1] ?? 0)
+      : (this.loadRpsNextValue ?? this.loadRpsSeries[slots - 1] ?? 0);
+    this.enqueueRamp(this.loadRpsQueue, current, v, this.loadRpsRampSteps, false);
+    const maxQueue = slots * 4;
+    if (this.loadRpsQueue.length > maxQueue) {
+      this.loadRpsQueue = this.loadRpsQueue.slice(-maxQueue);
     }
-	this.rpsRenderTarget = v;
-	if (this.rpsRenderValue === null) {
-		this.rpsRenderValue = v;
-	}
-	this.loadRpsSparklinePointsView = this.buildLoadRpsSparklinePoints(this.rpsRenderValue);
+
+    // Keep numeric readout smoothing.
+    this.rpsRenderTarget = v;
+    if (this.rpsRenderValue === null) {
+      this.rpsRenderValue = v;
+    }
   }
 
-  private buildLoadRpsSparklinePoints(renderLastValue?: number): string {
-    const series = this.loadRpsSeries;
+  private buildLoadRpsSparklinePoints(renderLastValue?: number, seriesOverride?: number[], nextValue?: number): string {
+    const series = seriesOverride ?? this.loadRpsSeries;
     if (!series.length) return '';
 
     const height = 20;
     const lastValue = renderLastValue !== undefined ? renderLastValue : series[series.length - 1] ?? 0;
-    const denom = Math.max(1, ...series, lastValue);
+    const extra = nextValue !== undefined ? nextValue : lastValue;
+    const denom = Math.max(1, ...series, lastValue, extra);
 
     // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
     const slots = this.loadRpsSeriesMaxPoints;
-    const step = slots > 1 ? 100 / (slots - 1) : 100;
-    const start = Math.max(0, slots - series.length);
+		// Match Users: step=100/slots so the extra point can be exactly at x=100.
+    const step = slots > 1 ? 100 / slots : 100;
+  const points: Array<{ x: number; y: number }> = [];
+  for (let i = 0; i < slots; i++) {
+    const x = i * step;
+    const raw = series[i] ?? 0;
+    const y = height - (Math.min(denom, raw) / denom) * height;
+    points.push({ x, y });
+  }
 
-    return series
-      .map((v, i) => {
-        const x = (start + i) * step;
-        const value = i === series.length - 1 ? lastValue : v;
-        const y = height - (Math.min(denom, value) / denom) * height;
-        return `${x.toFixed(2)},${y.toFixed(2)}`;
-      })
-      .join(' ');
+  if (nextValue !== undefined) {
+    const x = 100;
+    const y = height - (Math.min(denom, nextValue) / denom) * height;
+    points.push({ x, y });
+  }
+
+  return this.pointsToString(points);
+  }
+
+  private buildLoadRpsSparklinePathD(renderLastValue?: number, seriesOverride?: number[], nextValue?: number): string {
+    const series = seriesOverride ?? this.loadRpsSeries;
+    if (!series.length) return '';
+
+    const height = 20;
+    const lastValue = renderLastValue !== undefined ? renderLastValue : series[series.length - 1] ?? 0;
+    const extra = nextValue !== undefined ? nextValue : lastValue;
+    const denom = Math.max(1, ...series, lastValue, extra);
+
+    const slots = this.loadRpsSeriesMaxPoints;
+    const step = slots > 1 ? 100 / slots : 100;
+    const points: Array<{ x: number; y: number }> = [];
+    const firstValue = series[0] ?? 0;
+    const firstY = height - (Math.min(denom, firstValue) / denom) * height;
+    points.push({ x: -2 * step, y: firstY });
+    points.push({ x: -1 * step, y: firstY });
+    for (let i = 0; i < slots; i++) {
+      const x = i * step;
+      const value = series[i] ?? 0;
+      const y = height - (Math.min(denom, value) / denom) * height;
+      points.push({ x, y });
+    }
+    const y = height - (Math.min(denom, extra) / denom) * height;
+    points.push({ x: slots * step, y });
+    points.push({ x: (slots + 1) * step, y });
+    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.55);
+  }
+
+  private buildScrollingRpsSparklinePathD(series: number[], nextValue: number, phase: number): string {
+    const slots = this.loadRpsSeriesMaxPoints;
+    if (!series.length || slots <= 0) return '';
+
+    const height = 20;
+    const t = Math.max(0, Math.min(1, phase));
+    const denom = Math.max(1, ...series, nextValue);
+    const step = slots > 1 ? 100 / slots : 100;
+    const last = series[slots - 1] ?? 0;
+    const lerpedLast = last + (nextValue - last) * t;
+
+    const points: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < slots; i++) {
+      const x = i * step;
+      const value = series[i] ?? 0;
+      const y = height - (Math.min(denom, value) / denom) * height;
+      points.push({ x, y });
+    }
+    points.push({
+      x: slots * step,
+      y: height - (Math.min(denom, lerpedLast) / denom) * height
+    });
+    points.push({
+      x: (slots + 1) * step,
+      y: height - (Math.min(denom, nextValue) / denom) * height
+    });
+
+    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.75);
+  }
+
+  private tickUsersSparkline(dtMs: number): void {
+    const slots = this.loadUsersSeriesMaxPoints;
+    if (slots <= 0) return;
+    if (!this.loadUsersSeries.length) {
+      this.loadUsersSeries = Array(slots).fill(0);
+    }
+    if (this.loadUsersSeries.length !== slots) {
+      this.loadUsersSeries = this.loadUsersSeries.slice(-slots);
+      if (this.loadUsersSeries.length < slots) {
+        this.loadUsersSeries = [...Array(slots - this.loadUsersSeries.length).fill(0), ...this.loadUsersSeries];
+      }
+    }
+
+    const xStep = slots > 1 ? 100 / slots : 100;
+    const phaseInc = this.loadUsersScrollMs > 0 ? dtMs / this.loadUsersScrollMs : 0;
+    this.loadUsersScrollPhase = Math.min(10, Math.max(0, this.loadUsersScrollPhase + phaseInc));
+
+    if (this.loadUsersNextValue === null) {
+      this.loadUsersNextValue = this.loadUsersQueue.shift() ?? this.loadUsersSeries[slots - 1] ?? 0;
+    }
+
+    let advanced = false;
+    while (this.loadUsersScrollPhase >= 1) {
+      this.loadUsersSeries.shift();
+      this.loadUsersSeries.push(this.loadUsersNextValue);
+      this.loadUsersScrollPhase -= 1;
+      this.loadUsersNextValue = this.loadUsersQueue.shift() ?? this.loadUsersSeries[slots - 1] ?? 0;
+			advanced = true;
+    }
+
+    const offsetX = -xStep * this.loadUsersScrollPhase;
+    this.loadUsersSparklineTransformView = offsetX !== 0 ? `translate(${offsetX.toFixed(6)} 0)` : '';
+		if (advanced || !this.loadUsersSparklinePathDView) {
+			this.loadUsersSparklinePathDView = this.buildLoadUsersSparklinePathD(this.loadUsersSeries, this.loadUsersNextValue);
+		}
+  }
+
+  private tickRpsSparkline(dtMs: number): void {
+    const slots = this.loadRpsSeriesMaxPoints;
+    if (slots <= 0) return;
+    if (!this.loadRpsSeries.length) {
+      this.loadRpsSeries = Array(slots).fill(0);
+    }
+    if (this.loadRpsSeries.length !== slots) {
+      this.loadRpsSeries = this.loadRpsSeries.slice(-slots);
+      if (this.loadRpsSeries.length < slots) {
+        this.loadRpsSeries = [...Array(slots - this.loadRpsSeries.length).fill(0), ...this.loadRpsSeries];
+      }
+    }
+
+    const xStep = slots > 1 ? 100 / slots : 100;
+    const phaseInc = this.loadRpsScrollMs > 0 ? dtMs / this.loadRpsScrollMs : 0;
+    this.loadRpsScrollPhase = Math.min(10, Math.max(0, this.loadRpsScrollPhase + phaseInc));
+
+    if (this.loadRpsNextValue === null) {
+      this.loadRpsNextValue = this.loadRpsQueue.shift() ?? this.loadRpsSeries[slots - 1] ?? 0;
+    }
+    let advanced = false;
+    while (this.loadRpsScrollPhase >= 1) {
+      this.loadRpsSeries.shift();
+      this.loadRpsSeries.push(this.loadRpsNextValue);
+      this.loadRpsScrollPhase -= 1;
+      this.loadRpsNextValue = this.loadRpsQueue.shift() ?? this.loadRpsSeries[slots - 1] ?? 0;
+      advanced = true;
+    }
+
+    const offsetX = -xStep * this.loadRpsScrollPhase;
+    this.loadRpsSparklineTransformView = offsetX !== 0 ? `translate(${offsetX.toFixed(6)} 0)` : '';
+		if (advanced || !this.loadRpsSparklinePathDView) {
+			this.loadRpsSparklinePathDView = this.buildLoadRpsSparklinePathD(undefined, this.loadRpsSeries, this.loadRpsNextValue);
+		}
+  }
+
+  private pointsToString(points: Array<{ x: number; y: number }>): string {
+    return points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
+  }
+
+  private enqueueRamp(queue: number[], from: number, to: number, steps: number, isInt: boolean): void {
+    const n = Math.max(1, Math.min(60, Math.trunc(steps)));
+    const a = Number.isFinite(from) ? from : 0;
+    const b = Number.isFinite(to) ? to : 0;
+    for (let i = 1; i <= n; i++) {
+      const t = i / n;
+      const e = t * t * (3 - 2 * t); // smoothstep
+      const v = a + (b - a) * e;
+      queue.push(isInt ? Math.max(0, Math.trunc(v)) : Math.max(0, v));
+    }
+  }
+
+  private pointsToSmoothPathD(
+    points: Array<{ x: number; y: number }>,
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    tension = 0.9
+  ): string {
+    if (!points.length) return '';
+    if (points.length === 1) {
+      const p = points[0];
+      return `M ${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+    }
+
+    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+    const clampY = (p: { x: number; y: number }) => ({ x: p.x, y: clamp(p.y, bounds.minY, bounds.maxY) });
+
+    const t = clamp(tension, 0, 1.5);
+    let d = `M ${points[0].x.toFixed(3)},${points[0].y.toFixed(3)}`;
+
+    for (let i = 0; i < points.length - 1; i++) {
+      const p0 = points[i - 1] ?? points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] ?? p2;
+
+      // Catmull-Rom to cubic Bezier conversion.
+      let cp1 = {
+        x: p1.x + ((p2.x - p0.x) * t) / 6,
+        y: p1.y + ((p2.y - p0.y) * t) / 6
+      };
+      let cp2 = {
+        x: p2.x - ((p3.x - p1.x) * t) / 6,
+        y: p2.y - ((p3.y - p1.y) * t) / 6
+      };
+      cp1 = clampY(cp1);
+      cp2 = clampY(cp2);
+
+      d += ` C ${cp1.x.toFixed(3)},${cp1.y.toFixed(3)} ${cp2.x.toFixed(3)},${cp2.y.toFixed(3)} ${p2.x.toFixed(3)},${p2.y.toFixed(3)}`;
+    }
+
+    return d;
   }
 
   get currentLoadRpsView(): number {
@@ -1193,10 +1607,20 @@ export class AppComponent implements OnInit, OnDestroy {
       clearInterval(this.activeRunTickHandle);
       this.activeRunTickHandle = null;
     }
-	if (this.sparklineRafHandle !== null) {
+  if (this.sparklineRafHandle !== null) {
 		cancelAnimationFrame(this.sparklineRafHandle);
 		this.sparklineRafHandle = null;
 	}
+  this.loadUsersQueue = [];
+  this.loadUsersScrollPhase = 0;
+  this.loadUsersNextValue = null;
+  this.loadUsersSparklineTransformView = '';
+	this.loadUsersSparklinePathDView = '';
+  this.loadRpsQueue = [];
+  this.loadRpsScrollPhase = 0;
+  this.loadRpsNextValue = null;
+  this.loadRpsSparklineTransformView = '';
+	this.loadRpsSparklinePathDView = '';
 	this.sparklineLastFrameAtMs = null;
 	this.sparklineLastRenderedAtMs = null;
   }

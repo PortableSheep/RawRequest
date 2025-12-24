@@ -14,6 +14,7 @@ import { dirname } from '../utils/path';
 import { BackendClientService } from './backend-client.service';
 import { ScriptConsoleService } from './script-console.service';
 import { SecretService } from './secret.service';
+import { EventsOn } from '@wailsjs/runtime/runtime';
 
 @Injectable({
   providedIn: 'root'
@@ -25,7 +26,6 @@ export class HttpService {
 
   private readonly FILES_KEY = 'rawrequest_files';
   private readonly CANCELLED_RESPONSE = '__CANCELLED__';
-  private loadTestCancelled = new Set<string>();
 
   constructor() {
     this.scriptConsole.init().catch(() => {
@@ -34,7 +34,100 @@ export class HttpService {
   }
 
   cancelLoadTest(requestId: string): void {
-    this.loadTestCancelled.add(requestId);
+    // Backend owns load orchestration and cancellation.
+    this.backend.cancelRequest(requestId).catch(() => {
+      // Swallow errors to keep cancel UX responsive.
+    });
+  }
+
+  private async executeLoadTestViaBackend(
+    request: Request,
+    variables: { [key: string]: string } = {},
+    env?: string,
+    requestId?: string,
+    onProgress?: (progress: ActiveRunProgress) => void
+  ): Promise<LoadTestResults> {
+    if (!requestId) {
+      throw new Error('Load testing requires a requestId');
+    }
+    if (!request.loadTest) {
+      throw new Error('No load test configuration');
+    }
+    if (request.body instanceof FormData) {
+      throw new Error('Load tests do not support FormData bodies');
+    }
+
+    const envName = this.normalizeEnvName(env);
+    const processedUrl = await this.hydrateText(request.url, variables, envName);
+    const processedHeaders = await this.hydrateHeaders(request.headers, variables, envName);
+    const processedBody = request.body ? await this.hydrateText(String(request.body), variables, envName) : '';
+
+    return await new Promise<LoadTestResults>(async (resolve, reject) => {
+      let unsubProgress: (() => void) | null = null;
+      let unsubDone: (() => void) | null = null;
+      let unsubErr: (() => void) | null = null;
+
+      const cleanup = () => {
+        try {
+          unsubProgress?.();
+        } catch {}
+        try {
+          unsubDone?.();
+        } catch {}
+        try {
+          unsubErr?.();
+        } catch {}
+        unsubProgress = null;
+        unsubDone = null;
+        unsubErr = null;
+      };
+
+      unsubProgress = EventsOn('loadtest:progress', (payload: any) => {
+        if (!payload || payload.requestId !== requestId) return;
+        onProgress?.(payload as ActiveRunProgress);
+      });
+
+      unsubDone = EventsOn('loadtest:done', (payload: any) => {
+        if (!payload || payload.requestId !== requestId) return;
+        cleanup();
+        const r = payload.results || {};
+        resolve({
+          totalRequests: r.totalRequests ?? 0,
+          successfulRequests: r.successfulRequests ?? 0,
+          failedRequests: r.failedRequests ?? 0,
+          responseTimes: Array.isArray(r.responseTimes) ? r.responseTimes : [],
+          errors: Array.isArray(r.errors) ? r.errors : [],
+          failureStatusCounts: r.failureStatusCounts ?? {},
+          startTime: r.startTime ?? Date.now(),
+          endTime: r.endTime ?? Date.now(),
+          cancelled: !!r.cancelled,
+          aborted: !!r.aborted,
+          abortReason: r.abortReason,
+          plannedDurationMs: r.plannedDurationMs ?? null,
+          adaptive: r.adaptive,
+        });
+      });
+
+      unsubErr = EventsOn('loadtest:error', (payload: any) => {
+        if (!payload || payload.requestId !== requestId) return;
+        cleanup();
+        reject(new Error(payload.message || 'Load test failed'));
+      });
+
+      try {
+        await this.backend.startLoadTest(
+          requestId,
+          request.method,
+          processedUrl,
+          JSON.stringify(processedHeaders || {}),
+          processedBody,
+          JSON.stringify(request.loadTest)
+        );
+      } catch (e) {
+        cleanup();
+        reject(e);
+      }
+    });
   }
 
   async sendRequest(
@@ -533,11 +626,25 @@ export class HttpService {
       console.log('[HTTP Service] Executing chain with', requests.length, 'requests');
       const envName = this.normalizeEnvName(env);
 
+    // Sync initial variables into the backend so server-side placeholder resolution
+    // (including updates from scripts/responses) starts from the same base.
+    try {
+      await Promise.all(
+        Object.entries(variables || {}).map(([key, value]) =>
+          this.backend.setVariable(key, String(value ?? ''))
+        )
+      );
+    } catch (e) {
+      console.warn('[HTTP Service] Failed to sync initial variables to backend', e);
+    }
+
       // Convert requests to format expected by Go backend
       const requestsData: Array<Record<string, any>> = [];
       const previews: RequestPreview[] = [];
       for (const req of requests) {
-        const prepared = await this.prepareBackendRequest(req, variables, envName);
+  		// For chains: keep {{placeholders}} intact so the backend can resolve them
+  		// as scripts and prior responses update variables.
+  		const prepared = await this.prepareBackendRequestForChain(req, envName);
         requestsData.push(prepared.backend);
         previews.push(prepared.preview);
       }
@@ -788,444 +895,10 @@ export class HttpService {
     requestId?: string,
     onProgress?: (progress: ActiveRunProgress) => void
   ): Promise<LoadTestResults> {
-    const startTime = Date.now();
-    const envName = this.normalizeEnvName(env);
-    const results: LoadTestResults = {
-      totalRequests: 0,
-      successfulRequests: 0,
-      failedRequests: 0,
-      responseTimes: [],
-      errors: [],
-      failureStatusCounts: {},
-      startTime,
-      endTime: 0
-    };
-
-    // Clear any previous cancellation state for this request
-    if (requestId) {
-      this.loadTestCancelled.delete(requestId);
+    if (!requestId) {
+      throw new Error('Load testing requires a requestId');
     }
-
-    if (!request.loadTest) {
-      throw new Error('No load test configuration');
-    }
-
-    const cfg = this.normalizeLoadTestConfig(request.loadTest);
-    results.plannedDurationMs = cfg.durationMs;
-    let stopAt = cfg.durationMs ? (startTime + cfg.durationMs) : Number.POSITIVE_INFINITY;
-
-    let cancelled = false;
-    let aborted = false;
-    let abortReason: string | undefined;
-
-    let activeUsers = 0;
-
-    // Adaptive backoff summary (stored on results and copied into metrics later)
-    results.adaptive = {
-      enabled: cfg.adaptiveEnabled,
-      phase: cfg.adaptiveEnabled ? 'ramping' : 'disabled',
-    };
-
-    type WindowBucket = { sec: number; sent: number; failed: number };
-    const windowBuckets: WindowBucket[] = [];
-    const recordWindow = (nowMs: number, isFailure: boolean) => {
-      if (!cfg.adaptiveEnabled) return;
-      const sec = Math.floor(nowMs / 1000);
-      const last = windowBuckets.length ? windowBuckets[windowBuckets.length - 1] : null;
-      if (!last || last.sec !== sec) {
-        windowBuckets.push({ sec, sent: 0, failed: 0 });
-      }
-      const bucket = windowBuckets[windowBuckets.length - 1];
-      bucket.sent++;
-      if (isFailure) bucket.failed++;
-
-      const cutoff = sec - cfg.adaptiveWindowSec - 2;
-      while (windowBuckets.length && windowBuckets[0].sec < cutoff) {
-        windowBuckets.shift();
-      }
-    };
-
-    const getWindowStats = (nowMs: number): { sent: number; failed: number; failureRate: number | null; rps: number | null } => {
-      if (!cfg.adaptiveEnabled) return { sent: 0, failed: 0, failureRate: null, rps: null };
-      const nowSec = Math.floor(nowMs / 1000);
-      const minSec = nowSec - cfg.adaptiveWindowSec + 1;
-      let sent = 0;
-      let failed = 0;
-      for (const b of windowBuckets) {
-        if (b.sec >= minSec && b.sec <= nowSec) {
-          sent += b.sent;
-          failed += b.failed;
-        }
-      }
-      if (sent <= 0) {
-        return { sent, failed, failureRate: null, rps: null };
-      }
-      const failureRate = failed / sent;
-      const rps = sent / cfg.adaptiveWindowSec;
-      return { sent, failed, failureRate, rps };
-    };
-
-    let lastProgressEmitAt = 0;
-    const emitProgress = (patch: Partial<ActiveRunProgress> = {}, force = false) => {
-      if (!requestId || !onProgress) return;
-      const now = Date.now();
-      if (!force && now - lastProgressEmitAt < 200) return;
-      lastProgressEmitAt = now;
-      onProgress({
-        requestId,
-        type: 'load',
-        startedAt: startTime,
-        plannedDurationMs: cfg.durationMs,
-        activeUsers,
-        maxUsers: cfg.maxUsers,
-        totalSent: results.totalRequests,
-        successful: results.successfulRequests,
-        failed: results.failedRequests,
-        cancelled,
-        aborted,
-        abortReason,
-        ...patch
-      });
-    };
-
-    const markCancelledIfRequested = () => {
-      if (cancelled) return;
-      if (requestId && this.loadTestCancelled.has(requestId)) {
-        cancelled = true;
-        this.loadTestCancelled.delete(requestId);
-      }
-    };
-
-    const maybeAbortForFailureRate = () => {
-      if (aborted || cancelled) return;
-      if (cfg.failureRateThreshold === null) return;
-      const minSamples = 20;
-      if (results.totalRequests < minSamples) return;
-      if (results.totalRequests <= 0) return;
-      const rate = results.failedRequests / results.totalRequests;
-      if (rate >= cfg.failureRateThreshold) {
-        aborted = true;
-        abortReason = `Failure rate ${(rate * 100).toFixed(1)}% exceeded threshold ${(cfg.failureRateThreshold * 100).toFixed(1)}%`;
-      }
-    };
-
-    emitProgress({}, true);
-
-    let issuedRequests = 0;
-    const reserveRequestSlot = (): boolean => {
-      if (cfg.iterations === null) {
-        return true;
-      }
-      if (issuedRequests >= cfg.iterations) {
-        return false;
-      }
-      issuedRequests++;
-      return true;
-    };
-
-    const bumpFailureStatus = (status: number) => {
-      const key = String(status);
-      results.failureStatusCounts![key] = (results.failureStatusCounts![key] || 0) + 1;
-    };
-
-    // Global RPS limiter (simple spacing limiter)
-    const rpsIntervalMs = cfg.requestsPerSecond ? (1000 / cfg.requestsPerSecond) : null;
-    let nextAllowedAt = startTime;
-    const throttleIfNeeded = async () => {
-      if (!rpsIntervalMs) return;
-      const now = Date.now();
-      const waitMs = Math.max(0, nextAllowedAt - now);
-      nextAllowedAt = Math.max(nextAllowedAt, now) + rpsIntervalMs;
-      if (waitMs > 0) {
-        await this.sleep(waitMs);
-      }
-    };
-
-    const getPerUserWaitMs = (): number => {
-      if (cfg.waitMinMs !== null || cfg.waitMaxMs !== null) {
-        const min = cfg.waitMinMs ?? 0;
-        const max = cfg.waitMaxMs ?? min;
-        const low = Math.min(min, max);
-        const high = Math.max(min, max);
-        if (high <= low) return low;
-        return low + Math.floor(Math.random() * (high - low + 1));
-      }
-      return cfg.delayMs;
-    };
-
-    const runUser = async (userNumber: number) => {
-      while (true) {
-        markCancelledIfRequested();
-        if (cancelled || aborted) {
-          return;
-        }
-
-        // Adaptive downscale: users with a higher index than the current target exit.
-        // (This keeps the control logic simple and avoids forcibly killing requests mid-flight.)
-        if (cfg.adaptiveEnabled && userNumber > targetUsers) {
-          return;
-        }
-
-        const now = Date.now();
-        if (now >= stopAt) {
-          return;
-        }
-
-        if (!reserveRequestSlot()) {
-          return;
-        }
-
-        results.totalRequests++;
-        emitProgress();
-
-        try {
-          await throttleIfNeeded();
-          markCancelledIfRequested();
-          if (cancelled || aborted) {
-            return;
-          }
-
-          const response = await this.sendRequest(request, variables, undefined, envName);
-
-          const isFailure = response.status === 0 || response.status >= 400;
-          recordWindow(Date.now(), isFailure);
-
-          if (isFailure) {
-            results.failedRequests++;
-            bumpFailureStatus(response.status);
-            results.errors.push({
-              status: response.status,
-              statusText: response.statusText,
-              body: response.body
-            });
-          } else {
-            results.successfulRequests++;
-          }
-          results.responseTimes.push(response.responseTime);
-        } catch (error: any) {
-          recordWindow(Date.now(), true);
-          results.failedRequests++;
-          bumpFailureStatus(typeof error?.status === 'number' ? error.status : 0);
-          results.errors.push(error);
-        }
-
-        maybeAbortForFailureRate();
-        if (aborted) {
-          emitProgress({}, true);
-          return;
-        }
-
-        emitProgress();
-
-        const waitMs = getPerUserWaitMs();
-        if (waitMs > 0) {
-          markCancelledIfRequested();
-          if (cancelled || aborted) {
-            return;
-          }
-          await this.sleep(waitMs);
-        }
-      }
-    };
-
-    const runUserTracked = async (userNumber: number) => {
-      activeUsers++;
-      emitProgress({ activeUsers }, true);
-      try {
-        await runUser(userNumber);
-      } finally {
-        activeUsers = Math.max(0, activeUsers - 1);
-        emitProgress({ activeUsers }, true);
-      }
-    };
-
-    // Spawn users (optionally ramping up)
-    const userTasks: Promise<void>[] = [];
-    let nextUserNumber = 0;
-    let targetUsers = cfg.adaptiveEnabled ? cfg.startUsers : cfg.maxUsers;
-    const spawnUser = () => {
-      const userNumber = ++nextUserNumber;
-      userTasks.push(runUserTracked(userNumber));
-    };
-
-    for (let i = 0; i < cfg.startUsers; i++) {
-      spawnUser();
-    }
-
-    const remainingUsers = cfg.maxUsers - cfg.startUsers;
-    let allowRamping = true;
-    const rampPromise = (async () => {
-      if (remainingUsers <= 0) return;
-
-      // Prefer explicit spawnRate; else derive from rampUp duration.
-      let rate = cfg.spawnRate;
-      if (!rate && cfg.rampUpMs && cfg.rampUpMs > 0) {
-        const seconds = cfg.rampUpMs / 1000;
-        rate = seconds > 0 ? Math.ceil(remainingUsers / seconds) : remainingUsers;
-      }
-
-      if (!rate || rate <= 0) {
-        // No ramp parameters: spawn all immediately (unless adaptive stops ramping).
-        for (let i = 0; i < remainingUsers; i++) {
-          markCancelledIfRequested();
-          if (cancelled || aborted) return;
-          if (!allowRamping) return;
-          if (cfg.adaptiveEnabled) {
-            targetUsers = Math.min(cfg.maxUsers, targetUsers + 1);
-          }
-          spawnUser();
-        }
-        return;
-      }
-
-      const intervalMs = Math.max(1, Math.floor(1000 / rate));
-      for (let i = 0; i < remainingUsers; i++) {
-        markCancelledIfRequested();
-        if (cancelled || aborted) return;
-        if (!allowRamping) return;
-        if (Date.now() >= stopAt) return;
-
-        if (cfg.adaptiveEnabled) {
-          targetUsers = Math.min(cfg.maxUsers, targetUsers + 1);
-        }
-        spawnUser();
-        await this.sleep(intervalMs);
-      }
-    })();
-
-    // Adaptive controller loop: ramp until failure threshold hit, then back off until stable.
-    let lastAdjustAt = 0;
-    let stableSince: number | null = null;
-    let sawInstability = false;
-    const adaptiveController = (async () => {
-      if (!cfg.adaptiveEnabled || cfg.adaptiveFailureRate === null) return;
-      const minWindowSamples = 20;
-
-      while (true) {
-        markCancelledIfRequested();
-        if (cancelled || aborted) return;
-        const now = Date.now();
-        if (now >= stopAt) return;
-
-        const stats = getWindowStats(now);
-        if (stats.failureRate === null || stats.sent < minWindowSamples) {
-          await this.sleep(500);
-          continue;
-        }
-
-        if (!sawInstability) {
-          // If we haven't hit instability yet, keep ramping. Two outcomes are possible:
-          // 1) We exceed the failure threshold → enter backing-off.
-          // 2) We reach max users and remain healthy for adaptiveStableSec → consider "stable" without backoff.
-
-          if (stats.failureRate > cfg.adaptiveFailureRate) {
-            sawInstability = true;
-            allowRamping = false;
-            results.adaptive = {
-              ...(results.adaptive || { enabled: true }),
-              enabled: true,
-              phase: 'backing_off',
-              peakUsers: targetUsers,
-              timeToFirstFailureMs: now - startTime,
-              backoffSteps: 0,
-              peakWindowFailureRate: stats.failureRate,
-              peakWindowRps: stats.rps ?? undefined,
-            };
-            stableSince = null;
-            lastAdjustAt = now;
-            await this.sleep(500);
-            continue;
-          }
-
-          // Healthy window: only mark stable once we've reached the intended peak.
-          if (targetUsers >= cfg.maxUsers) {
-            if (stableSince === null) {
-              stableSince = now;
-            }
-            if (now - stableSince >= cfg.adaptiveStableSec * 1000) {
-              results.adaptive = {
-                ...(results.adaptive || { enabled: true }),
-                enabled: true,
-                stabilized: true,
-                phase: 'stable',
-                peakUsers: cfg.maxUsers,
-                stableUsers: cfg.maxUsers,
-                backoffSteps: 0,
-                peakWindowFailureRate: stats.failureRate,
-                stableWindowFailureRate: stats.failureRate,
-                peakWindowRps: stats.rps ?? undefined,
-                stableWindowRps: stats.rps ?? undefined,
-              };
-              stopAt = now;
-              return;
-            }
-          } else {
-            // Still ramping → don't let a "stable" timer run at lower user counts.
-            stableSince = null;
-          }
-
-          await this.sleep(500);
-          continue;
-        }
-
-        // backing off
-        if (stats.failureRate > cfg.adaptiveFailureRate) {
-          stableSince = null;
-          if (now - lastAdjustAt >= cfg.adaptiveCooldownMs) {
-            const prev = targetUsers;
-            targetUsers = Math.max(1, targetUsers - cfg.adaptiveBackoffStepUsers);
-            if (results.adaptive) {
-              results.adaptive.backoffSteps = (results.adaptive.backoffSteps ?? 0) + (targetUsers < prev ? 1 : 0);
-              results.adaptive.phase = 'backing_off';
-            }
-            lastAdjustAt = now;
-            if (targetUsers <= 1) {
-              // Can't back off further; mark as exhausted and stop.
-              if (results.adaptive) {
-                results.adaptive.phase = 'exhausted';
-              }
-              stopAt = now;
-              return;
-            }
-          }
-          await this.sleep(500);
-          continue;
-        }
-
-        // currently healthy in window
-        if (stableSince === null) {
-          stableSince = now;
-        }
-        if (now - stableSince >= cfg.adaptiveStableSec * 1000) {
-          if (results.adaptive) {
-            results.adaptive.stabilized = true;
-            results.adaptive.phase = 'stable';
-            results.adaptive.stableUsers = targetUsers;
-            results.adaptive.stableWindowFailureRate = stats.failureRate;
-            results.adaptive.stableWindowRps = stats.rps ?? undefined;
-          }
-          // Stop once stable (per your request).
-          stopAt = now;
-          return;
-        }
-
-        await this.sleep(500);
-      }
-    })();
-
-    try {
-      await Promise.all([rampPromise, adaptiveController]);
-      await Promise.all(userTasks);
-    } finally {
-      results.endTime = Date.now();
-      markCancelledIfRequested();
-      results.cancelled = cancelled;
-      results.aborted = aborted;
-      results.abortReason = abortReason;
-      emitProgress({ done: true }, true);
-    }
-
-    return results;
+    return await this.executeLoadTestViaBackend(request, variables, env, requestId, onProgress);
   }
 
   // Calculate load test metrics
@@ -1266,6 +939,25 @@ export class HttpService {
     }
     const withSecrets = await this.secretService.replaceSecrets(value, env);
     return this.replaceVariables(withSecrets, variables);
+  }
+
+  private async hydrateTextSecretsOnly(value: string, env: string): Promise<string> {
+    if (!value) {
+      return value;
+    }
+    return await this.secretService.replaceSecrets(value, env);
+  }
+
+  private async hydrateHeadersSecretsOnly(
+    headers: { [key: string]: string } | undefined,
+    env: string
+  ): Promise<{ [key: string]: string }> {
+    const source = headers || {};
+    const result: { [key: string]: string } = {};
+    for (const [key, value] of Object.entries(source)) {
+      result[key] = await this.hydrateTextSecretsOnly(value, env);
+    }
+    return result;
   }
 
   private async hydrateHeaders(
@@ -1311,6 +1003,41 @@ export class HttpService {
       url,
       headers: { ...headers },
       body: body || bodyPlaceholder
+    };
+
+    return { backend, preview };
+  }
+
+  private async prepareBackendRequestForChain(
+    req: Request,
+    env: string
+  ): Promise<{ backend: Record<string, any>; preview: RequestPreview }> {
+    const url = await this.hydrateTextSecretsOnly(req.url, env);
+    const headers = await this.hydrateHeadersSecretsOnly(req.headers, env);
+    let body = '';
+    let bodyPlaceholder: string | undefined;
+    if (req.body && !(req.body instanceof FormData)) {
+      body = await this.hydrateTextSecretsOnly(String(req.body), env);
+    } else if (req.body instanceof FormData) {
+      bodyPlaceholder = '[FormData]';
+    }
+
+    const backend = {
+      method: req.method,
+      url,
+      headers,
+      body,
+      preScript: req.preScript,
+      postScript: req.postScript,
+      options: req.options || undefined,
+    };
+
+    const preview: RequestPreview = {
+      name: req.name,
+      method: req.method,
+      url,
+      headers: { ...headers },
+      body: body || bodyPlaceholder,
     };
 
     return { backend, preview };

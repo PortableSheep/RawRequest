@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, signal, HostListener, ElementRef, inject } from '@angular/core';
+import { Component, input, output, signal, HostListener, ElementRef, inject, ViewChild, AfterViewInit, effect } from '@angular/core';
 import { ScriptLogEntry } from '../../models/http.models';
+import { gsap } from 'gsap';
 
 type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 
@@ -13,6 +14,9 @@ type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 })
 export class ConsoleDrawerComponent {
   private el = inject(ElementRef);
+
+  @ViewChild('drawerShell') drawerShell?: ElementRef<HTMLElement>;
+  @ViewChild('bubbleButton') bubbleButton?: ElementRef<HTMLButtonElement>;
   
   open = input<boolean>(false);
   logs = input<ScriptLogEntry[]>([]);
@@ -22,6 +26,13 @@ export class ConsoleDrawerComponent {
 
   onToggle = output<void>();
   onClear = output<void>();
+
+  // Render state: keep the drawer in DOM long enough to animate out.
+  isDrawerVisible = signal<boolean>(false);
+  private drawerTween: gsap.core.Tween | null = null;
+  private bubbleTween: gsap.core.Tween | null = null;
+  private hasView = false;
+  private pendingOpenAnimation = false;
 
   // Resize state
   panelHeight = signal<number>(256); // Default 256px (max-h-64)
@@ -34,12 +45,137 @@ export class ConsoleDrawerComponent {
     return typeof window !== 'undefined' ? window.innerHeight * 0.8 : 600;
   }
 
+  constructor() {
+    effect(() => {
+      const isOpen = this.open();
+      if (!this.hasView) {
+        // Defer animations until ViewChild refs are available.
+        this.isDrawerVisible.set(isOpen);
+        return;
+      }
+      this.syncAnimatedState(isOpen);
+    });
+  }
+
+  ngAfterViewInit(): void {
+    this.hasView = true;
+    // Apply initial state.
+    this.syncAnimatedState(this.open(), true);
+  }
+
   handleToggle() {
+    // Parent owns the actual open/close state.
     this.onToggle.emit();
+  }
+
+  requestClose() {
+    // Animate out first; only then tell parent to close.
+    if (!this.open()) {
+      return;
+    }
+    this.animateClose(() => this.onToggle.emit());
   }
 
   handleClear() {
     this.onClear.emit();
+  }
+
+  private syncAnimatedState(open: boolean, immediate = false): void {
+    if (open) {
+      this.animateOpen(immediate);
+      return;
+    }
+    this.animateClose(undefined, immediate);
+  }
+
+  private animateOpen(immediate = false): void {
+    this.drawerTween?.kill();
+    this.bubbleTween?.kill();
+
+    this.isDrawerVisible.set(true);
+    const shell = this.drawerShell?.nativeElement;
+    const bubble = this.bubbleButton?.nativeElement;
+    if (!shell) {
+      // Drawer is controlled by an @if; it won't exist until after this change
+      // detection pass. Retry on the next frame.
+      if (!this.pendingOpenAnimation) {
+        this.pendingOpenAnimation = true;
+        requestAnimationFrame(() => {
+          this.pendingOpenAnimation = false;
+          if (this.open()) {
+            this.animateOpen(immediate);
+          }
+        });
+      }
+      return;
+    }
+
+    if (immediate) {
+      gsap.set(shell, { y: 0, opacity: 1, scale: 1 });
+      if (bubble) gsap.set(bubble, { opacity: 0, scale: 0.98 });
+      return;
+    }
+
+    gsap.set(shell, { y: 18, opacity: 0, scale: 0.995 });
+    this.drawerTween = gsap.to(shell, {
+      y: 0,
+      opacity: 1,
+      scale: 1,
+      duration: 0.22,
+      ease: 'power2.out'
+    });
+
+    if (bubble) {
+      this.bubbleTween = gsap.to(bubble, {
+        opacity: 0,
+        scale: 0.98,
+        duration: 0.14,
+        ease: 'power1.out'
+      });
+    }
+  }
+
+  private animateClose(after?: () => void, immediate = false): void {
+    this.drawerTween?.kill();
+    this.bubbleTween?.kill();
+
+    const shell = this.drawerShell?.nativeElement;
+    const bubble = this.bubbleButton?.nativeElement;
+
+    if (immediate) {
+      this.isDrawerVisible.set(false);
+      if (bubble) gsap.set(bubble, { opacity: 1, scale: 1 });
+      if (after) after();
+      return;
+    }
+
+    if (!shell) {
+      this.isDrawerVisible.set(false);
+      if (after) after();
+      return;
+    }
+
+    this.drawerTween = gsap.to(shell, {
+      y: 14,
+      opacity: 0,
+      scale: 0.995,
+      duration: 0.18,
+      ease: 'power1.in',
+      onComplete: () => {
+        this.isDrawerVisible.set(false);
+        this.drawerTween = null;
+        if (bubble) {
+          gsap.set(bubble, { opacity: 0, scale: 0.98 });
+          this.bubbleTween = gsap.to(bubble, {
+            opacity: 1,
+            scale: 1,
+            duration: 0.16,
+            ease: 'power1.out'
+          });
+        }
+        if (after) after();
+      }
+    });
   }
 
   trackLogEntry(index: number, entry: ScriptLogEntry): string {

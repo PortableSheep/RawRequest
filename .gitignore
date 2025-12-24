@@ -20,6 +20,7 @@
 
 history/
 secrets/
+responses/
 dist/
 
 # Go workspace file

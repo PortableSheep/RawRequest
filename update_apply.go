@@ -140,8 +140,9 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 			return fmt.Errorf("failed to launch updater: %w", err)
 		}
 
-		// Clear state before quitting; helper has everything it needs.
-		a.clearPreparedUpdateState()
+		// Do not delete the prepared artifact/state here.
+		// The helper process still needs the artifact path to apply the update.
+		// Cleanup is best-effort after a successful apply/relaunch.
 		wailsruntime.Quit(a.ctx)
 		return nil
 	}

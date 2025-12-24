@@ -5,28 +5,26 @@ import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, hoverTooltip, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { autocompletion, CompletionContext, CompletionResult, Completion } from '@codemirror/autocomplete';
-import { foldKeymap, foldService } from '@codemirror/language';
+import { foldKeymap, foldService, syntaxTree, LRLanguage, LanguageSupport } from '@codemirror/language';
 import { linter, lintGutter, Diagnostic } from '@codemirror/lint';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
+
+import { parser as rawRequestHttpParser } from './rawrequest-http-parser';
 
 import { createEditorKeymap } from './editor-keymap';
 import { createRequestGutter } from './editor-request-gutter';
 
 import type { SecretIndex } from '../../services/secret.service';
 import {
-  isMethodLine,
   extractPlaceholders,
   extractDependsTarget,
   extractSetVarKeys,
   METHOD_LINE_REGEX,
-  DEPENDS_LINE_REGEX,
   LOAD_LINE_REGEX,
   ANNOTATION_LINE_REGEX,
-  SEPARATOR_PREFIX_REGEX,
   ENV_PLACEHOLDER_REGEX,
   REQUEST_REF_PLACEHOLDER_REGEX,
-  SECRET_PLACEHOLDER_REGEX,
-  isSeparatorLine
+  SECRET_PLACEHOLDER_REGEX
 } from '../../utils/http-file-analysis';
 
 // Common HTTP headers for autocomplete
@@ -50,6 +48,9 @@ const CONTENT_TYPES = [
 
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'];
 const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'];
+
+const rawRequestHttpLanguage = LRLanguage.define({ parser: rawRequestHttpParser });
+const rawRequestHttpSupport = new LanguageSupport(rawRequestHttpLanguage);
 
 const LOAD_TEST_KEYS: Array<{ label: string; detail: string }> = [
   // Concurrency / users
@@ -86,6 +87,19 @@ const LOAD_TEST_KEYS: Array<{ label: string; detail: string }> = [
   // Throttle
   { label: 'requestsPerSecond', detail: 'global RPS cap' },
   { label: 'rps', detail: 'global RPS cap (alias)' },
+
+  // Abort thresholds
+  { label: 'failureRateThreshold', detail: 'abort if failure rate exceeds (e.g. 1%, 0.01, 99%)' },
+  { label: 'failureThreshold', detail: 'abort threshold (alias)' },
+  { label: 'failRate', detail: 'abort threshold (alias)' },
+
+  // Adaptive mode
+  { label: 'adaptive', detail: 'enable adaptive capacity discovery (true/false)' },
+  { label: 'adaptiveFailureRate', detail: 'target failure rate (e.g. 1%, 0.01)' },
+  { label: 'adaptiveWindow', detail: 'window size (e.g. 15s)' },
+  { label: 'adaptiveStable', detail: 'stable duration (e.g. 20s)' },
+  { label: 'adaptiveCooldown', detail: 'cooldown between adjustments (e.g. 5s)' },
+  { label: 'adaptiveBackoffStep', detail: 'users to drop per backoff step' },
 ];
 
 @Component({
@@ -115,6 +129,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private isUpdatingFromInput = false;
   private autocompleteCompartment = new Compartment();
   private lintCompartment = new Compartment();
+
+  private requestBlockIndex: Array<{ from: number; to: number; index: number }> = [];
 
   editorContextMenu = {
     show: false,
@@ -264,6 +280,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       extensions: [
         basicSetup,
         oneDark,
+        rawRequestHttpSupport,
+        this.createRequestBlockIndexer(),
         this.createRequestFolding(),
         highlightSelectionMatches(),
         this.createRequestHighlighter(),
@@ -409,21 +427,25 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
       buildDecorations(view: EditorView): DecorationSet {
         const builder = new RangeSetBuilder<Decoration>();
+
+        // Use the Lezer tree to find AnnotationLine nodes in the viewport.
+        const tree = syntaxTree(view.state);
         for (const range of view.visibleRanges) {
-          let pos = range.from;
-          while (pos <= range.to) {
-            const line = view.state.doc.lineAt(pos);
-            const depends = extractDependsTarget(line.text);
-            if (depends) {
-              const from = line.from + depends.start;
-              const to = line.from + depends.end;
-              if (to > from) {
-                builder.add(from, to, linkMark);
-              }
+          tree.iterate({
+            from: range.from,
+            to: range.to,
+            enter: (node) => {
+              if (node.type.name !== 'AnnotationLine') return;
+              const text = view.state.doc.sliceString(node.from, node.to);
+              const depends = extractDependsTarget(text);
+              if (!depends) return;
+              const from = node.from + depends.start;
+              const to = node.from + depends.end;
+              if (to > from) builder.add(from, to, linkMark);
             }
-            pos = line.to + 1;
-          }
+          });
         }
+
         return builder.finish();
       }
     }, {
@@ -476,11 +498,17 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         let inScript = false;
         let scriptBraceDepth = 0;
 
+        const tree = syntaxTree(view.state);
+
         for (let i = 1; i <= view.state.doc.lines; i++) {
           const line = view.state.doc.line(i);
           const text = line.text;
           const trimmedText = text.trimStart();
           const leadingWhitespace = text.length - trimmedText.length;
+
+          const resolvePos = line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1));
+          const resolved = tree.resolve(resolvePos, 1);
+          const lineNodeName = resolved.name;
 
           // Check for script block start: < { or > { (can have content after)
           const scriptStartMatch = trimmedText.match(/^([<>])\s*\{/);
@@ -550,21 +578,26 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight HTTP methods
-          const methodMatch = trimmedText.match(METHOD_LINE_REGEX);
-          if (methodMatch) {
-            decorations.push({
-              from: line.from + leadingWhitespace,
-              to: line.from + leadingWhitespace + methodMatch[1].length,
-              cls: 'cm-http-method'
-            });
+          if (lineNodeName === 'MethodLine') {
+            const methodText = view.state.doc.sliceString(resolved.from, resolved.to);
+            const mm = methodText.trimStart().match(METHOD_LINE_REGEX);
+            const methodLen = mm?.[1]?.length ?? 0;
+            if (methodLen > 0) {
+              decorations.push({
+                from: line.from + leadingWhitespace,
+                to: line.from + leadingWhitespace + methodLen,
+                cls: 'cm-http-method'
+              });
+            }
           }
 
           // Highlight headers
-          const headerMatch = text.match(/^([^:]+):\s*(.+)$/);
-          if (headerMatch && !methodMatch && !trimmedText.startsWith('@')) {
+          if (lineNodeName === 'HeaderLine') {
+            const colonIdx = text.indexOf(':');
+            const keyLen = colonIdx >= 0 ? colonIdx : text.length;
             decorations.push({
               from: line.from,
-              to: line.from + headerMatch[1].length,
+              to: line.from + keyLen,
               cls: 'cm-http-header'
             });
           }
@@ -590,16 +623,20 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight @name, @depends, @load annotations
-          const annotationMatch = trimmedText.match(ANNOTATION_LINE_REGEX);
-          if (annotationMatch) {
+          if (lineNodeName === 'AnnotationLine') {
+            const annFrom = line.from + leadingWhitespace;
+            const annText = view.state.doc.sliceString(resolved.from, resolved.to);
+            const am = annText.trimStart().match(ANNOTATION_LINE_REGEX);
+            const annLen = am?.[0]?.length ?? 0;
             decorations.push({
-              from: line.from + leadingWhitespace,
-              to: line.from + leadingWhitespace + annotationMatch[0].length,
+              from: annFrom,
+              to: annFrom + annLen,
               cls: 'cm-annotation'
             });
 
             // If this is an @load line, also highlight key names in key=value pairs
-            if (LOAD_LINE_REGEX.test(trimmedText)) {
+            const annTrimmed = annText.trimStart();
+            if (LOAD_LINE_REGEX.test(annTrimmed)) {
               const loadIdx = text.indexOf('@load');
               if (loadIdx >= 0) {
                 const rest = text.slice(loadIdx + '@load'.length);
@@ -621,7 +658,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           }
 
           // Highlight separators
-          if (SEPARATOR_PREFIX_REGEX.test(trimmedText)) {
+          if (lineNodeName === 'SeparatorLine') {
             lineDecorations.push({ at: line.from, cls: 'cm-separator' });
           }
         }
@@ -709,12 +746,34 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     const cursorPos = context.pos - line.from;
     const textBeforeCursor = lineText.slice(0, cursorPos);
 
+    const tree = syntaxTree(context.state);
+    const trimmedStartIndex = lineText.length - lineText.trimStart().length;
+    const lineType = tree.resolve(line.from + trimmedStartIndex, 1).name;
+
+    let requestBlockNode: any = tree.resolve(context.pos, 1);
+    while (requestBlockNode && requestBlockNode.name !== 'RequestBlock') requestBlockNode = requestBlockNode.parent;
+    const inRequestBlock = !!requestBlockNode;
+
+    let firstBodyFrom: number | null = null;
+    if (requestBlockNode) {
+      const requestLines = requestBlockNode.getChildren('RequestLine');
+      for (const rl of requestLines) {
+        const child = rl.firstChild;
+        if (!child) continue;
+        if (child.name === 'BodyLine') {
+          firstBodyFrom = child.from;
+          break;
+        }
+      }
+    }
+    const inHeaderSection = inRequestBlock && (firstBodyFrom === null || context.pos < firstBodyFrom);
+
     // @load key completion (when typing key names)
     // Examples:
     //   @load con|
     //   @load users=10 dur|
     const trimmedLine = lineText.trimStart();
-    if (trimmedLine.toLowerCase().startsWith('@load')) {
+    if (lineType === 'AnnotationLine' && trimmedLine.toLowerCase().startsWith('@load')) {
       const before = textBeforeCursor.trimStart();
       const loadMatch = before.match(/^@load\s+([\s\S]*)$/i);
       if (loadMatch) {
@@ -816,7 +875,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
 
     // Check for annotation completion at start of line: @
-    if (textBeforeCursor.match(/^@[a-z]*$/i)) {
+    if (lineType === 'AnnotationLine' && textBeforeCursor.match(/^@[a-z]*$/i)) {
       const prefix = textBeforeCursor.slice(1);
       const from = context.pos - prefix.length - 1;
       return {
@@ -831,7 +890,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
 
     // Check for HTTP method at start of line
-    if (textBeforeCursor.match(/^[A-Z]*$/i) && cursorPos === textBeforeCursor.length) {
+    if ((lineType === 'MethodLine' || !inRequestBlock) && textBeforeCursor.match(/^[A-Z]*$/i) && cursorPos === textBeforeCursor.length) {
       const prefix = textBeforeCursor;
       const from = line.from;
       return {
@@ -847,7 +906,16 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
     // Check for header name completion (line contains : but we're before it)
     const colonIndex = lineText.indexOf(':');
-    if (colonIndex === -1 && !lineText.match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|@|#)/i)) {
+    if (
+      inHeaderSection &&
+      colonIndex === -1 &&
+      lineType !== 'MethodLine' &&
+      lineType !== 'AnnotationLine' &&
+      lineType !== 'SeparatorLine' &&
+      !trimmedLine.match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|@|#)/i) &&
+      !trimmedLine.startsWith('{') &&
+      !trimmedLine.startsWith('[')
+    ) {
       // Could be typing a header name
       const prefix = textBeforeCursor.trim();
       if (prefix.length > 0) {
@@ -865,7 +933,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
 
     // Check for Content-Type value completion
-    if (textBeforeCursor.match(/Content-Type:\s*[a-z/]*$/i)) {
+    if (lineType === 'HeaderLine' && textBeforeCursor.match(/Content-Type:\s*[a-z/]*$/i)) {
       const valueMatch = textBeforeCursor.match(/Content-Type:\s*([a-z/]*)$/i);
       if (valueMatch) {
         const prefix = valueMatch[1];
@@ -1116,16 +1184,37 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   private createRequestFolding() {
     return foldService.of((state, lineStart, _lineEnd) => {
+      // Prefer folding based on the Lezer syntax tree when available.
+      // This lets us fold an entire request block starting from its method line.
+      const tree = syntaxTree(state);
+      const resolved = tree.resolve(lineStart, 1);
+
+      if (resolved.name === 'MethodLine') {
+        let cur: typeof resolved | null = resolved;
+        while (cur && cur.name !== 'RequestBlock') cur = cur.parent;
+        if (cur && cur.name === 'RequestBlock') {
+          const methodNode = cur.getChild('MethodLine');
+          const from = methodNode ? methodNode.to : cur.from;
+          const to = cur.to;
+          if (to > from) return { from, to };
+        }
+      }
+
       const line = state.doc.lineAt(lineStart);
       const text = line.text;
-      if (!isSeparatorLine(text)) {
-        return null;
-      }
+      const trimmed = text.trimStart();
+      const leadingWhitespace = text.length - trimmed.length;
+      const lineType = tree.resolve(line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1)), 1).name;
+      if (lineType !== 'SeparatorLine') return null;
 
       const start = line.to;
       for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo++) {
         const next = state.doc.line(lineNo);
-        if (isSeparatorLine(next.text)) {
+        const nextText = next.text;
+        const nextTrimmed = nextText.trimStart();
+        const nextLeadingWhitespace = nextText.length - nextTrimmed.length;
+        const nextType = tree.resolve(next.from + Math.min(nextLeadingWhitespace, Math.max(0, nextText.length - 1)), 1).name;
+        if (nextType === 'SeparatorLine') {
           const end = next.from - 1;
           if (end <= start) {
             return null;
@@ -1138,6 +1227,39 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     });
   }
 
+  private createRequestBlockIndexer() {
+    const rebuild = (state: EditorState) => {
+      this.requestBlockIndex = this.computeRequestBlockIndexFromTree(state);
+    };
+
+    return ViewPlugin.fromClass(class {
+      constructor(view: EditorView) {
+        rebuild(view.state);
+      }
+
+      update(update: ViewUpdate) {
+        if (update.docChanged) {
+          rebuild(update.state);
+        }
+      }
+    });
+  }
+
+  private computeRequestBlockIndexFromTree(state: EditorState): Array<{ from: number; to: number; index: number }> {
+    const tree = syntaxTree(state);
+    const blocks: Array<{ from: number; to: number; index: number }> = [];
+
+    let index = 0;
+    const cursor = tree.cursor();
+    do {
+      if (cursor.name !== 'RequestBlock') continue;
+      blocks.push({ from: cursor.from, to: cursor.to, index });
+      index++;
+    } while (cursor.next());
+
+    return blocks;
+  }
+
   private createLintExtensions() {
     return [
       lintGutter(),
@@ -1148,6 +1270,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private computeDiagnostics(view: EditorView): Diagnostic[] {
     const diagnostics: Diagnostic[] = [];
     const requests = this.requests() || [];
+
+    const tree = syntaxTree(view.state);
+    const knownLoadKeys = new Set<string>(LOAD_TEST_KEYS.map(k => k.label.toLowerCase()));
 
     const nameToIndex = new Map<string, number>();
     for (let i = 0; i < requests.length; i++) {
@@ -1179,20 +1304,75 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       const line = view.state.doc.line(lineNo);
       const text = line.text;
 
-      const depends = extractDependsTarget(text);
-      if (depends) {
-        pendingDepends = {
-          target: depends.target,
-          from: line.from + depends.start,
-          to: line.from + depends.end
-        };
+      const trimmedStartIndex = text.length - text.trimStart().length;
+      const lineType = tree.resolve(line.from + trimmedStartIndex, 1).name;
+
+      // @load diagnostics (unknown keys)
+      const trimmed = text.trimStart();
+      if (lineType === 'AnnotationLine' && trimmed.toLowerCase().startsWith('@load')) {
+        const after = trimmed.slice('@load'.length);
+        const tokenRx = /([A-Za-z_][\w-]*)\s*=/g;
+        let m: RegExpExecArray | null;
+        while ((m = tokenRx.exec(after)) !== null) {
+          const key = m[1] || '';
+          if (!key) continue;
+          if (knownLoadKeys.has(key.toLowerCase())) continue;
+          const from = line.from + trimmedStartIndex + '@load'.length + m.index;
+          const to = from + key.length;
+          diagnostics.push({
+            from,
+            to,
+            severity: 'warning',
+            message: `Unknown @load key "${key}"`
+          });
+        }
       }
 
-      if (isMethodLine(text)) {
+      // @timeout diagnostics (non-numeric)
+      if (lineType === 'AnnotationLine' && trimmed.toLowerCase().startsWith('@timeout')) {
+        const match = trimmed.match(/^@timeout\s+([^\s#]+)?/i);
+        const token = (match?.[1] ?? '').trim();
+        if (token) {
+          const n = Number(token);
+          if (!Number.isFinite(n) || n < 0) {
+            const tokenStartInTrimmed = trimmed.toLowerCase().indexOf('@timeout') + '@timeout'.length;
+            const afterTimeout = trimmed.slice(tokenStartInTrimmed);
+            const leading = afterTimeout.match(/^\s*/)?.[0].length ?? 0;
+            const start = line.from + trimmedStartIndex + tokenStartInTrimmed + leading;
+            diagnostics.push({
+              from: start,
+              to: start + token.length,
+              severity: 'warning',
+              message: 'Invalid @timeout value (expected non-negative number)'
+            });
+          }
+        }
+      }
+
+      const depends = lineType === 'AnnotationLine' ? extractDependsTarget(text) : null;
+      if (depends) {
+        pendingDepends = { target: depends.target, from: line.from + depends.start, to: line.from + depends.end };
+      }
+
+      // Only count real method lines (Lezer token), not incidental "GET" in bodies.
+      if (lineType === 'MethodLine') {
         requestIndexForLine++;
         if (pendingDepends) {
           dependsTokenByRequestIndex[requestIndexForLine] = pendingDepends;
           pendingDepends = null;
+        }
+
+        // Method-line diagnostics (must include URL-ish token after method)
+        const methodMatch = text.trimStart().match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(\S+)/i);
+        if (!methodMatch) {
+          const from = line.from + trimmedStartIndex;
+          const to = Math.min(line.to, from + text.trimStart().length);
+          diagnostics.push({
+            from,
+            to,
+            severity: 'warning',
+            message: 'Method line should include a URL (e.g. GET https://example.com)'
+          });
         }
       }
     }
@@ -1255,6 +1435,127 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       dfs(i);
     }
 
+    // Structural request-block diagnostics using the Lezer tree.
+    // These don't depend on the parsed request model and help catch structural mistakes early.
+    {
+      const doc = view.state.doc;
+      tree.iterate({
+        enter: (node) => {
+          if (node.type.name !== 'RequestBlock') return;
+
+          let reqNode: any = tree.resolve(node.from, 1);
+          while (reqNode && reqNode.name !== 'RequestBlock') reqNode = reqNode.parent;
+          if (!reqNode) return;
+
+          let sawBody = false;
+      let multipartLikely = false;
+      let sawContentBodyLine = false;
+      const isIgnorableBodyLine = (text: string): boolean => {
+        const t = text.trimStart();
+        if (!t) return true;
+        // Common comment styles in .http files / scripts.
+        if (t.startsWith('#')) return true;
+        if (t.startsWith('//')) return true;
+        // Some users use ';' as a comment prefix.
+        if (t.startsWith(';')) return true;
+        return false;
+      };
+          const requestLines = reqNode.getChildren('RequestLine');
+          for (const rl of requestLines) {
+            const child = rl.firstChild;
+            if (!child) continue;
+
+            const kind = child.name;
+            const raw = doc.sliceString(child.from, child.to);
+            const trimmed = raw.trimStart();
+      const lower = trimmed.toLowerCase();
+
+            if (kind === 'BodyLine') {
+        const bodyText = trimmed.trim();
+        if (bodyText.length) {
+        sawBody = true;
+        if (!isIgnorableBodyLine(trimmed)) {
+          sawContentBodyLine = true;
+        }
+        // Heuristics: common file upload / multipart payloads contain header-like lines in the body.
+        if (bodyText.startsWith('--') || bodyText.includes('multipart/form-data')) {
+          multipartLikely = true;
+        }
+        if (bodyText.startsWith('< ')) {
+          multipartLikely = true;
+        }
+        }
+              continue;
+            }
+
+      if (kind === 'HeaderLine') {
+        // If the request itself declares multipart, don't warn about header-looking lines later.
+        if (lower.startsWith('content-type:') && lower.includes('multipart/form-data')) {
+          multipartLikely = true;
+        }
+      }
+
+            if (sawBody && (kind === 'HeaderLine' || kind === 'AnnotationLine')) {
+        if (kind === 'HeaderLine') {
+          // Suppress for multipart/file-upload bodies where header-like lines are expected.
+          if (!multipartLikely && sawContentBodyLine) {
+            diagnostics.push({
+              from: child.from,
+              to: child.to,
+              severity: 'info',
+              message: 'Header appears after body content started'
+            });
+          }
+          continue;
+        }
+
+        // AnnotationLine: only flag request-scoped annotations; ignore global var/env lines.
+        if (
+          lower.startsWith('@name') ||
+          lower.startsWith('@depends') ||
+          lower.startsWith('@timeout') ||
+          lower.startsWith('@load')
+        ) {
+          diagnostics.push({
+            from: child.from,
+            to: child.to,
+            severity: 'info',
+            message: 'Annotation appears after body content started'
+          });
+        }
+        continue;
+            }
+
+            if (kind === 'AnnotationLine') {
+              if (lower.startsWith('@name')) {
+                const nameArg = trimmed.slice('@name'.length).trim();
+                if (!nameArg) {
+                  diagnostics.push({
+                    from: child.from,
+                    to: child.to,
+                    severity: 'warning',
+                    message: 'Missing @name value'
+                  });
+                }
+              }
+
+              if (lower.startsWith('@depends')) {
+                const dep = extractDependsTarget(trimmed);
+                if (!dep) {
+                  diagnostics.push({
+                    from: child.from,
+                    to: child.to,
+                    severity: 'warning',
+                    message: 'Missing @depends target'
+                  });
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
     // Precompute chain-variable availability per request (ancestors scripts + current pre-script).
     const chainVarsCache: Array<Set<string>> = requests.map(() => new Set<string>());
     const chainStack = new Set<number>();
@@ -1282,14 +1583,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     for (let i = 0; i < requests.length; i++) buildChainVars(i);
 
     // Scan document placeholders and warn on unknown variables.
-    requestIndexForLine = -1;
     for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
       const line = view.state.doc.line(lineNo);
       const text = line.text;
 
-      if (isMethodLine(text)) {
-        requestIndexForLine++;
-      }
+      const trimmedStartIndex = text.length - text.trimStart().length;
+      const requestIndexForLine = this.getRequestIndexAtPos(view.state, line.from + trimmedStartIndex);
 
       const placeholders = extractPlaceholders(text);
       if (!placeholders.length) continue;
@@ -1325,7 +1624,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         if (currentEnvVars[inner] !== undefined) continue;
 
         // Possibly defined by setVar in current pre-script or any earlier request in chain.
-        if (requestIndexForLine >= 0 && requestIndexForLine < chainVarsCache.length) {
+        if (requestIndexForLine !== null && requestIndexForLine >= 0 && requestIndexForLine < chainVarsCache.length) {
           if (chainVarsCache[requestIndexForLine].has(inner)) continue;
         }
 
@@ -1337,26 +1636,24 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   private getRequestIndexAtPos(state: EditorState, pos: number): number | null {
-    const cursorLineNo = state.doc.lineAt(pos).number;
-    let methodLineNo: number | null = null;
-    for (let lineNo = cursorLineNo; lineNo >= 1; lineNo--) {
-      const line = state.doc.line(lineNo).text;
-      if (isMethodLine(line)) {
-        methodLineNo = lineNo;
-        break;
-      }
-      if (isSeparatorLine(line)) {
-        // allow cursor above first method in block; keep scanning upward
-        continue;
+    // Fast path: if Lezer parsed this position into a RequestBlock, use the cached range index.
+    if (this.requestBlockIndex.length) {
+      let lo = 0;
+      let hi = this.requestBlockIndex.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const block = this.requestBlockIndex[mid];
+        if (pos < block.from) {
+          hi = mid - 1;
+        } else if (pos > block.to) {
+          lo = mid + 1;
+        } else {
+          return block.index;
+        }
       }
     }
-    if (methodLineNo === null) return null;
 
-    let requestIndex = 0;
-    for (let i = 1; i < methodLineNo; i++) {
-      if (isMethodLine(state.doc.line(i).text)) requestIndex++;
-    }
-    return requestIndex;
+    return null;
   }
 }
 

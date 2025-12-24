@@ -149,6 +149,9 @@ func main() {
 		dief("apply update failed: %v", err)
 	}
 
+	// Best-effort: clear persisted "restart to install" state after a successful apply.
+	clearPreparedUpdateStateBestEffort()
+
 	fmt.Printf("Update applied successfully.\n")
 	if opts.relaunch {
 		fmt.Printf("Relaunching...\n")
@@ -187,6 +190,18 @@ func ensureDirWritable(dir string) error {
 	}
 	_ = f.Close()
 	return os.Remove(probe)
+}
+
+func preparedUpdateStatePath() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil || strings.TrimSpace(configDir) == "" {
+		configDir = os.TempDir()
+	}
+	return filepath.Join(configDir, "rawrequest", "update", "prepared_update.json")
+}
+
+func clearPreparedUpdateStateBestEffort() {
+	_ = os.Remove(preparedUpdateStatePath())
 }
 
 func downloadFile(url, dst string, timeout time.Duration) error {

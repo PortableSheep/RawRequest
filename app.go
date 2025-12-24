@@ -220,9 +220,79 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 	var postScript strings.Builder
 	inPreScript := false
 	inPostScript := false
+	// Support brace-based script blocks used by the frontend parser:
+	//   < { ... }
+	//   > { ... }
+	//   <\n{ ... }
+	//   >\n{ ... }
+	var pendingBraceScript string // "<" or ">" when a standalone marker was seen
+	inPreBraceScript := false
+	inPostBraceScript := false
+	braceDepth := 0
+	braceStarted := false
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+
+		// Handle brace script bodies (we only terminate once braces balance).
+		if inPreBraceScript || inPostBraceScript {
+			if inPreBraceScript {
+				preScript.WriteString(line + "\n")
+			} else {
+				postScript.WriteString(line + "\n")
+			}
+			openCount := strings.Count(line, "{")
+			closeCount := strings.Count(line, "}")
+			if openCount > 0 {
+				braceStarted = true
+			}
+			braceDepth += openCount - closeCount
+			if braceStarted && braceDepth <= 0 {
+				inPreBraceScript = false
+				inPostBraceScript = false
+				braceDepth = 0
+				braceStarted = false
+			}
+			continue
+		}
+
+		// If we saw a standalone < or > marker, only treat the *immediately following* line
+		// as a script opener if it begins with '{' (to avoid false-positives with XML bodies).
+		if pendingBraceScript != "" {
+			if strings.HasPrefix(trimmed, "{") {
+				if pendingBraceScript == "<" {
+					inPreBraceScript = true
+				} else {
+					inPostBraceScript = true
+				}
+				pendingBraceScript = ""
+				braceDepth = 0
+				braceStarted = false
+				// Re-process this line as part of the script body on the next loop iteration.
+				// We do this by directly handling it here.
+				if inPreBraceScript {
+					preScript.WriteString(line + "\n")
+				} else {
+					postScript.WriteString(line + "\n")
+				}
+				openCount := strings.Count(line, "{")
+				closeCount := strings.Count(line, "}")
+				if openCount > 0 {
+					braceStarted = true
+				}
+				braceDepth += openCount - closeCount
+				if braceStarted && braceDepth <= 0 {
+					inPreBraceScript = false
+					inPostBraceScript = false
+					braceDepth = 0
+					braceStarted = false
+				}
+				continue
+			}
+			// Not a script block; clear the pending marker and continue processing normally.
+			pendingBraceScript = ""
+		}
+
 		if trimmed == "" {
 			if inHeaders && !inBody && !inPreScript && !inPostScript {
 				inBody = true
@@ -313,6 +383,52 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 			continue
 		}
 
+		// Handle brace-based scripts (< { ... } / > { ... })
+		// Must be < or > followed by { on the same line, OR a standalone marker with { on the next line.
+		if trimmed == "<" || trimmed == ">" {
+			pendingBraceScript = trimmed
+			inHeaders = false
+			inBody = false
+			continue
+		}
+		if len(trimmed) >= 2 {
+			first := trimmed[0]
+			if (first == '<' || first == '>') && strings.Contains(trimmed, "{") {
+				// Require that the brace is the next non-space token after the marker.
+				rest := strings.TrimSpace(trimmed[1:])
+				if strings.HasPrefix(rest, "{") {
+					if first == '<' {
+						inPreBraceScript = true
+					} else {
+						inPostBraceScript = true
+					}
+					braceDepth = 0
+					braceStarted = false
+					// Include the opener line (matches frontend behavior when marker and brace share a line)
+					if inPreBraceScript {
+						preScript.WriteString(line + "\n")
+					} else {
+						postScript.WriteString(line + "\n")
+					}
+					openCount := strings.Count(line, "{")
+					closeCount := strings.Count(line, "}")
+					if openCount > 0 {
+						braceStarted = true
+					}
+					braceDepth += openCount - closeCount
+					if braceStarted && braceDepth <= 0 {
+						inPreBraceScript = false
+						inPostBraceScript = false
+						braceDepth = 0
+						braceStarted = false
+					}
+					inHeaders = false
+					inBody = false
+					continue
+				}
+			}
+		}
+
 		if currentRequest == nil {
 			currentRequest = make(map[string]interface{})
 		}
@@ -384,9 +500,64 @@ func (a *App) executeRequestsWithContext(ctx context.Context, requests []map[str
 	var results []string
 	responseStore := make(map[string]map[string]interface{})
 
+	resolveHeaders := func(headers map[string]string, responseStore map[string]map[string]interface{}) map[string]string {
+		if headers == nil {
+			return map[string]string{}
+		}
+		out := make(map[string]string, len(headers))
+		for k, v := range headers {
+			out[k] = a.resolveResponseReferences(v, responseStore)
+		}
+		return out
+	}
+
+	readTimeoutMs := func(req map[string]interface{}) int {
+		timeoutMs := 0
+		if options, exists := req["options"].(map[string]interface{}); exists {
+			if timeout, ok := options["timeout"].(float64); ok {
+				timeoutMs = int(timeout)
+			} else if timeout, ok := options["timeout"].(int); ok {
+				timeoutMs = timeout
+			}
+		}
+		return timeoutMs
+	}
+
+	readHeaders := func(req map[string]interface{}) map[string]string {
+		headers := map[string]string{}
+		if rawHeaders, exists := req["headers"]; exists {
+			switch h := rawHeaders.(type) {
+			case map[string]string:
+				headers = h
+			case map[string]interface{}:
+				for key, value := range h {
+					headers[key] = fmt.Sprint(value)
+				}
+			}
+		}
+		return headers
+	}
+
 	for i, req := range requests {
 		if ctx.Err() == context.Canceled {
 			return requestCancelledResponse
+		}
+
+		// Ensure headers exists in request map so scripts can safely mutate it.
+		if _, exists := req["headers"]; !exists {
+			req["headers"] = map[string]string{}
+		}
+
+		// Run pre-script *before* extracting request fields so updateRequest/setHeader changes apply.
+		if preScript, exists := req["preScript"].(string); exists && strings.TrimSpace(preScript) != "" {
+			a.executeScript(preScript, &scriptExecutionContext{
+				Request:       req,
+				Variables:     a.variables,
+				ResponseStore: responseStore,
+			}, "pre")
+			if ctx.Err() == context.Canceled {
+				return requestCancelledResponse
+			}
 		}
 
 		method, ok := req["method"].(string)
@@ -397,46 +568,13 @@ func (a *App) executeRequestsWithContext(ctx context.Context, requests []map[str
 		if !ok {
 			continue
 		}
-
-		headers := map[string]string{}
-		if rawHeaders, exists := req["headers"]; exists {
-			switch h := rawHeaders.(type) {
-			case map[string]string:
-				headers = h
-			case map[string]interface{}:
-				for key, value := range h {
-					if strVal, ok := value.(string); ok {
-						headers[key] = strVal
-					}
-				}
-			}
-		}
-
 		body, _ := req["body"].(string)
 
+		// Resolve placeholders after preScript so setVar can affect the same request.
 		url = a.resolveResponseReferences(url, responseStore)
 		body = a.resolveResponseReferences(body, responseStore)
-
-		// Extract timeout from request options
-		timeoutMs := 0
-		if options, exists := req["options"].(map[string]interface{}); exists {
-			if timeout, ok := options["timeout"].(float64); ok {
-				timeoutMs = int(timeout)
-			} else if timeout, ok := options["timeout"].(int); ok {
-				timeoutMs = timeout
-			}
-		}
-
-		if preScript, exists := req["preScript"].(string); exists && preScript != "" {
-			a.executeScript(preScript, &scriptExecutionContext{
-				Request:       req,
-				Variables:     a.variables,
-				ResponseStore: responseStore,
-			}, "pre")
-			if ctx.Err() == context.Canceled {
-				return requestCancelledResponse
-			}
-		}
+		headers := resolveHeaders(readHeaders(req), responseStore)
+		timeoutMs := readTimeoutMs(req)
 
 		headersJSON, _ := json.Marshal(headers)
 		result := a.performRequest(ctx, method, url, string(headersJSON), body, timeoutMs)
@@ -452,7 +590,7 @@ func (a *App) executeRequestsWithContext(ctx context.Context, requests []map[str
 			a.ParseResponseForVariables(responseBody)
 		}
 
-		if postScript, exists := req["postScript"].(string); exists && postScript != "" {
+		if postScript, exists := req["postScript"].(string); exists && strings.TrimSpace(postScript) != "" {
 			a.executeScript(postScript, &scriptExecutionContext{
 				Request:       req,
 				Response:      responseData,

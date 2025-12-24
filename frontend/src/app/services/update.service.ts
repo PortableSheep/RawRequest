@@ -68,8 +68,22 @@ export class UpdateService {
 
     const readyVersion = localStorage.getItem(UPDATE_READY_VERSION_KEY);
     if (readyVersion) {
-      this._isUpdateReady.set(true);
-      this._updateReadyVersion.set(readyVersion);
+      // If we've already relaunched into the new version, drop the persisted "ready" state.
+      // This avoids repeatedly prompting "Restart to update" after a successful install.
+      const current = (this._appVersion() || '').trim();
+      if (current && current !== 'unknown' && current === readyVersion.trim()) {
+        localStorage.removeItem(UPDATE_READY_VERSION_KEY);
+        this._isUpdateReady.set(false);
+        this._updateReadyVersion.set(null);
+        try {
+          void ClearPreparedUpdate();
+        } catch {
+          // ignore
+        }
+      } else {
+        this._isUpdateReady.set(true);
+        this._updateReadyVersion.set(readyVersion);
+      }
     }
 
     this.unsubscribers.push(

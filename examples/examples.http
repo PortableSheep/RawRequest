@@ -241,14 +241,15 @@ GET https://httpbun.com/delay/1
 @name assertionDemo
 GET https://httpbun.com/get
 
-### Assert
-status == 200
+> {
+  assert(response.status === 200, `Expected status 200, got ${response.status}`);
 
-### Assert
-headers.Content-Type contains application/json
+  const contentType = String(response.headers?.['content-type'] ?? response.headers?.['Content-Type'] ?? '');
+  assert(contentType.includes('application/json'), `Expected Content-Type to include application/json, got ${contentType}`);
 
-### Assert
-response.json.url contains "httpbun.com/get"
+  const responseUrl = String(response.json?.url ?? '');
+  assert(responseUrl.includes('httpbun.com/get'), `Expected response.json.url to include httpbun.com/get, got ${responseUrl}`);
+}
 
 ###
 

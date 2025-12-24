@@ -12,7 +12,7 @@ import {
   ExecuteRequestsWithID,
   CancelRequest,
   SaveResponseFile,
-  SaveResponseFileToRunLocation
+  SaveResponseFileToRunLocation,
 } from '@wailsjs/go/main/App';
 
 @Injectable({
@@ -37,6 +37,22 @@ export class BackendClientService {
 
   cancelRequest(requestId: string): Promise<void> {
     return CancelRequest(requestId);
+  }
+
+  startLoadTest(
+    requestId: string,
+    method: string,
+    url: string,
+    headersJson: string,
+    body: string,
+    loadConfigJson: string
+  ): Promise<void> {
+		const g: any = globalThis as any;
+		const fn = g?.go?.main?.App?.StartLoadTest;
+		if (typeof fn !== 'function') {
+			return Promise.reject(new Error('Wails binding missing: StartLoadTest'));
+		}
+		return fn(requestId, method, url, headersJson, body, loadConfigJson);
   }
 
   setVariable(key: string, value: string): Promise<void> {

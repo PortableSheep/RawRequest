@@ -210,6 +210,10 @@ export function ShowSaveDialog(arg1) {
   return window['go']['main']['App']['ShowSaveDialog'](arg1);
 }
 
+export function StartLoadTest(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['StartLoadTest'](arg1, arg2, arg3, arg4, arg5, arg6);
+}
+
 export function StartUpdateAndRestart(arg1) {
   return window['go']['main']['App']['StartUpdateAndRestart'](arg1);
 }
