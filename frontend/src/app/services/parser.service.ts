@@ -166,9 +166,10 @@ export class ParserService {
           } else if (meta.startsWith('tab:')) {
             fileDisplayName = this.normalizeDisplayName(meta.substring(4));
           }
+
+			i++;
+			continue;
         }
-        i++;
-        continue;
       }
 
       // Check for headers

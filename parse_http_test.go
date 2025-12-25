@@ -6,7 +6,7 @@ func TestParseHttp_BraceScripts(t *testing.T) {
 	app := NewApp()
 
 	content := "" +
-		"###\n" +
+		"### Request\n" +
 		"GET https://example.com\n" +
 		"< {\n" +
 		"  console.log('pre');\n" +

@@ -218,8 +218,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 	var currentGroup string
 	var preScript strings.Builder
 	var postScript strings.Builder
-	inPreScript := false
-	inPostScript := false
 	// Support brace-based script blocks used by the frontend parser:
 	//   < { ... }
 	//   > { ... }
@@ -233,6 +231,22 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+
+		isSeparatorLine := func(s string) bool {
+			if !strings.HasPrefix(s, "###") {
+				return false
+			}
+			after := strings.TrimPrefix(s, "###")
+			if after == "" {
+				return false
+			}
+			// Require at least one space/tab after ###.
+			if after[0] != ' ' && after[0] != '\t' {
+				return false
+			}
+			rest := strings.TrimLeft(after, " \t")
+			return rest != ""
+		}
 
 		// Handle brace script bodies (we only terminate once braces balance).
 		if inPreBraceScript || inPostBraceScript {
@@ -294,20 +308,20 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 		}
 
 		if trimmed == "" {
-			if inHeaders && !inBody && !inPreScript && !inPostScript {
+			if inHeaders && !inBody {
 				inBody = true
 			}
 			continue
 		}
 
-		// Handle request groups
-		if strings.HasPrefix(trimmed, "###") {
-			if strings.Contains(trimmed, "# @group") {
-				currentGroup = strings.TrimSpace(strings.TrimPrefix(trimmed, "### @group"))
-				continue
-			}
+		// Handle request groups/directives (must run before generic separator handling).
+		if strings.HasPrefix(trimmed, "### @group") {
+			currentGroup = strings.TrimSpace(strings.TrimPrefix(trimmed, "### @group"))
+			continue
+		}
 
-			// New request
+		// New request separator: only treat as separator when it's "### <something>".
+		if isSeparatorLine(trimmed) {
 			if currentRequest != nil {
 				bodyStr := strings.TrimSpace(currentBody.String())
 				if strings.HasPrefix(bodyStr, "< ") {
@@ -338,48 +352,6 @@ func (a *App) ParseHttp(content string, variables map[string]string, envVars map
 			currentBody.Reset()
 			inBody = false
 			inHeaders = false
-			inPreScript = false
-			inPostScript = false
-			continue
-		}
-
-		// Handle pre-request scripts
-		if strings.HasPrefix(trimmed, "### @pre") || strings.HasPrefix(trimmed, "<%") {
-			inPreScript = true
-			inHeaders = false
-			inBody = false
-			inPostScript = false
-			if strings.HasPrefix(trimmed, "<%") {
-				preScript.WriteString(strings.TrimPrefix(trimmed, "<%") + "\n")
-			}
-			continue
-		}
-		if inPreScript {
-			if strings.HasPrefix(trimmed, "%>") {
-				inPreScript = false
-			} else {
-				preScript.WriteString(line + "\n")
-			}
-			continue
-		}
-
-		// Handle post-response scripts
-		if strings.HasPrefix(trimmed, "### @post") || strings.HasPrefix(trimmed, "<%") {
-			inPostScript = true
-			inHeaders = false
-			inBody = false
-			inPreScript = false
-			if strings.HasPrefix(trimmed, "<%") {
-				postScript.WriteString(strings.TrimPrefix(trimmed, "<%") + "\n")
-			}
-			continue
-		}
-		if inPostScript {
-			if strings.HasPrefix(trimmed, "%>") {
-				inPostScript = false
-			} else {
-				postScript.WriteString(line + "\n")
-			}
 			continue
 		}
 
