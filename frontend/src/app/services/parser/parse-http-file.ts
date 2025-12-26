@@ -94,7 +94,7 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
     }
 
     if (line.startsWith('@env.')) {
-      const envMatch = line.match(/^@env\.(\w+)\.(\w+)\s+(.+)$/);
+	  const envMatch = line.match(/^@env\.(\w+)\.(\w+)\s*(?:=|\s+)\s*(.+)$/);
       if (envMatch) {
         const envName = envMatch[1];
         const key = envMatch[2];

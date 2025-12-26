@@ -158,6 +158,70 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
         let sawBody = false;
         let multipartLikely = false;
         let sawContentBodyLine = false;
+
+    // Track whether we're inside a brace-based script block (< { ... } / > { ... }).
+    // Lezer intentionally keeps the grammar simple and may classify script lines as HeaderLine
+    // (e.g. JSON key/value pairs). We must suppress structural header/annotation diagnostics
+    // while inside scripts.
+    let pendingBraceScript = false;
+    let inBraceScript = false;
+    let braceDepth = 0;
+    let braceStarted = false;
+    const countChars = (text: string, ch: string): number => {
+      let c = 0;
+      for (let i = 0; i < text.length; i++) if (text[i] === ch) c++;
+      return c;
+    };
+    const maybeUpdateScriptStateAndIsScriptLine = (fullLineText: string): boolean => {
+      const trimmed = fullLineText.trimStart();
+
+      const applyBraceCounts = () => {
+        const openCount = countChars(fullLineText, '{');
+        const closeCount = countChars(fullLineText, '}');
+        if (openCount > 0) braceStarted = true;
+        braceDepth += openCount - closeCount;
+        if (braceStarted && braceDepth <= 0) {
+          inBraceScript = false;
+          braceDepth = 0;
+          braceStarted = false;
+        }
+      };
+
+      if (inBraceScript) {
+        applyBraceCounts();
+        return true;
+      }
+
+      if (pendingBraceScript) {
+        // Common style: '<' then '{' on the next line.
+        if (trimmed.startsWith('{')) {
+          pendingBraceScript = false;
+          inBraceScript = true;
+          braceDepth = 0;
+          braceStarted = false;
+          applyBraceCounts();
+          return true;
+        }
+        // If we didn't get '{' right after, stop treating this as a script block.
+        pendingBraceScript = false;
+      }
+
+      if (trimmed === '<' || trimmed === '>') {
+        pendingBraceScript = true;
+        return true;
+      }
+      if ((trimmed.startsWith('<') || trimmed.startsWith('>')) && trimmed.includes('{')) {
+        const rest = trimmed.slice(1).trimStart();
+        if (rest.startsWith('{')) {
+          inBraceScript = true;
+          braceDepth = 0;
+          braceStarted = false;
+          applyBraceCounts();
+          return true;
+        }
+      }
+      return false;
+    };
         const isIgnorableBodyLine = (text: string): boolean => {
           const t = text.trimStart();
           if (!t) return true;
@@ -177,6 +241,13 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
           const raw = doc.sliceString(child.from, child.to);
           const trimmed = raw.trimStart();
           const lower = trimmed.toLowerCase();
+
+      // Script blocks can be misclassified as headers/annotations (e.g. JSON with ':'),
+      // but should not participate in structural ordering lint.
+      const fullLineText = doc.lineAt(child.from).text;
+      if (maybeUpdateScriptStateAndIsScriptLine(fullLineText)) {
+        continue;
+      }
 
           if (kind === 'BodyLine') {
             const bodyText = trimmed.trim();
@@ -219,10 +290,11 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
 
             // AnnotationLine: only flag request-scoped annotations; ignore global var/env lines.
             if (
-              lower.startsWith('@name') ||
-              lower.startsWith('@depends') ||
-              lower.startsWith('@timeout') ||
-              lower.startsWith('@load')
+              sawContentBodyLine &&
+              (lower.startsWith('@name') ||
+                lower.startsWith('@depends') ||
+                lower.startsWith('@timeout') ||
+                lower.startsWith('@load'))
             ) {
               diagnostics.push({
                 from: child.from,

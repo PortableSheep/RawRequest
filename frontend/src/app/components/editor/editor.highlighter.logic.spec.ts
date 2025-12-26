@@ -132,6 +132,21 @@ describe('editor.highlighter.logic', () => {
       expect(keys).toEqual(['users', 'ramp']);
     });
 
+    it('highlights global var declaration name', () => {
+      const text = '@baseUrl = https://example.com';
+      const res = getNonScriptLineDecorations({
+        lineFrom: 20,
+        text,
+        leadingWhitespace: 0,
+        lineNodeName: 'AnnotationLine',
+        nodeText: text
+      });
+
+      const d = res.decorations.find((x) => x.cls === 'cm-global-var');
+      expect(d).toBeTruthy();
+      expect(text.slice(d!.from - 20, d!.to - 20)).toBe('@baseUrl');
+    });
+
     it('adds line decoration for SeparatorLine', () => {
       const res = getNonScriptLineDecorations({
         lineFrom: 50,

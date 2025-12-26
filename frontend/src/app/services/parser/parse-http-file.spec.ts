@@ -25,6 +25,19 @@ describe('parser/parse-http-file', () => {
     expect(parsed.requests[0].body).toBe('{"a": 1}');
   });
 
+  it('parses env vars defined with equals sign', () => {
+    const parsed = parseHttpFile([
+      '@env.dev.token=abc',
+      '@env.dev.baseUrl = https://example.com',
+      '',
+      'GET {{env.dev.baseUrl}}',
+    ].join('\n'));
+
+    expect(parsed.environments['dev']['token']).toBe('abc');
+    expect(parsed.environments['dev']['baseUrl']).toBe('https://example.com');
+    expect(parsed.requests).toHaveLength(1);
+  });
+
   it('detects scripts only for < or > blocks with braces (avoids XML confusion)', () => {
     const parsed = parseHttpFile([
       'POST https://example.com',

@@ -272,6 +272,11 @@ html, body {
   font-weight: 600;
 }
 
+.cm-global-var {
+  color: var(--rr-warning) !important;
+  font-weight: 600;
+}
+
 .cm-load-key {
   color: var(--rr-prose-bold);
   font-weight: 600;

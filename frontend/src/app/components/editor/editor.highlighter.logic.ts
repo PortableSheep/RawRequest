@@ -185,11 +185,29 @@ export function getNonScriptLineDecorations(params: {
     const annFrom = params.lineFrom + params.leadingWhitespace;
     const am = params.nodeText.trimStart().match(ANNOTATION_LINE_REGEX);
     const annLen = am?.[0]?.length ?? 0;
+
+  // Request-scoped annotations (@name/@depends/@load/@timeout)
+  if (annLen > 0) {
     decorations.push({
       from: annFrom,
       to: annFrom + annLen,
       cls: 'cm-annotation'
     });
+  } else {
+    // Global var declarations are also parsed as AnnotationLine.
+    // Highlight the variable name token (e.g. @baseUrl) for readability.
+    const trimmedLine = params.nodeText.trimStart();
+    if (trimmedLine.startsWith('@') && !trimmedLine.toLowerCase().startsWith('@env.')) {
+      const m = trimmedLine.match(/^@\w+/);
+      if (m) {
+        decorations.push({
+          from: annFrom,
+          to: annFrom + m[0].length,
+          cls: 'cm-global-var'
+        });
+      }
+    }
+  }
 
     // If this is an @load line, also highlight key names in key=value pairs
     const annTrimmed = params.nodeText.trimStart();

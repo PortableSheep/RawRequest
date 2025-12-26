@@ -985,10 +985,9 @@ Content-Type: application/json
   console.log('Session:', getVar('checkoutSessionId'));
   console.log('Transaction:', getVar('transactionId'));
   console.log('Amount:', '$' + getVar('finalTotal'));
-}
 
-### Assert
-status == 200
+	assert(response.status === 200, `Expected status 200, got ${response.status}`);
+}
 
 ###
 
@@ -1105,16 +1104,15 @@ Content-Type: application/json
   }
 }
 
-### Assert
-status == 200
-
-### Assert
-headers.Content-Type contains application/json
-
-### Assert
-response.json != null
-
 > {
+  assert(response.status === 200, `Expected status 200, got ${response.status}`);
+  const ct = response.headers?.['Content-Type'] || response.headers?.['content-type'] || '';
+  assert(
+    String(ct).toLowerCase().includes('application/json'),
+    `Expected Content-Type to include application/json, got ${ct}`
+  );
+  assert(response.json != null, 'Expected response.json to be non-null');
+
   // Custom validation logic
   const data = response.json?.slideshow
     ? response.json
@@ -1153,7 +1151,7 @@ response.json != null
 # ✓ Request naming (@name)
 # ✓ Request chains (@depends)
 # ✓ Pre/post scripts (< { ... } / > { ... }) + helper APIs
-# ✓ Assertions (### Assert)
+# ✓ Assertions via scripts (assert(...))
 # ✓ Load testing (@load), including ramping, wait time, RPS caps, early aborts,
 #   and adaptive backoff (ramp → back off → stable → stop)
 # ✓ Secrets usage ({{secret:key}})
