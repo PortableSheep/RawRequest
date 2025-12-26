@@ -22,7 +22,16 @@ export function isMethodLine(text: string): boolean {
 }
 
 export function isSeparatorLine(text: string): boolean {
-  return SEPARATOR_LINE_REGEX.test(text.trimStart());
+  const trimmed = text.trimStart();
+  if (!SEPARATOR_LINE_REGEX.test(trimmed)) return false;
+
+  // Treat `### <label>` as a separator only when the label isn't just hashes.
+  // This avoids accidentally folding/splitting on visual dividers like:
+  //   ### ########################
+  const label = trimmed.replace(SEPARATOR_PREFIX_REGEX, '').trim();
+  if (!label) return false;
+  if (label.replace(/#/g, '').trim() === '') return false;
+  return true;
 }
 
 export function extractPlaceholders(text: string): PlaceholderMatch[] {

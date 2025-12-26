@@ -142,5 +142,16 @@ describe('editor.highlighter.logic', () => {
       });
       expect(res.lineDecorations).toEqual([{ at: 50, cls: 'cm-separator' }]);
     });
+
+    it('does not add separator decoration for hash-divider lines', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 10,
+        text: '### #######',
+        leadingWhitespace: 0,
+        lineNodeName: 'SeparatorLine',
+        nodeText: '### #######'
+      });
+      expect(res.lineDecorations).toEqual([]);
+    });
   });
 });

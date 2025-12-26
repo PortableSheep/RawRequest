@@ -4,7 +4,8 @@ import {
   extractPlaceholders,
   ANNOTATION_LINE_REGEX,
   LOAD_LINE_REGEX,
-  METHOD_LINE_REGEX
+  METHOD_LINE_REGEX,
+  isSeparatorLine
 } from '../../utils/http-file-analysis';
 
 type HighlightedRange = [number, number];
@@ -209,7 +210,9 @@ export function getNonScriptLineDecorations(params: {
 
   // Highlight separators
   if (params.lineNodeName === 'SeparatorLine') {
-    lineDecorations.push({ at: params.lineFrom, cls: 'cm-separator' });
+    if (isSeparatorLine(params.text)) {
+      lineDecorations.push({ at: params.lineFrom, cls: 'cm-separator' });
+    }
   }
 
   return { decorations, lineDecorations };

@@ -19,5 +19,13 @@ func IsNewRequestSeparatorLine(trimmed string) bool {
 		return false
 	}
 	rest := strings.TrimLeft(after, " \t")
-	return rest != ""
+	rest = strings.TrimSpace(rest)
+	if rest == "" {
+		return false
+	}
+	// Ignore visual dividers like "### #######".
+	if strings.Trim(rest, "#") == "" {
+		return false
+	}
+	return true
 }

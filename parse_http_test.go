@@ -22,6 +22,9 @@ func TestIsNewRequestSeparatorLine(t *testing.T) {
 	if parsehttp.IsNewRequestSeparatorLine("### @group Foo") {
 		t.Fatalf("expected ### @group to not be a separator")
 	}
+	if parsehttp.IsNewRequestSeparatorLine("### #######") {
+		t.Fatalf("expected ### ####### to not be a separator")
+	}
 }
 
 func TestParseHttp_BraceScripts(t *testing.T) {
