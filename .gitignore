@@ -24,10 +24,10 @@
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
-history/
-secrets/
-responses/
-dist/
+/history/
+/secrets/
+/responses/
+/dist/
 
 # Go workspace file
 go.work
