@@ -1,6 +1,28 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"rawrequest/internal/parsehttp"
+)
+
+func TestIsNewRequestSeparatorLine(t *testing.T) {
+	if parsehttp.IsNewRequestSeparatorLine("###") {
+		t.Fatalf("expected bare ### to not be a separator")
+	}
+	if parsehttp.IsNewRequestSeparatorLine("###\t") {
+		t.Fatalf("expected ### followed only by whitespace to not be a separator")
+	}
+	if parsehttp.IsNewRequestSeparatorLine("###Request") {
+		t.Fatalf("expected ### without space to not be a separator")
+	}
+	if !parsehttp.IsNewRequestSeparatorLine("### Request") {
+		t.Fatalf("expected ### Request to be a separator")
+	}
+	if parsehttp.IsNewRequestSeparatorLine("### @group Foo") {
+		t.Fatalf("expected ### @group to not be a separator")
+	}
+}
 
 func TestParseHttp_BraceScripts(t *testing.T) {
 	app := NewApp()

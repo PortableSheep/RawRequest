@@ -30,6 +30,56 @@ import { HistoryStoreService } from './services/history-store.service';
 import { WorkspaceFacadeService } from './services/workspace-facade.service';
 import { Subject, takeUntil } from 'rxjs';
 import { gsap } from 'gsap';
+import {
+  buildActiveRequestMeta,
+  buildActiveRequestPreview,
+  buildLastResponseSummary,
+  buildRequestLabel,
+  buildRequestToken,
+  buildSecretDeletedToast,
+  buildSecretSavedToast,
+  buildTrackedLogEntryId,
+  buildVaultExportedToast,
+  buildVaultFileName,
+  decideGlobalKeydownAction,
+  decideFooterStatus,
+  findExistingOpenFileIndex,
+  formatClockMmSs,
+  getRequestTimeoutMs,
+  normalizeEnvName,
+  parseSplitWidthPx
+} from './logic/app/app.component.logic';
+import {
+  buildFileAfterSave,
+  buildFirstSaveDefaultName,
+  buildSaveAsDefaultName,
+  decideFirstSaveHistoryMigration,
+  decideSaveAsHistoryMigration
+} from './logic/app/file-save.logic';
+import { deriveAppStateAfterWorkspaceUpdateWithEnvSync, deriveAppStateFromWorkspaceUpdate } from './logic/app/workspace-update.logic';
+import { decideHistorySyncForWorkspaceState } from './logic/app/history-sync.logic';
+import {
+  clampSplitWidthToContainerPx,
+  computeDragSplitWidthPx,
+  computeSplitGridTemplateColumns,
+  DEFAULT_LEFT_PX,
+  SPLIT_LAYOUT_BREAKPOINT_PX
+} from './utils/split-layout';
+import { readSplitWidthPxFromStorage, writeSplitWidthPxToStorage } from './logic/layout/split-pane-persistence.logic';
+import { decideHistoryLoadForActiveFile } from './logic/history/history-load.logic';
+import { sampleAndApplyRpsUiState } from './logic/active-run/active-run-rps-ui.logic';
+import {
+  pushUsersSampleToQueue,
+  smoothTowards,
+  tickRpsSparklineUi,
+  tickUsersSparklineUi
+} from './logic/active-run/active-run-sparkline.logic';
+import { buildStopActiveRunTickPatch } from './logic/active-run/active-run-stop.logic';
+import { decideActiveRunTickActions } from './logic/active-run/active-run-tick.logic';
+import { buildActiveRequestInfo, buildInitialLoadRunUiState } from './logic/request/active-request.logic';
+import { consumeQueuedRequest } from './logic/request/request-queue.logic';
+import { buildPendingRequestResetPatch } from './logic/request/pending-request-reset.logic';
+import { buildCancelActiveRequestErrorPatch, decideCancelActiveRequest } from './logic/request/cancel-active-request.logic';
 
 type AlertType = 'info' | 'success' | 'warning' | 'danger';
 
@@ -233,14 +283,8 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!container) return;
 
     const rect = container.getBoundingClientRect();
-    const splitterColWidth = 10;
-    const minLeft = 340;
-    const minRight = 420;
-    const maxLeft = Math.max(minLeft, rect.width - minRight - splitterColWidth);
-
     const dx = event.clientX - this.splitDragStartX;
-    const next = Math.max(minLeft, Math.min(maxLeft, this.splitDragStartWidth + dx));
-    this.editorPaneWidthPx = Math.round(next);
+    this.editorPaneWidthPx = computeDragSplitWidthPx(rect.width, this.splitDragStartWidth, dx);
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
@@ -252,11 +296,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isSplitDragging = false;
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
-    try {
-      localStorage.setItem(this.EDITOR_SPLIT_WIDTH_KEY, String(this.editorPaneWidthPx));
-    } catch {
-      // ignore
-    }
+    writeSplitWidthPxToStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY, this.editorPaneWidthPx);
   }
 
   onSplitMouseDown(event: MouseEvent) {
@@ -268,30 +308,21 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   resetSplit() {
-    this.editorPaneWidthPx = 520;
+    this.editorPaneWidthPx = DEFAULT_LEFT_PX;
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
-    try {
-      localStorage.setItem(this.EDITOR_SPLIT_WIDTH_KEY, String(this.editorPaneWidthPx));
-    } catch {
-      // ignore
-    }
+    writeSplitWidthPxToStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY, this.editorPaneWidthPx);
   }
 
   private restoreSplitState(): void {
-    try {
-      const raw = localStorage.getItem(this.EDITOR_SPLIT_WIDTH_KEY);
-      const n = raw ? parseInt(raw, 10) : NaN;
-      if (Number.isFinite(n) && n > 0) {
-        this.editorPaneWidthPx = n;
-      }
-    } catch {
-      // ignore
+    const n = readSplitWidthPxFromStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY);
+    if (n !== null) {
+      this.editorPaneWidthPx = n;
     }
   }
 
   private refreshSplitLayoutState(): void {
     // Tailwind `lg` breakpoint is 1024px.
-    this.isSplitLayout = typeof window !== 'undefined' && window.innerWidth >= 1024;
+    this.isSplitLayout = typeof window !== 'undefined' && window.innerWidth >= SPLIT_LAYOUT_BREAKPOINT_PX;
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
   }
 
@@ -299,8 +330,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!this.isSplitLayout) {
       return null;
     }
-    // editor | splitter | response
-    return `minmax(0, ${this.editorPaneWidthPx}px) 10px minmax(0, 1fr)`;
+    return computeSplitGridTemplateColumns(this.editorPaneWidthPx);
   }
 
   private clampSplitWidthToContainer(): void {
@@ -308,13 +338,10 @@ export class AppComponent implements OnInit, OnDestroy {
     const container = this.mainSplitEl?.nativeElement;
     if (!container) return;
     const rect = container.getBoundingClientRect();
-    const splitterColWidth = 10;
-    const minLeft = 340;
-    const minRight = 420;
-    const maxLeft = Math.max(minLeft, rect.width - minRight - splitterColWidth);
-    const clamped = Math.max(minLeft, Math.min(maxLeft, this.editorPaneWidthPx));
+
+    const clamped = clampSplitWidthToContainerPx(rect.width, this.editorPaneWidthPx);
     if (clamped !== this.editorPaneWidthPx) {
-      this.editorPaneWidthPx = Math.round(clamped);
+      this.editorPaneWidthPx = clamped;
       this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
     }
   }
@@ -328,24 +355,20 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private loadFiles(): void {
-    const initial = this.workspace.loadFromStorage(this.LAST_SESSION_KEY);
-    if (initial.files.length > 0) {
-      this.files = initial.files;
-      this.filesSignal.set(initial.files);
-      this.currentFileIndex = initial.currentFileIndex;
-      this.currentFileIndexSignal.set(initial.currentFileIndex);
-
-      const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
-      this.files = synced.files;
-      this.filesSignal.set(synced.files);
-      this.currentEnvSignal.set(synced.currentEnv || '');
-
-      this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
-      this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
-    } else {
+    const init = this.workspace.initializeFromStorage(this.LAST_SESSION_KEY);
+    if (init.shouldAddNewTab) {
       // Create default file with example content
       this.addNewTab();
+      return;
     }
+
+    const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
+      update: init,
+      syncCurrentEnvWithFile: (files, index) => this.workspace.syncCurrentEnvWithFile(files, index)
+    });
+    this.applyWorkspaceDerivedState(next);
+
+    this.loadHistoryForFile(next.activeFileId || undefined);
   }
 
   private refreshSecrets(force = false): void {
@@ -380,17 +403,14 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     this.currentEnvSignal.set(synced.currentEnv || '');
 
-    const activeFile = this.files[this.currentFileIndex];
-    if (activeFile) {
-      const cached = this.historyStore.get(activeFile.id);
-      if (cached) {
-        this.history = cached;
-      } else {
-        this.history = [];
-        this.loadHistoryForFile(activeFile.id);
-      }
-    } else {
-      this.history = [];
+    const historyDecision = decideHistorySyncForWorkspaceState({
+      files: this.files,
+      currentFileIndex: this.currentFileIndex,
+      getCachedHistory: (fileId) => this.historyStore.get(fileId)
+    });
+    this.history = historyDecision.history;
+    if (historyDecision.fileIdToLoad) {
+      this.loadHistoryForFile(historyDecision.fileIdToLoad);
     }
     this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
   }
@@ -406,7 +426,15 @@ export class AppComponent implements OnInit, OnDestroy {
     }
     this.currentEnvSignal.set(synced.currentEnv || '');
 
-    this.loadHistoryForFile(this.files[index]?.id);
+    const historyDecision = decideHistorySyncForWorkspaceState({
+      files: this.files,
+      currentFileIndex: index,
+      getCachedHistory: (fileId) => this.historyStore.get(fileId)
+    });
+    this.history = historyDecision.history;
+    if (historyDecision.fileIdToLoad) {
+      this.loadHistoryForFile(historyDecision.fileIdToLoad);
+    }
     this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
   }
 
@@ -453,38 +481,35 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isRequestRunning = true;
     this.pendingRequestIndex = requestIndex;
     const request = activeFile.requests[requestIndex];
-    const requestId = this.buildRequestToken(activeFile.id, requestIndex);
-    this.activeRequestInfo = {
-      id: requestId,
-      label: this.buildRequestLabel(request),
-      requestIndex,
-      canCancel: true,
-      type: request.loadTest ? 'load' : request.depends ? 'chain' : 'single',
-      startedAt: Date.now()
-    };
+    const now = Date.now();
+    this.activeRequestInfo = buildActiveRequestInfo(activeFile.id, requestIndex, request, now);
     this.isCancellingActiveRequest = false;
-    this.activeRunProgress = null;
-    this.loadUsersSeries = Array(this.loadUsersSeriesMaxPoints).fill(0);
-		this.loadUsersQueue = [];
-		this.loadUsersScrollPhase = 0;
-		this.loadUsersNextValue = null;
-    this.loadUsersSparklineTransformView = '';
-		this.loadUsersSparklinePathDView = this.buildLoadUsersSparklinePathD(this.loadUsersSeries);
 
-		this.loadRpsSeries = Array(this.loadRpsSeriesMaxPoints).fill(0);
-		this.loadRpsQueue = [];
-		this.loadRpsScrollPhase = 0;
-		this.loadRpsNextValue = null;
-    this.loadRpsSparklineTransformView = '';
-    this.loadRpsSparklinePathDView = this.buildLoadRpsSparklinePathD(undefined, this.loadRpsSeries);
-    this.lastRpsSampleAtMs = null;
-    this.lastRpsTotalSent = null;
-  	this.lastRpsSmoothed = null;
-  	this.rpsRenderValue = null;
-  	this.rpsRenderTarget = null;
+    const loadRun = buildInitialLoadRunUiState(this.loadUsersSeriesMaxPoints, this.loadRpsSeriesMaxPoints);
+    this.activeRunProgress = loadRun.activeRunProgress;
+
+    this.loadUsersSeries = loadRun.loadUsersSeries;
+    this.loadUsersQueue = loadRun.loadUsersQueue;
+    this.loadUsersScrollPhase = loadRun.loadUsersScrollPhase;
+    this.loadUsersNextValue = loadRun.loadUsersNextValue;
+    this.loadUsersSparklineTransformView = loadRun.loadUsersSparklineTransformView;
+    this.loadUsersSparklinePathDView = loadRun.loadUsersSparklinePathDView;
+
+    this.loadRpsSeries = loadRun.loadRpsSeries;
+    this.loadRpsQueue = loadRun.loadRpsQueue;
+    this.loadRpsScrollPhase = loadRun.loadRpsScrollPhase;
+    this.loadRpsNextValue = loadRun.loadRpsNextValue;
+    this.loadRpsSparklineTransformView = loadRun.loadRpsSparklineTransformView;
+    this.loadRpsSparklinePathDView = loadRun.loadRpsSparklinePathDView;
+
+    this.lastRpsSampleAtMs = loadRun.lastRpsSampleAtMs;
+    this.lastRpsTotalSent = loadRun.lastRpsTotalSent;
+    this.lastRpsSmoothed = loadRun.lastRpsSmoothed;
+    this.rpsRenderValue = loadRun.rpsRenderValue;
+    this.rpsRenderTarget = loadRun.rpsRenderTarget;
     this.startActiveRunTick();
 
-    const execution = this.requestManager.executeRequestByIndex(requestIndex, requestId);
+    const execution = this.requestManager.executeRequestByIndex(requestIndex, this.activeRequestInfo.id);
     execution?.catch(error => {
       console.error('Request execution failed', error);
       this.resetPendingRequestState();
@@ -541,34 +566,38 @@ export class AppComponent implements OnInit, OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent): void {
-    // Save shortcuts
-    if ((event.metaKey || event.ctrlKey) && (event.key === 's' || event.key === 'S')) {
+    const decision = decideGlobalKeydownAction({
+      key: event.key,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      shiftKey: event.shiftKey,
+      showHistoryModal: this.showHistoryModal,
+      showHistory: this.showHistory
+    });
+
+    if (decision.shouldPreventDefault) {
       event.preventDefault();
+    }
+    if (decision.shouldStopPropagation) {
       event.stopPropagation();
-      if (event.shiftKey) {
+    }
+
+    switch (decision.action) {
+      case 'saveAs':
         void this.saveCurrentFileAs();
-      } else {
+        return;
+      case 'save':
         void this.saveCurrentFile();
-      }
-      return;
-    }
-
-    // Overlay close
-    if (event.key !== 'Escape') return;
-
-    // Close only the topmost layer.
-    if (this.showHistoryModal) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.closeHistoryModal();
-      return;
-    }
-
-    if (this.showHistory) {
-      event.preventDefault();
-      event.stopPropagation();
-      this.toggleHistory();
-      return;
+        return;
+      case 'closeHistoryModal':
+        this.closeHistoryModal();
+        return;
+      case 'toggleHistory':
+        this.toggleHistory();
+        return;
+      case 'none':
+      default:
+        return;
     }
   }
 
@@ -588,23 +617,13 @@ export class AppComponent implements OnInit, OnDestroy {
 
   closeTab(index: number) {
     const updated = this.workspace.closeTab(this.LAST_SESSION_KEY, this.files, this.currentFileIndex, index);
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentFileIndex = updated.currentFileIndex;
-    this.currentFileIndexSignal.set(updated.currentFileIndex);
 
-    if (this.files.length) {
-      const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
-      if (synced.files !== this.files) {
-        this.files = synced.files;
-        this.filesSignal.set(synced.files);
-      }
-      this.currentEnvSignal.set(synced.currentEnv || '');
-      this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
-    } else {
-      this.currentEnvSignal.set('');
-      this.history = [];
-    }
+    const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
+      update: updated,
+      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+    });
+    this.applyWorkspaceDerivedState(next);
+    this.loadHistoryForFile(next.activeFileId || undefined);
   }
 
   async revealInFinder(index: number) {
@@ -625,33 +644,22 @@ export class AppComponent implements OnInit, OnDestroy {
 
   closeOtherTabs(keepIndex: number) {
     const updated = this.workspace.closeOtherTabs(this.LAST_SESSION_KEY, this.files, keepIndex);
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentFileIndex = updated.currentFileIndex;
-    this.currentFileIndexSignal.set(updated.currentFileIndex);
-
-    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
-    if (synced.files !== this.files) {
-      this.files = synced.files;
-      this.filesSignal.set(synced.files);
-    }
-    this.currentEnvSignal.set(synced.currentEnv || '');
-    this.loadHistoryForFile(this.files[this.currentFileIndex]?.id);
+    const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
+      update: updated,
+      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+    });
+    this.applyWorkspaceDerivedState(next);
+    this.loadHistoryForFile(next.activeFileId || undefined);
   }
 
   addNewTab() {
     const updated = this.workspace.addNewTab(this.LAST_SESSION_KEY, this.files);
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentFileIndex = updated.currentFileIndex;
-    this.currentFileIndexSignal.set(updated.currentFileIndex);
 
-    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
-    if (synced.files !== this.files) {
-      this.files = synced.files;
-      this.filesSignal.set(synced.files);
-    }
-    this.currentEnvSignal.set(synced.currentEnv || '');
+    const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
+      update: updated,
+      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+    });
+    this.applyWorkspaceDerivedState(next);
 
     this.history = [];
   }
@@ -664,7 +672,7 @@ export class AppComponent implements OnInit, OnDestroy {
       
       if (filePaths && filePaths.length > 0) {
         for (const filePath of filePaths) {
-          const existingIndex = this.files.findIndex(file => file.filePath === filePath || file.id === filePath);
+          const existingIndex = findExistingOpenFileIndex(this.files, filePath);
           if (existingIndex >= 0) {
             this.switchToFile(existingIndex);
             continue;
@@ -709,10 +717,8 @@ export class AppComponent implements OnInit, OnDestroy {
       event.toIndex
     );
 
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentFileIndex = updated.currentFileIndex;
-    this.currentFileIndexSignal.set(updated.currentFileIndex);
+    const next = deriveAppStateFromWorkspaceUpdate(updated);
+    this.applyWorkspaceDerivedState(next);
   }
 
   private addFileFromContent(fileName: string, content: string, filePath?: string) {
@@ -724,15 +730,11 @@ export class AppComponent implements OnInit, OnDestroy {
       filePath
     );
 
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentFileIndex = updated.currentFileIndex;
-    this.currentFileIndexSignal.set(updated.currentFileIndex);
-
-    this.currentEnvSignal.set(updated.currentEnv || '');
+    const next = deriveAppStateFromWorkspaceUpdate(updated);
+    this.applyWorkspaceDerivedState(next);
     this.history = [];
-    if (updated.activeFileId) {
-      this.loadHistoryForFile(updated.activeFileId);
+    if (next.activeFileId) {
+      this.loadHistoryForFile(next.activeFileId);
     }
   }
 
@@ -755,14 +757,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getActiveRequestPreview(): string {
     const request = this.getActiveRequestDetails();
-    if (!request) {
-      return '// Waiting for the next request to start.';
-    }
-
-    const method = (request.method || 'GET').toUpperCase();
-    const url = request.url || request.name || 'https://';
-    const body = typeof request.body === 'string' ? request.body.trim() : '';
-    return body ? `${method} ${url}\n\n${body}` : `${method} ${url}`;
+    return buildActiveRequestPreview(request);
   }
 
   get activeRunProgressView(): ActiveRunProgress | null {
@@ -770,79 +765,26 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   getActiveRequestMeta(): string {
-    if (!this.activeRequestInfo) {
-      return 'Awaiting request';
-    }
-
-    if (this.isCancellingActiveRequest) {
-      return 'Canceling active request';
-    }
-
-    if (this.isRequestRunning) {
-      const elapsedMs = Math.max(0, this.activeRunNowMs - this.activeRequestInfo.startedAt);
-      const elapsed = this.formatClock(elapsedMs);
-
-      if (this.activeRequestInfo.type === 'load') {
-        const total = this.activeRunProgress?.totalSent ?? 0;
-        const ok = this.activeRunProgress?.successful ?? 0;
-        const failed = this.activeRunProgress?.failed ?? 0;
-        const planned = this.activeRunProgress?.plannedDurationMs ?? null;
-        if (planned && planned > 0) {
-          const remainingMs = Math.max(0, (this.activeRequestInfo.startedAt + planned) - this.activeRunNowMs);
-          const remaining = this.formatClock(remainingMs);
-          return `Load test running · ${total} sent · ${ok} ok · ${failed} failed · ${elapsed} elapsed · ${remaining} remaining`;
-        }
-        return `Load test running · ${total} sent · ${ok} ok · ${failed} failed · ${elapsed} elapsed`;
-      }
-
-      const timeoutMs = this.getActiveRequestTimeoutMs();
-      if (timeoutMs && timeoutMs > 0) {
-        const remainingMs = Math.max(0, (this.activeRequestInfo.startedAt + timeoutMs) - this.activeRunNowMs);
-        const remaining = this.formatClock(remainingMs);
-        return `Request running · ${elapsed} elapsed · ${remaining} remaining`;
-      }
-
-      return `Request running · ${elapsed} elapsed`;
-    }
-
     const request = this.getActiveRequestDetails();
-    const method = request?.method?.toUpperCase() || '—';
-    const target = request?.url || request?.name || 'Untitled request';
-    return `${method} · ${target}`;
+    return buildActiveRequestMeta({
+      activeRequestInfo: this.activeRequestInfo,
+      isRequestRunning: this.isRequestRunning,
+      isCancellingActiveRequest: this.isCancellingActiveRequest,
+      nowMs: this.activeRunNowMs,
+      activeRunProgress: this.activeRunProgress,
+      activeRequestTimeoutMs: this.getActiveRequestTimeoutMs(),
+      request
+    });
   }
 
   footerStatus(): { label: string; detail: string; tone: 'idle' | 'pending' | 'success' | 'warning' | 'error' } {
-    if (this.isRequestRunning) {
-      return {
-        label: this.isCancellingActiveRequest ? 'Canceling run' : 'Running request',
-        detail: this.getActiveRequestMeta(),
-        tone: this.isCancellingActiveRequest ? 'warning' : 'pending'
-      };
-    }
-
-    const summary = this.lastResponseSummary();
-    if (summary) {
-      let tone: 'success' | 'warning' | 'error';
-      if (summary.code >= 200 && summary.code < 300) {
-        tone = 'success';
-      } else if (summary.code >= 400 || summary.code === 0) {
-        tone = 'error';
-      } else {
-        tone = 'warning';
-      }
-      return {
-        label: summary.status,
-        detail: summary.time,
-        tone
-      };
-    }
-
-    const activeEnv = this.currentEnv();
-    return {
-      label: 'Ready to send',
-      detail: activeEnv ? `Env · ${activeEnv}` : 'Waiting for next request',
-      tone: 'idle'
-    };
+    return decideFooterStatus({
+      isRequestRunning: this.isRequestRunning,
+      isCancellingActiveRequest: this.isCancellingActiveRequest,
+      activeRequestMeta: this.getActiveRequestMeta(),
+      lastResponseSummary: this.lastResponseSummary(),
+      activeEnv: this.currentEnv()
+    });
   }
 
   toggleConsole(force?: boolean) {
@@ -858,22 +800,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   trackLogEntry(index: number, entry: ScriptLogEntry): string {
-    return `${entry.timestamp}-${entry.source}-${index}`;
+    return buildTrackedLogEntryId(entry, index);
   }
 
   lastResponseSummary(): { status: string; time: string; code: number } | null {
-    if (this.lastExecutedRequestIndex === null) {
-      return null;
-    }
-    const response = this.currentFile.responseData?.[this.lastExecutedRequestIndex];
-    if (!response) {
-      return null;
-    }
-    return {
-      status: `${response.status} ${response.statusText}`.trim(),
-      time: `${response.responseTime}ms`,
-      code: response.status
-    };
+    return buildLastResponseSummary(this.currentFile, this.lastExecutedRequestIndex);
   }
   //
   // private loadEnvironmentPreference(): void {
@@ -893,6 +824,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.currentEnvSignal.set(synced.currentEnv || '');
   }
 
+  private applyWorkspaceDerivedState(next: { files: FileTab[]; currentFileIndex: number; currentEnv: string }): void {
+    this.files = next.files;
+    this.filesSignal.set(next.files);
+    this.currentFileIndex = next.currentFileIndex;
+    this.currentFileIndexSignal.set(next.currentFileIndex);
+    this.currentEnvSignal.set(next.currentEnv);
+  }
+
   private replaceFileAtIndex(index: number, newFile: FileTab): void {
     const updated = this.workspace.replaceFileAtIndex(this.files, index, newFile);
     this.files = updated;
@@ -900,16 +839,28 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private resetPendingRequestState(): void {
-    this.isRequestRunning = false;
-    this.pendingRequestIndex = null;
     this.stopActiveRunTick();
-    this.activeRunProgress = null;
-    this.loadUsersSeries = [];
-    this.loadRpsSeries = [];
-    this.lastRpsSampleAtMs = null;
-    this.lastRpsTotalSent = null;
-    this.clearActiveRequestState();
-    this.triggerQueuedRequestIfNeeded();
+
+    const patch = buildPendingRequestResetPatch();
+    this.isRequestRunning = patch.isRequestRunning;
+    this.pendingRequestIndex = patch.pendingRequestIndex;
+    this.activeRunProgress = patch.activeRunProgress;
+    this.loadUsersSeries = patch.loadUsersSeries;
+    this.loadRpsSeries = patch.loadRpsSeries;
+    this.lastRpsSampleAtMs = patch.lastRpsSampleAtMs;
+    this.lastRpsTotalSent = patch.lastRpsTotalSent;
+    this.activeRequestInfo = patch.activeRequestInfo;
+    this.isCancellingActiveRequest = patch.isCancellingActiveRequest;
+
+    const q = consumeQueuedRequest({
+      isRequestRunning: this.isRequestRunning,
+      queuedRequestIndex: this.queuedRequestIndex
+    });
+    this.queuedRequestIndex = q.queuedRequestIndexAfter;
+    const nextIndexToExecute = q.nextRequestIndexToExecute;
+    if (nextIndexToExecute !== null) {
+      setTimeout(() => this.onRequestExecute(nextIndexToExecute), 0);
+    }
   }
 
   async saveCurrentFile(): Promise<void> {
@@ -925,12 +876,12 @@ export class AppComponent implements OnInit, OnDestroy {
       } else {
         const previousId = file.id;
         // Ask for a location
-        const defaultName = file.name || file.displayName || 'untitled.http';
+        const defaultName = buildFirstSaveDefaultName(file);
         const path = await ShowSaveDialog(defaultName);
         if (path && path.length) {
           await SaveFileContents(path, file.content);
           // Update file metadata to point to saved path
-          const updated = { ...file, filePath: path, id: path, name: basename(path) } as any;
+          const updated = buildFileAfterSave(file, path);
           const idx = this.currentFileIndex;
           this.replaceFileAtIndex(idx, updated);
           this.httpService.saveFiles(this.files);
@@ -941,10 +892,20 @@ export class AppComponent implements OnInit, OnDestroy {
             const priorHistory = await this.httpService.loadHistory(previousId);
             if (priorHistory?.length) {
               await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
-              this.historyStore.delete(previousId);
-              this.historyStore.set(updated.id, priorHistory);
-              if (this.files[this.currentFileIndex]?.id === updated.id) {
-                this.history = priorHistory;
+            }
+
+            const decision = decideFirstSaveHistoryMigration({
+              previousId,
+              newId: updated.id,
+              priorHistory,
+              activeFileId: this.files[this.currentFileIndex]?.id
+            });
+
+            if (decision.shouldMigrate) {
+              this.historyStore.delete(decision.oldId);
+              this.historyStore.set(decision.newId, decision.newHistory);
+              if (decision.activeHistory) {
+                this.history = decision.activeHistory;
               }
             }
           } catch (historyErr) {
@@ -966,19 +927,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
       const previousId = file.id;
       const previousPath = file.filePath;
-      const defaultName = basename(file.filePath || file.name || file.displayName || 'untitled.http');
+      const defaultName = buildSaveAsDefaultName(file);
       const path = await ShowSaveDialog(defaultName);
       if (!path || !path.length) {
         return;
       }
 
       await SaveFileContents(path, file.content);
-      const updated = {
-        ...file,
-        filePath: path,
-        id: path,
-        name: basename(path)
-      } as any;
+      const updated = buildFileAfterSave(file, path);
 
       const idx = this.currentFileIndex;
       this.replaceFileAtIndex(idx, updated);
@@ -990,10 +946,16 @@ export class AppComponent implements OnInit, OnDestroy {
         if (priorHistory?.length) {
           await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
         }
-        this.historyStore.delete(previousId);
-        this.historyStore.set(updated.id, priorHistory || []);
-        if (this.files[this.currentFileIndex]?.id === updated.id) {
-          this.history = this.historyStore.get(updated.id) || [];
+        const decision = decideSaveAsHistoryMigration({
+          previousId,
+          newId: updated.id,
+          priorHistory,
+          activeFileId: this.files[this.currentFileIndex]?.id
+        });
+        this.historyStore.delete(decision.oldId);
+        this.historyStore.set(decision.newId, decision.newHistory);
+        if (decision.activeHistory) {
+          this.history = decision.activeHistory;
         }
       } catch (historyErr) {
         console.warn('Failed to migrate history on Save As:', historyErr);
@@ -1011,31 +973,21 @@ export class AppComponent implements OnInit, OnDestroy {
       const name = result?.filePath || 'Examples.http';
 
       const updated = this.workspace.upsertExamplesTab(this.LAST_SESSION_KEY, this.files, content, name);
-      this.files = updated.files;
-      this.filesSignal.set(updated.files);
-      this.currentFileIndex = updated.currentFileIndex;
-      this.currentFileIndexSignal.set(updated.currentFileIndex);
-      this.currentEnvSignal.set(updated.currentEnv || '');
 
-      if (updated.activeFileId === '__examples__') {
+      const next = deriveAppStateFromWorkspaceUpdate(updated);
+      this.files = next.files;
+      this.filesSignal.set(next.files);
+      this.currentFileIndex = next.currentFileIndex;
+      this.currentFileIndexSignal.set(next.currentFileIndex);
+      this.currentEnvSignal.set(next.currentEnv);
+
+      if (next.activeFileId === '__examples__') {
         this.history = [];
       }
     } catch (error) {
       console.error('Failed to open examples file:', error);
       this.toast.error('Failed to open examples file.');
     }
-  }
-
-  private triggerQueuedRequestIfNeeded(): void {
-    if (this.isRequestRunning) {
-      return;
-    }
-    const nextIndex = this.queuedRequestIndex;
-    if (nextIndex === null || nextIndex === undefined) {
-      return;
-    }
-    this.queuedRequestIndex = null;
-    setTimeout(() => this.onRequestExecute(nextIndex), 0);
   }
 
   private loadHistoryForFile(fileId?: string): void {
@@ -1066,12 +1018,12 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async handleSecretSave(secret: { env: string; key: string; value: string }) {
-    const normalizedEnv = (secret.env || '').trim() || 'default';
+    const normalizedEnv = normalizeEnvName(secret.env);
     try {
       const snapshot = await this.secretService.save(normalizedEnv, secret.key, secret.value);
       this.allSecrets = snapshot;
       await this.loadVaultInfo(true);
-      this.toast.success(`Saved secret "${secret.key}" to ${normalizedEnv}`);
+      this.toast.success(buildSecretSavedToast({ key: secret.key, env: normalizedEnv }));
     } catch (error) {
       console.error('Failed to save secret', error);
       this.toast.error('Failed to save secret');
@@ -1093,7 +1045,7 @@ export class AppComponent implements OnInit, OnDestroy {
       const snapshot = await this.secretService.remove(this.secretToDelete.env, this.secretToDelete.key);
       this.allSecrets = snapshot;
       await this.loadVaultInfo(true);
-      this.toast.info(`Deleted secret "${this.secretToDelete.key}"`);
+      this.toast.info(buildSecretDeletedToast(this.secretToDelete.key));
     } catch (error) {
       console.error('Failed to delete secret', error);
       this.toast.error('Failed to delete secret');
@@ -1111,9 +1063,9 @@ export class AppComponent implements OnInit, OnDestroy {
   async handleVaultExport() {
     try {
       const payload = await this.secretService.export();
-      const fileName = this.buildVaultFileName();
+      const fileName = buildVaultFileName(new Date());
       this.downloadSecretsFile(payload, fileName);
-      this.toast.success(`Exported secrets to ${fileName}`);
+      this.toast.success(buildVaultExportedToast(fileName));
     } catch (error) {
       console.error('Failed to export secrets', error);
       this.toast.error('Failed to export secrets');
@@ -1137,28 +1089,25 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   async cancelActiveRequest() {
-    if (!this.activeRequestInfo?.id || this.isCancellingActiveRequest) {
+    const decision = decideCancelActiveRequest({
+      activeRequestId: this.activeRequestInfo?.id,
+      isCancelling: this.isCancellingActiveRequest,
+      hasRequestManager: Boolean(this.requestManager)
+    });
+    if (!decision.shouldCancel) {
       return;
     }
 
-    if (!this.requestManager) {
-      return;
-    }
-
-    this.isCancellingActiveRequest = true;
+    this.isCancellingActiveRequest = decision.isCancellingAfterStart;
     try {
       await this.requestManager.cancelActiveRequest();
       this.toast.info('Request cancelled');
     } catch (error) {
       console.error('Failed to cancel request', error);
       this.toast.error('Failed to cancel request');
-      this.isCancellingActiveRequest = false;
+      const patch = buildCancelActiveRequestErrorPatch();
+      this.isCancellingActiveRequest = patch.isCancellingActiveRequest;
     }
-  }
-
-  private clearActiveRequestState(): void {
-    this.activeRequestInfo = null;
-    this.isCancellingActiveRequest = false;
   }
 
   private startActiveRunTick(): void {
@@ -1166,19 +1115,32 @@ export class AppComponent implements OnInit, OnDestroy {
     this.activeRunNowMs = Date.now();
     this.activeRunTickHandle = setInterval(() => {
       this.activeRunNowMs = Date.now();
-      if (this.isRequestRunning && this.activeRequestInfo?.type === 'load') {
-        const sample = this.activeRunProgress?.activeUsers ?? 0;
-        this.pushLoadUsersSample(sample);
+      const actions = decideActiveRunTickActions({
+        isRequestRunning: this.isRequestRunning,
+        activeRequestType: this.activeRequestInfo?.type,
+        activeUsers: this.activeRunProgress?.activeUsers
+      });
+
+      if (actions.usersSample !== null) {
+        this.pushLoadUsersSample(actions.usersSample);
+      }
+      if (actions.shouldSampleRps) {
         this.sampleLoadRps();
       }
-
-      // Kick the animation loop while a run is active.
-      if (this.isRequestRunning && this.activeRequestInfo?.type === 'load') {
+      if (actions.shouldEnsureSparkline) {
         this.ensureSparklineAnimation();
       }
     }, 200);
 
-    this.ensureSparklineAnimation();
+    // Only start rAF animation for load runs.
+    const initialActions = decideActiveRunTickActions({
+      isRequestRunning: this.isRequestRunning,
+      activeRequestType: this.activeRequestInfo?.type,
+      activeUsers: this.activeRunProgress?.activeUsers
+    });
+    if (initialActions.shouldEnsureSparkline) {
+      this.ensureSparklineAnimation();
+    }
   }
 
   private ensureSparklineAnimation(): void {
@@ -1203,398 +1165,92 @@ export class AppComponent implements OnInit, OnDestroy {
       this.sparklineLastRenderedAtMs = t;
 
       // Smooth the RPS readout every frame; the RPS sparkline also uses this value.
-      if (this.rpsRenderTarget !== null) {
-        if (this.rpsRenderValue === null) {
-          this.rpsRenderValue = this.rpsRenderTarget;
-        } else {
-          const k = 1 - Math.pow(0.02, dt / 16.67);
-          this.rpsRenderValue = this.rpsRenderValue + (this.rpsRenderTarget - this.rpsRenderValue) * k;
-        }
-      }
+      this.rpsRenderValue = smoothTowards(this.rpsRenderValue, this.rpsRenderTarget, dt);
 
-      this.tickUsersSparkline(dt);
-      this.tickRpsSparkline(dt);
+      const usersTick = tickUsersSparklineUi({
+        state: {
+          series: this.loadUsersSeries,
+          queue: this.loadUsersQueue,
+          scrollPhase: this.loadUsersScrollPhase,
+          nextValue: this.loadUsersNextValue
+        },
+        dtMs: dt,
+        maxPoints: this.loadUsersSeriesMaxPoints,
+        scrollMs: this.loadUsersScrollMs,
+        maxUsers: this.activeRunProgress?.maxUsers,
+        currentPathDView: this.loadUsersSparklinePathDView
+      });
+
+      this.loadUsersSeries = usersTick.state.series;
+      this.loadUsersQueue = usersTick.state.queue;
+      this.loadUsersScrollPhase = usersTick.state.scrollPhase;
+      this.loadUsersNextValue = usersTick.state.nextValue;
+      this.loadUsersSparklineTransformView = usersTick.transformView;
+      this.loadUsersSparklinePathDView = usersTick.pathDView;
+
+      const rpsTick = tickRpsSparklineUi({
+        state: {
+          series: this.loadRpsSeries,
+          queue: this.loadRpsQueue,
+          scrollPhase: this.loadRpsScrollPhase,
+          nextValue: this.loadRpsNextValue
+        },
+        dtMs: dt,
+        maxPoints: this.loadRpsSeriesMaxPoints,
+        scrollMs: this.loadRpsScrollMs,
+        currentPathDView: this.loadRpsSparklinePathDView
+      });
+
+      this.loadRpsSeries = rpsTick.state.series;
+      this.loadRpsQueue = rpsTick.state.queue;
+      this.loadRpsScrollPhase = rpsTick.state.scrollPhase;
+      this.loadRpsNextValue = rpsTick.state.nextValue;
+      this.loadRpsSparklineTransformView = rpsTick.transformView;
+      this.loadRpsSparklinePathDView = rpsTick.pathDView;
     };
 
     this.sparklineRafHandle = requestAnimationFrame(step);
   }
 
   private pushLoadUsersSample(value: number): void {
-    const v = Number.isFinite(value) ? Math.max(0, Math.trunc(value)) : 0;
-    const slots = this.loadUsersSeriesMaxPoints;
-    const current = this.loadUsersQueue.length
-      ? (this.loadUsersQueue[this.loadUsersQueue.length - 1] ?? 0)
-      : (this.loadUsersNextValue ?? this.loadUsersSeries[slots - 1] ?? 0);
-    this.enqueueRamp(this.loadUsersQueue, current, v, this.loadUsersRampSteps, true);
-    const maxQueue = slots * 4;
-    if (this.loadUsersQueue.length > maxQueue) {
-      this.loadUsersQueue = this.loadUsersQueue.slice(-maxQueue);
-    }
+    const r = pushUsersSampleToQueue(
+      this.loadUsersQueue,
+      this.loadUsersSeries,
+      this.loadUsersNextValue,
+      this.loadUsersSeriesMaxPoints,
+      this.loadUsersRampSteps,
+      value
+    );
+    this.loadUsersQueue = r.queue;
   }
 
-  private buildLoadUsersSparklinePoints(series: number[], nextValue?: number): string {
-    const slots = this.loadUsersSeriesMaxPoints;
-    if (!series.length || slots <= 0) return '';
-
-    const height = 20;
-    const maxUsers = this.activeRunProgress?.maxUsers;
-    const localMax = Math.max(1, ...series, nextValue ?? 0);
-    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
-
-    // Use step=100/slots so we can place the "next" point at x=100 without
-    // drawing any segment beyond the viewBox (prevents a persistent right-edge blob).
-    const step = slots > 1 ? 100 / slots : 100;
-    const points: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i < slots; i++) {
-      const x = i * step;
-      const value = series[i] ?? 0;
-      const y = height - (Math.min(denom, value) / denom) * height;
-      points.push({ x, y });
-    }
-
-    if (nextValue !== undefined) {
-      const x = 100;
-      const y = height - (Math.min(denom, nextValue) / denom) * height;
-      points.push({ x, y });
-    }
-
-    return this.pointsToString(points);
-  }
-
-  private buildLoadUsersSparklinePathD(series: number[], nextValue?: number): string {
-    const slots = this.loadUsersSeriesMaxPoints;
-    if (!series.length || slots <= 0) return '';
-
-    const height = 20;
-    const maxUsers = this.activeRunProgress?.maxUsers;
-    const localMax = Math.max(1, ...series, nextValue ?? 0);
-    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
-
-    const step = slots > 1 ? 100 / slots : 100;
-    const points: Array<{ x: number; y: number }> = [];
-    const firstValue = series[0] ?? 0;
-    const firstY = height - (Math.min(denom, firstValue) / denom) * height;
-    points.push({ x: -2 * step, y: firstY });
-    points.push({ x: -1 * step, y: firstY });
-    for (let i = 0; i < slots; i++) {
-      const x = i * step;
-      const value = series[i] ?? 0;
-      const y = height - (Math.min(denom, value) / denom) * height;
-      points.push({ x, y });
-    }
-
-    if (nextValue !== undefined) {
-      const y = height - (Math.min(denom, nextValue) / denom) * height;
-      points.push({ x: slots * step, y });
-      points.push({ x: (slots + 1) * step, y });
-    }
-
-    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.55);
-  }
-
-  private buildScrollingUsersSparklinePathD(series: number[], nextValue: number, phase: number): string {
-    const slots = this.loadUsersSeriesMaxPoints;
-    if (!series.length || slots <= 0) return '';
-
-    const height = 20;
-    const maxUsers = this.activeRunProgress?.maxUsers;
-    const localMax = Math.max(1, ...series, nextValue);
-    const denom = typeof maxUsers === 'number' && maxUsers > 0 ? Math.max(maxUsers, 1) : localMax;
-
-    // Build a stable curve and scroll it via translate().
-    // We include two extra points past x=100 and clip in the SVG, so the line
-    // enters/exits smoothly without the "top-to-bottom" shimmer of reindexing.
-    const step = slots > 1 ? 100 / slots : 100;
-    const t = Math.max(0, Math.min(1, phase));
-    const last = series[slots - 1] ?? 0;
-    const lerpedLast = last + (nextValue - last) * t;
-
-    const points: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i < slots; i++) {
-      const x = i * step;
-      const value = series[i] ?? 0;
-      const y = height - (Math.min(denom, value) / denom) * height;
-      points.push({ x, y });
-    }
-    // Point at x=100 eases from last->next during the phase.
-    points.push({
-      x: slots * step,
-      y: height - (Math.min(denom, lerpedLast) / denom) * height
-    });
-    // One more point past the viewBox.
-    points.push({
-      x: (slots + 1) * step,
-      y: height - (Math.min(denom, nextValue) / denom) * height
-    });
-
-    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.75);
-  }
 
   private sampleLoadRps(): void {
-    const now = this.activeRunNowMs;
-    const totalSent = this.activeRunProgress?.totalSent;
-    if (typeof totalSent !== 'number') {
-      return;
-    }
-
-    if (this.lastRpsSampleAtMs === null || this.lastRpsTotalSent === null) {
-      this.lastRpsSampleAtMs = now;
-      this.lastRpsTotalSent = totalSent;
-      return;
-    }
-
-    const dtMs = now - this.lastRpsSampleAtMs;
-    if (dtMs < 150) {
-      return;
-    }
-
-    const dCount = totalSent - this.lastRpsTotalSent;
-    const rps = dtMs > 0 ? Math.max(0, dCount) / (dtMs / 1000) : 0;
-		const alpha = 0.18;
-		const smoothed = this.lastRpsSmoothed === null ? rps : (alpha * rps + (1 - alpha) * this.lastRpsSmoothed);
-		this.lastRpsSmoothed = smoothed;
-
-    this.lastRpsSampleAtMs = now;
-    this.lastRpsTotalSent = totalSent;
-    this.pushLoadRpsSample(smoothed);
-  }
-
-  private pushLoadRpsSample(value: number): void {
-    const v = Number.isFinite(value) ? Math.max(0, value) : 0;
-    const slots = this.loadRpsSeriesMaxPoints;
-    const current = this.loadRpsQueue.length
-      ? (this.loadRpsQueue[this.loadRpsQueue.length - 1] ?? 0)
-      : (this.loadRpsNextValue ?? this.loadRpsSeries[slots - 1] ?? 0);
-    this.enqueueRamp(this.loadRpsQueue, current, v, this.loadRpsRampSteps, false);
-    const maxQueue = slots * 4;
-    if (this.loadRpsQueue.length > maxQueue) {
-      this.loadRpsQueue = this.loadRpsQueue.slice(-maxQueue);
-    }
-
-    // Keep numeric readout smoothing.
-    this.rpsRenderTarget = v;
-    if (this.rpsRenderValue === null) {
-      this.rpsRenderValue = v;
-    }
-  }
-
-  private buildLoadRpsSparklinePoints(renderLastValue?: number, seriesOverride?: number[], nextValue?: number): string {
-    const series = seriesOverride ?? this.loadRpsSeries;
-    if (!series.length) return '';
-
-    const height = 20;
-    const lastValue = renderLastValue !== undefined ? renderLastValue : series[series.length - 1] ?? 0;
-    const extra = nextValue !== undefined ? nextValue : lastValue;
-    const denom = Math.max(1, ...series, lastValue, extra);
-
-    // Fixed x spacing (stable window) to avoid jitter from re-scaling when length changes.
-    const slots = this.loadRpsSeriesMaxPoints;
-		// Match Users: step=100/slots so the extra point can be exactly at x=100.
-    const step = slots > 1 ? 100 / slots : 100;
-  const points: Array<{ x: number; y: number }> = [];
-  for (let i = 0; i < slots; i++) {
-    const x = i * step;
-    const raw = series[i] ?? 0;
-    const y = height - (Math.min(denom, raw) / denom) * height;
-    points.push({ x, y });
-  }
-
-  if (nextValue !== undefined) {
-    const x = 100;
-    const y = height - (Math.min(denom, nextValue) / denom) * height;
-    points.push({ x, y });
-  }
-
-  return this.pointsToString(points);
-  }
-
-  private buildLoadRpsSparklinePathD(renderLastValue?: number, seriesOverride?: number[], nextValue?: number): string {
-    const series = seriesOverride ?? this.loadRpsSeries;
-    if (!series.length) return '';
-
-    const height = 20;
-    const lastValue = renderLastValue !== undefined ? renderLastValue : series[series.length - 1] ?? 0;
-    const extra = nextValue !== undefined ? nextValue : lastValue;
-    const denom = Math.max(1, ...series, lastValue, extra);
-
-    const slots = this.loadRpsSeriesMaxPoints;
-    const step = slots > 1 ? 100 / slots : 100;
-    const points: Array<{ x: number; y: number }> = [];
-    const firstValue = series[0] ?? 0;
-    const firstY = height - (Math.min(denom, firstValue) / denom) * height;
-    points.push({ x: -2 * step, y: firstY });
-    points.push({ x: -1 * step, y: firstY });
-    for (let i = 0; i < slots; i++) {
-      const x = i * step;
-      const value = series[i] ?? 0;
-      const y = height - (Math.min(denom, value) / denom) * height;
-      points.push({ x, y });
-    }
-    const y = height - (Math.min(denom, extra) / denom) * height;
-    points.push({ x: slots * step, y });
-    points.push({ x: (slots + 1) * step, y });
-    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.55);
-  }
-
-  private buildScrollingRpsSparklinePathD(series: number[], nextValue: number, phase: number): string {
-    const slots = this.loadRpsSeriesMaxPoints;
-    if (!series.length || slots <= 0) return '';
-
-    const height = 20;
-    const t = Math.max(0, Math.min(1, phase));
-    const denom = Math.max(1, ...series, nextValue);
-    const step = slots > 1 ? 100 / slots : 100;
-    const last = series[slots - 1] ?? 0;
-    const lerpedLast = last + (nextValue - last) * t;
-
-    const points: Array<{ x: number; y: number }> = [];
-    for (let i = 0; i < slots; i++) {
-      const x = i * step;
-      const value = series[i] ?? 0;
-      const y = height - (Math.min(denom, value) / denom) * height;
-      points.push({ x, y });
-    }
-    points.push({
-      x: slots * step,
-      y: height - (Math.min(denom, lerpedLast) / denom) * height
-    });
-    points.push({
-      x: (slots + 1) * step,
-      y: height - (Math.min(denom, nextValue) / denom) * height
+    const r = sampleAndApplyRpsUiState({
+      samplingState: {
+        lastSampleAtMs: this.lastRpsSampleAtMs,
+        lastTotalSent: this.lastRpsTotalSent,
+        lastSmoothed: this.lastRpsSmoothed
+      },
+      nowMs: this.activeRunNowMs,
+      totalSent: this.activeRunProgress?.totalSent,
+      queue: this.loadRpsQueue,
+      series: this.loadRpsSeries,
+      nextValue: this.loadRpsNextValue,
+      maxPoints: this.loadRpsSeriesMaxPoints,
+      rampSteps: this.loadRpsRampSteps,
+      rpsRenderTarget: this.rpsRenderTarget,
+      rpsRenderValue: this.rpsRenderValue
     });
 
-    return this.pointsToSmoothPathD(points, { minX: 0, maxX: 100, minY: 0, maxY: height }, 0.75);
+    this.lastRpsSampleAtMs = r.samplingState.lastSampleAtMs;
+    this.lastRpsTotalSent = r.samplingState.lastTotalSent;
+    this.lastRpsSmoothed = r.samplingState.lastSmoothed;
+    this.loadRpsQueue = r.queue;
+    this.rpsRenderTarget = r.rpsRenderTarget;
+    this.rpsRenderValue = r.rpsRenderValue;
   }
 
-  private tickUsersSparkline(dtMs: number): void {
-    const slots = this.loadUsersSeriesMaxPoints;
-    if (slots <= 0) return;
-    if (!this.loadUsersSeries.length) {
-      this.loadUsersSeries = Array(slots).fill(0);
-    }
-    if (this.loadUsersSeries.length !== slots) {
-      this.loadUsersSeries = this.loadUsersSeries.slice(-slots);
-      if (this.loadUsersSeries.length < slots) {
-        this.loadUsersSeries = [...Array(slots - this.loadUsersSeries.length).fill(0), ...this.loadUsersSeries];
-      }
-    }
-
-    const xStep = slots > 1 ? 100 / slots : 100;
-    const phaseInc = this.loadUsersScrollMs > 0 ? dtMs / this.loadUsersScrollMs : 0;
-    this.loadUsersScrollPhase = Math.min(10, Math.max(0, this.loadUsersScrollPhase + phaseInc));
-
-    if (this.loadUsersNextValue === null) {
-      this.loadUsersNextValue = this.loadUsersQueue.shift() ?? this.loadUsersSeries[slots - 1] ?? 0;
-    }
-
-    let advanced = false;
-    while (this.loadUsersScrollPhase >= 1) {
-      this.loadUsersSeries.shift();
-      this.loadUsersSeries.push(this.loadUsersNextValue);
-      this.loadUsersScrollPhase -= 1;
-      this.loadUsersNextValue = this.loadUsersQueue.shift() ?? this.loadUsersSeries[slots - 1] ?? 0;
-			advanced = true;
-    }
-
-    const offsetX = -xStep * this.loadUsersScrollPhase;
-    this.loadUsersSparklineTransformView = offsetX !== 0 ? `translate(${offsetX.toFixed(6)} 0)` : '';
-		if (advanced || !this.loadUsersSparklinePathDView) {
-			this.loadUsersSparklinePathDView = this.buildLoadUsersSparklinePathD(this.loadUsersSeries, this.loadUsersNextValue);
-		}
-  }
-
-  private tickRpsSparkline(dtMs: number): void {
-    const slots = this.loadRpsSeriesMaxPoints;
-    if (slots <= 0) return;
-    if (!this.loadRpsSeries.length) {
-      this.loadRpsSeries = Array(slots).fill(0);
-    }
-    if (this.loadRpsSeries.length !== slots) {
-      this.loadRpsSeries = this.loadRpsSeries.slice(-slots);
-      if (this.loadRpsSeries.length < slots) {
-        this.loadRpsSeries = [...Array(slots - this.loadRpsSeries.length).fill(0), ...this.loadRpsSeries];
-      }
-    }
-
-    const xStep = slots > 1 ? 100 / slots : 100;
-    const phaseInc = this.loadRpsScrollMs > 0 ? dtMs / this.loadRpsScrollMs : 0;
-    this.loadRpsScrollPhase = Math.min(10, Math.max(0, this.loadRpsScrollPhase + phaseInc));
-
-    if (this.loadRpsNextValue === null) {
-      this.loadRpsNextValue = this.loadRpsQueue.shift() ?? this.loadRpsSeries[slots - 1] ?? 0;
-    }
-    let advanced = false;
-    while (this.loadRpsScrollPhase >= 1) {
-      this.loadRpsSeries.shift();
-      this.loadRpsSeries.push(this.loadRpsNextValue);
-      this.loadRpsScrollPhase -= 1;
-      this.loadRpsNextValue = this.loadRpsQueue.shift() ?? this.loadRpsSeries[slots - 1] ?? 0;
-      advanced = true;
-    }
-
-    const offsetX = -xStep * this.loadRpsScrollPhase;
-    this.loadRpsSparklineTransformView = offsetX !== 0 ? `translate(${offsetX.toFixed(6)} 0)` : '';
-		if (advanced || !this.loadRpsSparklinePathDView) {
-			this.loadRpsSparklinePathDView = this.buildLoadRpsSparklinePathD(undefined, this.loadRpsSeries, this.loadRpsNextValue);
-		}
-  }
-
-  private pointsToString(points: Array<{ x: number; y: number }>): string {
-    return points.map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
-  }
-
-  private enqueueRamp(queue: number[], from: number, to: number, steps: number, isInt: boolean): void {
-    const n = Math.max(1, Math.min(60, Math.trunc(steps)));
-    const a = Number.isFinite(from) ? from : 0;
-    const b = Number.isFinite(to) ? to : 0;
-    for (let i = 1; i <= n; i++) {
-      const t = i / n;
-      const e = t * t * (3 - 2 * t); // smoothstep
-      const v = a + (b - a) * e;
-      queue.push(isInt ? Math.max(0, Math.trunc(v)) : Math.max(0, v));
-    }
-  }
-
-  private pointsToSmoothPathD(
-    points: Array<{ x: number; y: number }>,
-    bounds: { minX: number; maxX: number; minY: number; maxY: number },
-    tension = 0.9
-  ): string {
-    if (!points.length) return '';
-    if (points.length === 1) {
-      const p = points[0];
-      return `M ${p.x.toFixed(2)},${p.y.toFixed(2)}`;
-    }
-
-    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
-    const clampY = (p: { x: number; y: number }) => ({ x: p.x, y: clamp(p.y, bounds.minY, bounds.maxY) });
-
-    const t = clamp(tension, 0, 1.5);
-    let d = `M ${points[0].x.toFixed(3)},${points[0].y.toFixed(3)}`;
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = points[i - 1] ?? points[i];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = points[i + 2] ?? p2;
-
-      // Catmull-Rom to cubic Bezier conversion.
-      let cp1 = {
-        x: p1.x + ((p2.x - p0.x) * t) / 6,
-        y: p1.y + ((p2.y - p0.y) * t) / 6
-      };
-      let cp2 = {
-        x: p2.x - ((p3.x - p1.x) * t) / 6,
-        y: p2.y - ((p3.y - p1.y) * t) / 6
-      };
-      cp1 = clampY(cp1);
-      cp2 = clampY(cp2);
-
-      d += ` C ${cp1.x.toFixed(3)},${cp1.y.toFixed(3)} ${cp2.x.toFixed(3)},${cp2.y.toFixed(3)} ${p2.x.toFixed(3)},${p2.y.toFixed(3)}`;
-    }
-
-    return d;
-  }
 
   get currentLoadRpsView(): number {
     const series = this.loadRpsSeries;
@@ -1607,43 +1263,30 @@ export class AppComponent implements OnInit, OnDestroy {
       clearInterval(this.activeRunTickHandle);
       this.activeRunTickHandle = null;
     }
-  if (this.sparklineRafHandle !== null) {
-		cancelAnimationFrame(this.sparklineRafHandle);
-		this.sparklineRafHandle = null;
-	}
-  this.loadUsersQueue = [];
-  this.loadUsersScrollPhase = 0;
-  this.loadUsersNextValue = null;
-  this.loadUsersSparklineTransformView = '';
-	this.loadUsersSparklinePathDView = '';
-  this.loadRpsQueue = [];
-  this.loadRpsScrollPhase = 0;
-  this.loadRpsNextValue = null;
-  this.loadRpsSparklineTransformView = '';
-	this.loadRpsSparklinePathDView = '';
-	this.sparklineLastFrameAtMs = null;
-	this.sparklineLastRenderedAtMs = null;
-  }
 
-  private formatClock(ms: number): string {
-    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    if (this.sparklineRafHandle !== null) {
+      cancelAnimationFrame(this.sparklineRafHandle);
+      this.sparklineRafHandle = null;
+    }
+
+    const patch = buildStopActiveRunTickPatch();
+    this.loadUsersQueue = patch.loadUsersQueue;
+    this.loadUsersScrollPhase = patch.loadUsersScrollPhase;
+    this.loadUsersNextValue = patch.loadUsersNextValue;
+    this.loadUsersSparklineTransformView = patch.loadUsersSparklineTransformView;
+    this.loadUsersSparklinePathDView = patch.loadUsersSparklinePathDView;
+    this.loadRpsQueue = patch.loadRpsQueue;
+    this.loadRpsScrollPhase = patch.loadRpsScrollPhase;
+    this.loadRpsNextValue = patch.loadRpsNextValue;
+    this.loadRpsSparklineTransformView = patch.loadRpsSparklineTransformView;
+    this.loadRpsSparklinePathDView = patch.loadRpsSparklinePathDView;
+    this.sparklineLastFrameAtMs = patch.sparklineLastFrameAtMs;
+    this.sparklineLastRenderedAtMs = patch.sparklineLastRenderedAtMs;
   }
 
   private getActiveRequestTimeoutMs(): number | null {
     const req = this.getActiveRequestDetails();
-    const timeout = req?.options?.timeout;
-    return typeof timeout === 'number' && Number.isFinite(timeout) && timeout > 0 ? timeout : null;
-  }
-
-  private buildRequestLabel(request: Request): string {
-    return `${request.method} ${request.url}`.trim();
-  }
-
-  private buildRequestToken(fileId: string, requestIndex: number): string {
-    return `${fileId}-${requestIndex}-${Date.now()}`;
+    return getRequestTimeoutMs(req);
   }
 
   private downloadSecretsFile(content: string, fileName: string) {
@@ -1654,11 +1297,6 @@ export class AppComponent implements OnInit, OnDestroy {
     anchor.download = fileName;
     anchor.click();
     URL.revokeObjectURL(url);
-  }
-
-  private buildVaultFileName(): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return `rawrequest-secrets-${timestamp}.json`;
   }
 
   private async checkForUpdates(): Promise<void> {

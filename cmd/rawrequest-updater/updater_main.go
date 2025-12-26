@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"rawrequest/cmd/rawrequest-updater/internal/updaterlogic"
 	"runtime"
 	"strings"
 	"time"
@@ -44,14 +45,12 @@ func main() {
 	flag.DurationVar(&opts.downloadTimeout, "download-timeout", 2*time.Minute, "Download timeout")
 	flag.Parse()
 
-	if opts.installPath == "" {
-		die("missing --install-path")
-	}
-	if opts.artifactURL == "" && opts.artifactPath == "" {
-		die("missing --artifact-url (or --artifact-path)")
-	}
-	if opts.artifactURL != "" && opts.artifactPath != "" {
-		die("provide only one of --artifact-url or --artifact-path")
+	if err := updaterlogic.ValidateOptions(updaterlogic.Options{
+		InstallPath:  opts.installPath,
+		ArtifactURL:  opts.artifactURL,
+		ArtifactPath: opts.artifactPath,
+	}); err != nil {
+		die(err.Error())
 	}
 
 	installPath, err := filepath.Abs(opts.installPath)
@@ -86,9 +85,11 @@ func main() {
 	}()
 
 	artifactPath := filepath.Join(tmpDir, "artifact")
-	artifactLabel := opts.artifactURL
+	artifactLabel := updaterlogic.ArtifactLabel(updaterlogic.Options{
+		ArtifactURL:  opts.artifactURL,
+		ArtifactPath: opts.artifactPath,
+	})
 	if opts.artifactPath != "" {
-		artifactLabel = opts.artifactPath
 		fmt.Printf("Using local artifact %s...\n", opts.artifactPath)
 		if err := copyFile(opts.artifactPath, artifactPath); err != nil {
 			dief("copy artifact failed: %v", err)
@@ -111,25 +112,29 @@ func main() {
 	}
 
 	fmt.Printf("Extracting to staging...\n")
-	artifactLower := strings.ToLower(artifactLabel)
-	switch {
-	case strings.HasSuffix(artifactLower, ".tar.gz") || strings.HasSuffix(artifactLower, ".tgz"):
-		if err := extractTarGz(artifactPath, stagingDir); err != nil {
-			dief("failed to extract tar.gz: %v", err)
+	formats := updaterlogic.ArtifactFormatsForLabel(artifactLabel)
+	if len(formats) == 1 {
+		switch formats[0] {
+		case updaterlogic.ArtifactTarGz:
+			if err := extractTarGz(artifactPath, stagingDir); err != nil {
+				dief("failed to extract tar.gz: %v", err)
+			}
+		case updaterlogic.ArtifactZip:
+			if err := extractZip(artifactPath, stagingDir); err != nil {
+				dief("failed to extract zip: %v", err)
+			}
+		default:
+			die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 		}
-	case strings.HasSuffix(artifactLower, ".zip"):
-		if err := extractZip(artifactPath, stagingDir); err != nil {
-			dief("failed to extract zip: %v", err)
-		}
-	default:
+	} else {
 		// Fallback: artifact may be a local temp file without an extension.
 		if err := extractZip(artifactPath, stagingDir); err == nil {
-			break
+			// ok
+		} else if err := extractTarGz(artifactPath, stagingDir); err == nil {
+			// ok
+		} else {
+			die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 		}
-		if err := extractTarGz(artifactPath, stagingDir); err == nil {
-			break
-		}
-		die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 	}
 
 	newPayloadPath, err := findNewPayloadPath(stagingDir)

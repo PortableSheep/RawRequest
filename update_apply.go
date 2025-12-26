@@ -16,6 +16,8 @@ import (
 	"strings"
 	"time"
 
+	"rawrequest/internal/updateapplylogic"
+
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -48,7 +50,7 @@ func (a *App) loadPreparedUpdateState() (*preparedUpdateState, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(st.Version) == "" || strings.TrimSpace(st.Artifact) == "" || strings.TrimSpace(st.Sha256) == "" {
+	if !updateapplylogic.PreparedUpdateFieldsComplete(st.Version, st.Artifact, st.Sha256) {
 		return nil, nil
 	}
 	if _, err := os.Stat(st.Artifact); err != nil {
@@ -99,7 +101,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		}
 		exePath = filepath.Clean(exePath)
 
-		installPath, err := determineInstallPath(exePath)
+		installPath, err := updateapplylogic.DetermineInstallPath(runtime.GOOS, exePath)
 		if err != nil {
 			return err
 		}
@@ -109,7 +111,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 			return errors.New(msg)
 		}
 
-		updaterPath, err := determineUpdaterPath(exePath)
+		updaterPath, err := updateapplylogic.DetermineUpdaterPath(runtime.GOOS, exePath)
 		if err != nil {
 			return err
 		}
@@ -158,7 +160,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 	}
 	exePath = filepath.Clean(exePath)
 
-	updaterPath, err := determineUpdaterPath(exePath)
+	updaterPath, err := updateapplylogic.DetermineUpdaterPath(runtime.GOOS, exePath)
 	if err != nil {
 		return err
 	}
@@ -166,7 +168,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		return fmt.Errorf("updater helper not found at %s: %w", updaterPath, err)
 	}
 
-	artifactURL, err := buildArtifactURL(latestVersion)
+	artifactURL, err := updateapplylogic.BuildArtifactURL(runtime.GOOS, latestVersion, githubOwner, githubRepo)
 	if err != nil {
 		return err
 	}
@@ -178,12 +180,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 	}
 
 	artifactPath, shaHex, err := downloadUpdateArtifact(artifactURL, artifactDir, func(written, total int64) {
-		payload := map[string]any{"written": written}
-		if total > 0 {
-			payload["total"] = total
-			payload["percent"] = float64(written) / float64(total)
-		}
-		wailsruntime.EventsEmit(a.ctx, "update:progress", payload)
+		wailsruntime.EventsEmit(a.ctx, "update:progress", updateapplylogic.BuildDownloadProgressPayload(written, total))
 	})
 	if err != nil {
 		wailsruntime.EventsEmit(a.ctx, "update:error", map[string]any{"message": err.Error()})
@@ -214,7 +211,7 @@ func (a *App) ClearPreparedUpdate() {
 }
 
 func downloadUpdateArtifact(url string, destDir string, onProgress func(written, total int64)) (path string, sha256Hex string, err error) {
-	pattern := "rawrequest-update-artifact-*" + archiveSuffixFromURL(url)
+	pattern := updateapplylogic.TempArtifactPattern(url)
 	client := &http.Client{Timeout: 5 * time.Minute}
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -261,8 +258,9 @@ func downloadUpdateArtifact(url string, destDir string, onProgress func(written,
 			}
 			_, _ = h.Write(buf[:n])
 			written += int64(n)
-			if onProgress != nil && (time.Since(lastEmit) > 150*time.Millisecond || (total > 0 && written == total)) {
-				lastEmit = time.Now()
+			now := time.Now()
+			if onProgress != nil && updateapplylogic.ShouldEmitProgress(lastEmit, now, written, total) {
+				lastEmit = now
 				onProgress(written, total)
 			}
 		}
@@ -279,27 +277,10 @@ func downloadUpdateArtifact(url string, destDir string, onProgress func(written,
 	return tmp.Name(), sha256Hex, nil
 }
 
-func archiveSuffixFromURL(url string) string {
-	lower := strings.ToLower(strings.TrimSpace(url))
-	switch {
-	case strings.HasSuffix(lower, ".tar.gz"):
-		return ".tar.gz"
-	case strings.HasSuffix(lower, ".tgz"):
-		return ".tgz"
-	case strings.HasSuffix(lower, ".zip"):
-		return ".zip"
-	default:
-		return ""
-	}
-}
-
 func ensureInstallParentDirWritable(installPath string) error {
-	parent := installPath
-	if strings.HasSuffix(strings.ToLower(installPath), ".app") {
-		parent = filepath.Dir(installPath)
-	}
-	if parent == "" {
-		return errors.New("could not determine install parent directory")
+	parent, err := updateapplylogic.InstallParentDir(installPath)
+	if err != nil {
+		return err
 	}
 	probe := filepath.Join(parent, ".rawrequest-write-probe")
 	f, err := os.OpenFile(probe, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
@@ -308,52 +289,4 @@ func ensureInstallParentDirWritable(installPath string) error {
 	}
 	_ = f.Close()
 	return os.Remove(probe)
-}
-
-func determineInstallPath(exePath string) (string, error) {
-	switch runtime.GOOS {
-	case "darwin":
-		// Expect: /path/RawRequest.app/Contents/MacOS/RawRequest
-		exeDir := filepath.Dir(exePath)
-		contentsDir := filepath.Dir(exeDir)
-		appPath := filepath.Dir(contentsDir)
-		if !strings.HasSuffix(strings.ToLower(appPath), ".app") {
-			return "", fmt.Errorf("could not determine app bundle path from %s", exePath)
-		}
-		return appPath, nil
-	case "windows":
-		// Treat install path as directory containing RawRequest.exe
-		return filepath.Dir(exePath), nil
-	default:
-		return "", fmt.Errorf("auto-update not supported on %s", runtime.GOOS)
-	}
-}
-
-func determineUpdaterPath(exePath string) (string, error) {
-	exeDir := filepath.Dir(exePath)
-	switch runtime.GOOS {
-	case "darwin":
-		return filepath.Join(exeDir, "rawrequest-updater"), nil
-	case "windows":
-		return filepath.Join(exeDir, "rawrequest-updater.exe"), nil
-	default:
-		return "", fmt.Errorf("auto-update not supported on %s", runtime.GOOS)
-	}
-}
-
-func buildArtifactURL(latestVersion string) (string, error) {
-	v := strings.TrimPrefix(latestVersion, "v")
-	tag := "v" + v
-
-	var asset string
-	switch runtime.GOOS {
-	case "darwin":
-		asset = fmt.Sprintf("RawRequest-%s-macos-universal.tar.gz", tag)
-	case "windows":
-		asset = fmt.Sprintf("RawRequest-%s-windows-portable.zip", v)
-	default:
-		return "", fmt.Errorf("auto-update not supported on %s", runtime.GOOS)
-	}
-
-	return fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", githubOwner, githubRepo, tag, asset), nil
 }

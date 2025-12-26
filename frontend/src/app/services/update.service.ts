@@ -1,6 +1,12 @@
 import { Injectable, signal, computed } from '@angular/core';
 import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
 import { EventsOn } from '../../../wailsjs/runtime/runtime';
+import {
+  decideUpdateReadyState,
+  normalizeUpdateProgressPercent,
+  shouldShowUpdateNotification,
+  shouldUseCachedUpdateInfo
+} from './update/update-logic';
 
 export interface UpdateInfo {
   available: boolean;
@@ -68,10 +74,8 @@ export class UpdateService {
 
     const readyVersion = localStorage.getItem(UPDATE_READY_VERSION_KEY);
     if (readyVersion) {
-      // If we've already relaunched into the new version, drop the persisted "ready" state.
-      // This avoids repeatedly prompting "Restart to update" after a successful install.
-      const current = (this._appVersion() || '').trim();
-      if (current && current !== 'unknown' && current === readyVersion.trim()) {
+      const decision = decideUpdateReadyState(this._appVersion(), readyVersion);
+      if (decision.shouldClearPreparedUpdate) {
         localStorage.removeItem(UPDATE_READY_VERSION_KEY);
         this._isUpdateReady.set(false);
         this._updateReadyVersion.set(null);
@@ -81,8 +85,8 @@ export class UpdateService {
           // ignore
         }
       } else {
-        this._isUpdateReady.set(true);
-        this._updateReadyVersion.set(readyVersion);
+        this._isUpdateReady.set(decision.isUpdateReady);
+        this._updateReadyVersion.set(decision.updateReadyVersion);
       }
     }
 
@@ -92,12 +96,7 @@ export class UpdateService {
         if (typeof msg === 'string') this._updateStatus.set(msg);
       }),
       EventsOn('update:progress', (payload: any) => {
-        const pct = payload?.percent;
-        if (typeof pct === 'number' && isFinite(pct)) {
-          this._updateProgress.set(Math.max(0, Math.min(1, pct)));
-        } else {
-          this._updateProgress.set(null);
-        }
+        this._updateProgress.set(normalizeUpdateProgressPercent(payload?.percent));
       }),
       EventsOn('update:ready', (payload: any) => {
         const version = payload?.version;
@@ -128,14 +127,13 @@ export class UpdateService {
   }
 
   async checkForUpdates(): Promise<UpdateInfo | null> {
-    const lastCheck = localStorage.getItem(LAST_CHECK_KEY);
-    if (lastCheck) {
-      const lastCheckTime = parseInt(lastCheck, 10);
-      if (Date.now() - lastCheckTime < CHECK_INTERVAL_MS) {
-        const cached = this._updateInfo();
-        if (cached) return cached;
-      }
-    }
+    const cached = shouldUseCachedUpdateInfo(
+      localStorage.getItem(LAST_CHECK_KEY),
+      Date.now(),
+      CHECK_INTERVAL_MS,
+      this._updateInfo()
+    );
+    if (cached) return cached;
   
     this._isChecking.set(true);
     this._error.set(null);
@@ -147,7 +145,7 @@ export class UpdateService {
 
       if (info.available) {
         const dismissedVersion = localStorage.getItem(DISMISSED_VERSION_KEY);
-        if (dismissedVersion !== info.latestVersion) {
+        if (shouldShowUpdateNotification(info, dismissedVersion)) {
           this._showNotification.set(true);
         }
       }

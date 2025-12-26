@@ -11,9 +11,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"sync"
+
+	"rawrequest/internal/secretvaultlogic"
 
 	"github.com/zalando/go-keyring"
 )
@@ -112,12 +113,12 @@ func (sv *SecretVault) ListSecrets() (map[string][]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return snapshotSecretKeys(secrets), nil
+	return secretvaultlogic.SnapshotSecretKeys(secrets), nil
 }
 
 func (sv *SecretVault) StoreSecret(env, key, value string) (map[string][]string, error) {
-	env = normalizeSecretEnv(env)
-	cleanedKey, err := normalizeSecretKey(key)
+	env = secretvaultlogic.NormalizeEnv(env)
+	cleanedKey, err := secretvaultlogic.NormalizeKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -140,12 +141,12 @@ func (sv *SecretVault) StoreSecret(env, key, value string) (map[string][]string,
 	if err := sv.saveSecretsLocked(secrets); err != nil {
 		return nil, err
 	}
-	return snapshotSecretKeys(secrets), nil
+	return secretvaultlogic.SnapshotSecretKeys(secrets), nil
 }
 
 func (sv *SecretVault) RemoveSecret(env, key string) (map[string][]string, error) {
-	env = normalizeSecretEnv(env)
-	cleanedKey, err := normalizeSecretKey(key)
+	env = secretvaultlogic.NormalizeEnv(env)
+	cleanedKey, err := secretvaultlogic.NormalizeKey(key)
 	if err != nil {
 		return nil, err
 	}
@@ -168,12 +169,12 @@ func (sv *SecretVault) RemoveSecret(env, key string) (map[string][]string, error
 	if err := sv.saveSecretsLocked(secrets); err != nil {
 		return nil, err
 	}
-	return snapshotSecretKeys(secrets), nil
+	return secretvaultlogic.SnapshotSecretKeys(secrets), nil
 }
 
 func (sv *SecretVault) GetSecret(env, key string) (string, error) {
-	env = normalizeSecretEnv(env)
-	cleanedKey, err := normalizeSecretKey(key)
+	env = secretvaultlogic.NormalizeEnv(env)
+	cleanedKey, err := secretvaultlogic.NormalizeKey(key)
 	if err != nil {
 		return "", err
 	}
@@ -263,12 +264,9 @@ func (sv *SecretVault) ensureKeyLocked(create bool) error {
 	}
 	data, err := os.ReadFile(sv.keyPath)
 	if err == nil {
-		decoded, decodeErr := base64.StdEncoding.DecodeString(strings.TrimSpace(string(data)))
+		decoded, decodeErr := secretvaultlogic.DecodeKeyFromFileBase64(string(data))
 		if decodeErr != nil {
 			return decodeErr
-		}
-		if len(decoded) != 32 {
-			return errors.New("vault key has invalid length")
 		}
 		sv.key = decoded
 		sv.keySource = "file"
@@ -307,14 +305,7 @@ func (sv *SecretVault) readKeyring() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	decoded, decodeErr := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
-	if decodeErr != nil {
-		return nil, decodeErr
-	}
-	if len(decoded) != 32 {
-		return nil, errors.New("invalid key length from keyring")
-	}
-	return decoded, nil
+	return secretvaultlogic.DecodeKeyFromKeyringBase64(value)
 }
 
 func (sv *SecretVault) writeKeyring(value string) error {
@@ -359,31 +350,4 @@ func (sv *SecretVault) decrypt(ciphertext []byte) ([]byte, error) {
 	return gcm.Open(nil, nonce, payload, nil)
 }
 
-func normalizeSecretEnv(value string) string {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "default"
-	}
-	return trimmed
-}
-
-func normalizeSecretKey(value string) (string, error) {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return "", errors.New("secret key cannot be empty")
-	}
-	return trimmed, nil
-}
-
-func snapshotSecretKeys(secrets map[string]map[string]string) map[string][]string {
-	result := make(map[string][]string)
-	for env, entries := range secrets {
-		keys := make([]string, 0, len(entries))
-		for key := range entries {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
-		result[env] = keys
-	}
-	return result
-}
+// Note: deterministic env/key normalization and key listing helpers live in internal/secretvaultlogic.

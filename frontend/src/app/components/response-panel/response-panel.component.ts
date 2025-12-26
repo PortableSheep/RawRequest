@@ -1,7 +1,14 @@
-import { Component, OnDestroy, effect, input, signal, untracked, HostListener, ElementRef } from '@angular/core';
+import { Component, OnDestroy, effect, input, signal, untracked, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SyntaxHighlightPipe } from "../../pipes/syntax-highlight.pipe";
 import { ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
+
+import {
+  formatBytesForResponsePanel,
+  getChainItemsForResponsePanel,
+  getStatusClassForEntry,
+  getStatusLabelForEntry
+} from './response-panel.logic';
 
 type EntryTab = 'response' | 'request';
 
@@ -145,32 +152,7 @@ export class ResponsePanelComponent implements OnDestroy {
   }
 
   getChainItems(): ChainEntryPreview[] {
-    const data = this.responseData();
-    if (data?.chainItems?.length) {
-      return data.chainItems;
-    }
-    const fallbackRequest = this.request();
-    if (!fallbackRequest) {
-      const preview = data?.requestPreview;
-      if (!preview) {
-        return [];
-      }
-      return [{
-        id: preview.name || preview.url || `${preview.method}-request`,
-        label: preview.name || `${preview.method} ${preview.url}`.trim(),
-        request: this.cloneRequestPreview(preview),
-        response: data ? this.buildResponsePreview(data) : null,
-        isPrimary: true
-      }];
-    }
-    const fallbackResponse = data;
-    return [{
-      id: fallbackRequest.name || fallbackRequest.url || `${fallbackRequest.method}-request`,
-      label: fallbackRequest.name || `${fallbackRequest.method} ${fallbackRequest.url}`.trim(),
-      request: this.buildFallbackRequestPreview(fallbackRequest),
-      response: fallbackResponse ? this.buildResponsePreview(fallbackResponse) : null,
-      isPrimary: true
-    }];
+    return getChainItemsForResponsePanel(this.responseData(), this.request());
   }
 
   toggleEntry(id: string) {
@@ -186,36 +168,15 @@ export class ResponsePanelComponent implements OnDestroy {
   }
 
   getStatusClass(entry: ChainEntryPreview): string {
-    if (!entry.response) {
-      return 'pending';
-    }
-    const status = entry.response.status;
-    if (status >= 200 && status < 300) {
-      return 'bg-green-500 text-black';
-    }
-    if (status >= 400 || status === 0) {
-      return 'bg-red-500 text-white';
-    }
-    if (status >= 300 && status < 400) {
-      return 'bg-yellow-500 text-black';
-    }
-    return 'bg-gray-500 text-white';
+    return getStatusClassForEntry(entry);
   }
 
   getStatusLabel(entry: ChainEntryPreview): string {
-    if (!entry.response) {
-      return 'Pending';
-    }
-    return `${entry.response.status} ${entry.response.statusText}`.trim();
+    return getStatusLabelForEntry(entry);
   }
 
   formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    const size = bytes / Math.pow(k, i);
-    return `${size.toFixed(i > 0 ? 1 : 0)} ${units[i]}`;
+    return formatBytesForResponsePanel(bytes);
   }
 
   isRequestCollapsed(entryId: string): boolean {
@@ -274,35 +235,4 @@ export class ResponsePanelComponent implements OnDestroy {
     this.copyTimers.set(entryId, timer);
   }
 
-  private buildFallbackRequestPreview(request: Request): RequestPreview {
-    return {
-      name: request.name,
-      method: request.method,
-      url: request.url,
-      headers: { ...request.headers },
-      body: typeof request.body === 'string' ? request.body : undefined
-    };
-  }
-
-  private cloneRequestPreview(preview: RequestPreview): RequestPreview {
-    return {
-      name: preview.name,
-      method: preview.method,
-      url: preview.url,
-      headers: { ...preview.headers },
-      body: preview.body
-    };
-  }
-
-  private buildResponsePreview(response: ResponseData): ResponsePreview {
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers || {},
-      body: response.body,
-      responseTime: response.responseTime,
-      timing: response.timing,
-      size: response.size
-    };
-  }
 }

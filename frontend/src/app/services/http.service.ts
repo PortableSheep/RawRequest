@@ -15,6 +15,31 @@ import { BackendClientService } from './backend-client.service';
 import { ScriptConsoleService } from './script-console.service';
 import { SecretService } from './secret.service';
 import { EventsOn } from '@wailsjs/runtime/runtime';
+import { parseGoResponse as parseGoResponseHelper } from './http/go-response';
+import { calculateLoadTestMetrics as calculateLoadTestMetricsHelper } from './http/load-test-metrics';
+import { executeLoadTestViaBackend as executeLoadTestViaBackendHelper } from './http/load-test-backend';
+import { throwIfCancelledResponse } from './http/cancellation';
+import {
+  hydrateHeaders as hydrateHeadersHelper,
+  hydrateHeadersSecretsOnly as hydrateHeadersSecretsOnlyHelper,
+  hydrateText as hydrateTextHelper,
+  hydrateTextSecretsOnly as hydrateTextSecretsOnlyHelper,
+  normalizeEnvName as normalizeEnvNameHelper
+} from './http/hydration';
+import { runScript } from './http/script-runner';
+import {
+  prepareBackendRequestForChain as prepareBackendRequestForChainHelper
+} from './http/request-prep';
+import { parseConcatenatedChainResponses } from './http/chain-response-parser';
+import { syncInitialVariablesToBackend } from './http/backend-variable-sync';
+import { loadFileTabsFromStorage, saveFileTabsToStorage } from './http/file-tabs-storage';
+import {
+  addToHistory as addToHistoryHelper,
+  loadHistory as loadHistoryHelper,
+  saveHistorySnapshot as saveHistorySnapshotHelper
+} from './http/history-storage';
+import { sendRequest as sendRequestHelper } from './http/send-request';
+import { executeChain as executeChainHelper } from './http/execute-chain';
 
 @Injectable({
   providedIn: 'root'
@@ -47,86 +72,15 @@ export class HttpService {
     requestId?: string,
     onProgress?: (progress: ActiveRunProgress) => void
   ): Promise<LoadTestResults> {
-    if (!requestId) {
-      throw new Error('Load testing requires a requestId');
-    }
-    if (!request.loadTest) {
-      throw new Error('No load test configuration');
-    }
-    if (request.body instanceof FormData) {
-      throw new Error('Load tests do not support FormData bodies');
-    }
-
-    const envName = this.normalizeEnvName(env);
-    const processedUrl = await this.hydrateText(request.url, variables, envName);
-    const processedHeaders = await this.hydrateHeaders(request.headers, variables, envName);
-    const processedBody = request.body ? await this.hydrateText(String(request.body), variables, envName) : '';
-
-    return await new Promise<LoadTestResults>(async (resolve, reject) => {
-      let unsubProgress: (() => void) | null = null;
-      let unsubDone: (() => void) | null = null;
-      let unsubErr: (() => void) | null = null;
-
-      const cleanup = () => {
-        try {
-          unsubProgress?.();
-        } catch {}
-        try {
-          unsubDone?.();
-        } catch {}
-        try {
-          unsubErr?.();
-        } catch {}
-        unsubProgress = null;
-        unsubDone = null;
-        unsubErr = null;
-      };
-
-      unsubProgress = EventsOn('loadtest:progress', (payload: any) => {
-        if (!payload || payload.requestId !== requestId) return;
-        onProgress?.(payload as ActiveRunProgress);
-      });
-
-      unsubDone = EventsOn('loadtest:done', (payload: any) => {
-        if (!payload || payload.requestId !== requestId) return;
-        cleanup();
-        const r = payload.results || {};
-        resolve({
-          totalRequests: r.totalRequests ?? 0,
-          successfulRequests: r.successfulRequests ?? 0,
-          failedRequests: r.failedRequests ?? 0,
-          responseTimes: Array.isArray(r.responseTimes) ? r.responseTimes : [],
-          errors: Array.isArray(r.errors) ? r.errors : [],
-          failureStatusCounts: r.failureStatusCounts ?? {},
-          startTime: r.startTime ?? Date.now(),
-          endTime: r.endTime ?? Date.now(),
-          cancelled: !!r.cancelled,
-          aborted: !!r.aborted,
-          abortReason: r.abortReason,
-          plannedDurationMs: r.plannedDurationMs ?? null,
-          adaptive: r.adaptive,
-        });
-      });
-
-      unsubErr = EventsOn('loadtest:error', (payload: any) => {
-        if (!payload || payload.requestId !== requestId) return;
-        cleanup();
-        reject(new Error(payload.message || 'Load test failed'));
-      });
-
-      try {
-        await this.backend.startLoadTest(
-          requestId,
-          request.method,
-          processedUrl,
-          JSON.stringify(processedHeaders || {}),
-          processedBody,
-          JSON.stringify(request.loadTest)
-        );
-      } catch (e) {
-        cleanup();
-        reject(e);
-      }
+    return await executeLoadTestViaBackendHelper(request, variables, env, requestId, onProgress, {
+      backend: {
+        startLoadTest: (id, method, url, headersJson, body, loadTestJson) =>
+          this.backend.startLoadTest(id, method, url, headersJson, body, loadTestJson),
+      },
+      eventsOn: EventsOn,
+      normalizeEnvName: (e) => this.normalizeEnvName(e),
+      hydrateText: (text, vars, envName) => this.hydrateText(text, vars, envName),
+      hydrateHeaders: (headers, vars, envName) => this.hydrateHeaders(headers, vars, envName),
     });
   }
 
@@ -136,483 +90,69 @@ export class HttpService {
     requestId?: string,
     env?: string
   ): Promise<ResponseData & { processedUrl: string; requestPreview: RequestPreview }> {
-    const startTime = Date.now();
-    const envName = this.normalizeEnvName(env);
-    let processedUrl = request.url;
-    let processedHeaders: { [key: string]: string } = { ...(request.headers || {}) };
-    let processedBody: string | undefined;
-    let requestPreview: RequestPreview | null = null;
-    let bodyPlaceholder: string | undefined;
-
-    try {
-      // Execute pre-script if present
-      if (request.preScript) {
-        await this.executeScript(request.preScript, { request, variables }, 'pre');
-      }
-      
-      // Replace secrets + variables in URL, headers, and body
-      processedUrl = await this.hydrateText(request.url, variables, envName);
-      processedHeaders = await this.hydrateHeaders(request.headers, variables, envName);
-      if (request.body && !(request.body instanceof FormData)) {
-        processedBody = await this.hydrateText(String(request.body), variables, envName);
-      } else if (request.body instanceof FormData) {
-        bodyPlaceholder = '[FormData]';
-      }
-
-      // Prepare request options
-      const requestOptions: RequestInit = {
-        method: request.method,
-        headers: processedHeaders,
-      };
-
-      // Add body if present
-      if (request.body) {
-        if (request.body instanceof FormData) {
-          requestOptions.body = request.body;
-          // Remove Content-Type header for FormData (let browser set it)
-          delete processedHeaders['Content-Type'];
-        } else {
-          requestOptions.body = processedBody ?? '';
-        }
-      }
-
-      requestPreview = {
-        name: request.name,
-        method: request.method,
-        url: processedUrl,
-        headers: { ...processedHeaders },
-        body: processedBody ?? bodyPlaceholder
-      };
-
-      // Add timeout if specified
-      let controller: AbortController | undefined;
-      if (request.options?.timeout) {
-        controller = new AbortController();
-        requestOptions.signal = controller.signal;
-        setTimeout(() => controller?.abort(), request.options.timeout);
-      }
-
-      // Use Wails Go backend to send request (avoids CORS)
-      const headersJson = JSON.stringify(processedHeaders);
-      const bodyStr = requestOptions.body ? String(requestOptions.body) : '';
-
-      console.log('[HTTP Service] Sending request:', { method: request.method, url: processedUrl });
-      const responseStr = requestId
-        ? await this.backend.sendRequestWithID(requestId, request.method, processedUrl, headersJson, bodyStr)
-        : await this.backend.sendRequest(request.method, processedUrl, headersJson, bodyStr);
-
-      this.throwIfCancelled(responseStr);
-      const responseTime = Date.now() - startTime;
-      console.log('[HTTP Service] Response received:', responseStr.substring(0, 200));
-
-      // Parse the response from Go backend
-      // Format: "Status: 200 OK\nHeaders: {...}\nBody: ..."
-      const responseData = this.parseGoResponse(responseStr, responseTime);
-
-      // Execute post-script if present
-      if (request.postScript) {
-        await this.executeScript(request.postScript, { request, response: responseData, variables }, 'post');
-      }
-
-      return { ...responseData, processedUrl, requestPreview: requestPreview! };
-    } catch (error: any) {
-      if (error?.cancelled) {
-        throw error;
-      }
-      const responseTime = Date.now() - startTime;
-      const fallback: ResponseData = {
-        status: 0,
-        statusText: error.name || 'Network Error',
-        headers: {},
-        body: error.message || 'Unknown error occurred',
-        responseTime
-      };
-      if (requestPreview) {
-        fallback.processedUrl = requestPreview.url;
-        fallback.requestPreview = requestPreview;
-      }
-      throw fallback;
-    }
-  }
-
-  private replaceVariables(text: string, variables: { [key: string]: string }): string {
-    let result = text;
-    for (const [key, value] of Object.entries(variables)) {
-      const regex = new RegExp(`{{${key}}}`, 'g');
-      result = result.replace(regex, value);
-    }
-    return result;
-  }
-
-  private parseResponseHeaders(headers: Headers): { [key: string]: string } {
-    const result: { [key: string]: string } = {};
-    headers.forEach((value, key) => {
-      result[key] = value;
+    return await sendRequestHelper(request, variables, requestId, env, {
+      backend: {
+        sendRequest: (method, url, headersJson, bodyStr) => this.backend.sendRequest(method, url, headersJson, bodyStr),
+        sendRequestWithID: (id, method, url, headersJson, bodyStr) =>
+          this.backend.sendRequestWithID(id, method, url, headersJson, bodyStr),
+      },
+      now: () => Date.now(),
+      normalizeEnvName: (e) => this.normalizeEnvName(e),
+      hydrateText: (value, vars, envName) => this.hydrateText(value, vars, envName),
+      hydrateHeaders: (headers, vars, envName) => this.hydrateHeaders(headers, vars, envName),
+      executeScript: (script, context, stage) => this.executeScript(script, context, stage),
+      parseGoResponse: (s, t) => this.parseGoResponse(s, t),
+      throwIfCancelled: (s) => this.throwIfCancelled(s),
+      log: { debug: console.log },
     });
-    return result;
   }
 
   private parseGoResponse(responseStr: string, responseTime: number): ResponseData {
-    // Check if this is an error response from Go backend
-    if (responseStr.startsWith('Error: ') || responseStr.startsWith('Error reading')) {
-      return {
-        status: 0,
-        statusText: 'Request Error',
-        headers: {},
-        body: responseStr,
-        responseTime
-      };
-    }
-
-    // Parse Go backend response format: "Status: 200 OK\nHeaders: {...}\nBody: ..."
-    const lines = responseStr.split('\n');
-    let status = 0;
-    let statusText = '';
-    let headers: { [key: string]: string } = {};
-    let body = '';
-    let timing: any = null;
-    let size: number | undefined;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.startsWith('Status: ')) {
-        const statusLine = line.substring(8); // Remove "Status: "
-        const parts = statusLine.split(' ');
-        status = parseInt(parts[0]) || 0;
-        statusText = parts.slice(1).join(' ');
-      } else if (line.startsWith('Headers: ')) {
-        try {
-          const headersStr = line.substring(9).trim();
-          if (headersStr) {
-            // New format: Headers contains ResponseMetadata JSON with timing, size, and headers
-            const metadata = JSON.parse(headersStr);
-            if (metadata.headers) {
-              headers = metadata.headers;
-            }
-            if (metadata.timing) {
-              timing = metadata.timing;
-            }
-            if (typeof metadata.size === 'number') {
-              size = metadata.size;
-            }
-          }
-        } catch (e) {
-          console.error('Failed to parse headers/metadata:', e, 'Headers string:', line.substring(9));
-          headers = {};
-        }
-      } else if (line.startsWith('Body: ')) {
-        // Body is everything after "Body: "
-        body = line.substring(6);
-        // If there are more lines, append them (multiline body)
-        if (i + 1 < lines.length) {
-          body += '\n' + lines.slice(i + 1).join('\n');
-        }
-        break;
-      }
-    }
-
-    // If we didn't parse anything, treat the whole response as an error
-    if (status === 0 && !statusText && !body) {
-      return {
-        status: 0,
-        statusText: 'Parse Error',
-        headers: {},
-        body: responseStr,
-        responseTime
-      };
-    }
-
-    const responseData: ResponseData = {
-      status,
-      statusText,
-      headers,
-      body,
-      responseTime: timing?.total ?? responseTime,
-      timing,
-      size
-    };
-
-    // Try to parse JSON
-    if (body) {
-      try {
-        responseData.json = JSON.parse(body);
-      } catch (e) {
-        // Not JSON, that's fine
-      }
-    }
-
-    return responseData;
+    return parseGoResponseHelper(responseStr, responseTime);
   }
 
   private async executeScript(script: string, context: any, stage: 'pre' | 'post' | 'custom' = 'custom'): Promise<void> {
-    if (!script || !script.trim()) {
-      return;
-    }
-
-    try {
-      const cleanScript = cleanScriptContent(script).trim();
-      if (!cleanScript) {
-        return;
-      }
-
-      const scriptContext = context || {};
-      scriptContext.variables = scriptContext.variables || {};
-      const source = this.buildScriptSource(stage, scriptContext.request);
-
-      const emitLog = (level: 'info' | 'warn' | 'error' | 'debug', args: any[]) => {
-        const message = this.buildConsoleMessage(args);
-        if (!message) {
-          return;
-        }
+    return await runScript(script, context, stage, {
+      cleanScript: (raw) => cleanScriptContent(raw),
+      recordConsole: (level, source, message) => {
         void this.scriptConsole.record(level, source, message);
-      };
-
-      const setVar = (key: string, value: any) => {
-        if (!key) {
-          return;
-        }
-        const stringValue = String(value ?? '');
-        scriptContext.variables[key] = stringValue;
-        this.backend.setVariable(key, stringValue).catch(err => console.error('Failed to sync variable:', err));
-      };
-
-      const getVar = (key: string) => {
-        if (!key) {
-          return '';
-        }
-        return scriptContext.variables[key] || '';
-      };
-
-      const setHeader = (header: string, value: any) => {
-        if (!header) {
-          return;
-        }
-        const request = this.ensureScriptRequest(scriptContext);
-        request.headers[header] = String(value ?? '');
-      };
-
-      const updateRequest = (patch: Record<string, any>) => {
-        if (!patch || typeof patch !== 'object') {
-          return;
-        }
-        const request = this.ensureScriptRequest(scriptContext);
-        Object.entries(patch).forEach(([key, val]) => {
-          if (key === 'headers' && val && typeof val === 'object') {
-            Object.entries(val as Record<string, any>).forEach(([headerKey, headerValue]) => {
-              request.headers[headerKey] = String(headerValue ?? '');
-            });
-            return;
-          }
-          (request as any)[key] = val;
-        });
-      };
-
-      const assertFn = (condition: any, message = 'Assertion failed') => {
-        if (!condition) {
-          throw new Error(message);
-        }
-      };
-
-      const delayFn = (duration: any) => {
-        const parsed = Number(duration);
-        if (!Number.isFinite(parsed) || parsed <= 0) {
-          return Promise.resolve();
-        }
-        return new Promise<void>(resolve => setTimeout(resolve, parsed));
-      };
-
-      const consoleProxy = {
-        log: (...args: any[]) => emitLog('info', args),
-        info: (...args: any[]) => emitLog('info', args),
-        warn: (...args: any[]) => emitLog('warn', args),
-        error: (...args: any[]) => emitLog('error', args),
-        debug: (...args: any[]) => emitLog('debug', args)
-      };
-
-      // Extract response and request from context for direct access in scripts
-      const response = scriptContext.response || {};
-      const request = scriptContext.request || {};
-
-      const func = new Function(
-        'context',
-        'setVar',
-        'getVar',
-        'console',
-        'setHeader',
-        'updateRequest',
-        'assert',
-        'delay',
-        'response',
-        'request',
-        cleanScript
-      );
-
-      const result = func(
-        scriptContext,
-        setVar,
-        getVar,
-        consoleProxy,
-        setHeader,
-        updateRequest,
-        assertFn,
-        delayFn,
-        response,
-        request
-      );
-
-      if (result instanceof Promise) {
-        await result;
-      }
-    } catch (error: any) {
-      console.error('Script execution error:', error);
-      const message = error?.message || String(error);
-      void this.scriptConsole.record('error', this.buildScriptSource(stage, context?.request), `runtime error: ${message}`);
-    }
-  }
-
-  private ensureScriptRequest(context: any): { headers: Record<string, string> } & Record<string, any> {
-    if (!context.request) {
-      context.request = { headers: {} };
-    }
-    if (!context.request.headers) {
-      context.request.headers = {};
-    }
-    return context.request;
-  }
-
-  private buildScriptSource(stage: string, request?: Request): string {
-    const prefix = stage || 'script';
-    if (!request) {
-      return prefix;
-    }
-    if (request.name) {
-      return `${prefix}:${request.name}`;
-    }
-    if (request.method && request.url) {
-      return `${prefix}:${request.method} ${request.url}`;
-    }
-    if (request.method) {
-      return `${prefix}:${request.method}`;
-    }
-    return prefix;
-  }
-
-  private buildConsoleMessage(args: any[]): string {
-    if (!args || !args.length) {
-      return '';
-    }
-    return args
-      .map(arg => {
-        if (arg == null) {
-          return '';
-        }
-        if (typeof arg === 'string') {
-          return arg;
-        }
-        if (typeof arg === 'object') {
-          try {
-            return JSON.stringify(arg);
-          } catch {
-            return '[object]';
-          }
-        }
-        return String(arg);
-      })
-      .filter(Boolean)
-      .join(' ')
-      .trim();
+      },
+      setVariable: (key, value) => this.backend.setVariable(key, value),
+    });
   }
 
   // History management
   async loadHistory(fileId: string, filePath?: string): Promise<HistoryItem[]> {
-    if (!fileId) {
-      return [];
-    }
-    try {
-      const stored = filePath
-        ? await this.backend.loadFileHistoryFromDir(fileId, dirname(filePath))
-        : await this.backend.loadFileHistoryFromRunLocation(fileId);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        return parsed.map((item: any) => ({
-          ...item,
-          timestamp: new Date(item.timestamp)
-        }));
-      }
-    } catch (error) {
-      console.error('Error loading history for file', fileId, error);
-    }
-    return [];
+    return await loadHistoryHelper(fileId, filePath, {
+      backend: this.backend,
+      dirname,
+      log: { error: console.error }
+    } as any);
   }
 
   async saveHistorySnapshot(fileId: string, history: HistoryItem[], filePath?: string): Promise<void> {
-    if (!fileId) return;
-    const json = JSON.stringify(history || []);
-    try {
-      if (filePath) {
-        await this.backend.saveFileHistoryToDir(fileId, json, dirname(filePath));
-      } else {
-        await this.backend.saveFileHistoryToRunLocation(fileId, json);
-      }
-    } catch (error) {
-      console.error('Error saving history snapshot for file', fileId, error);
-    }
+    return await saveHistorySnapshotHelper(fileId, history, filePath, {
+      backend: this.backend,
+      dirname,
+      log: { error: console.error }
+    } as any);
   }
 
   async addToHistory(fileId: string, item: HistoryItem, filePath?: string, maxItems: number = 100): Promise<HistoryItem[]> {
-    const history = await this.loadHistory(fileId, filePath);
-    history.unshift(item);
-    if (history.length > maxItems) {
-      history.splice(maxItems);
-    }
-    try {
-      if (filePath) {
-        await this.backend.saveFileHistoryToDir(fileId, JSON.stringify(history), dirname(filePath));
-      } else {
-        // Save to run location for unsaved tabs
-        await this.backend.saveFileHistoryToRunLocation(fileId, JSON.stringify(history));
-      }
-    } catch (error) {
-      console.error('Error saving history for file', fileId, error);
-    }
-
-    // If a file path was provided (file saved on disk), also save the response
-    // payload alongside the http file for easier inspection.
-    try {
-      if (filePath) {
-        // Save the response JSON for this history entry
-        const saved = await this.backend.saveResponseFile(filePath, JSON.stringify(item.responseData, null, 2));
-        console.debug('[HTTP Service] Saved response to', saved);
-      } else {
-        const saved = await this.backend.saveResponseFileToRunLocation(fileId, JSON.stringify(item.responseData, null, 2));
-        console.debug('[HTTP Service] Saved response to', saved);
-      }
-    } catch (err) {
-      console.warn('Failed to save response file:', err);
-    }
-
-    return history;
+    return await addToHistoryHelper(fileId, item, filePath, maxItems, {
+      backend: this.backend,
+      dirname,
+      log: { error: console.error, warn: console.warn, debug: console.debug }
+    } as any);
   }
 
   // File management
   loadFiles(): FileTab[] {
-    try {
-      const stored = localStorage.getItem(this.FILES_KEY);
-      if (stored) {
-        return JSON.parse(stored);
-      }
-    } catch (error) {
-      console.error('Error loading files:', error);
-    }
-    return [];
+    return loadFileTabsFromStorage(this.FILES_KEY, localStorage, { error: console.error });
   }
 
   saveFiles(files: FileTab[]): void {
-    try {
-      localStorage.setItem(this.FILES_KEY, JSON.stringify(files));
-    } catch (error) {
-      console.error('Error saving files:', error);
-    }
+    saveFileTabsToStorage(this.FILES_KEY, files, localStorage, { error: console.error });
   }
 
   // Execute chained requests using Go backend
@@ -622,89 +162,20 @@ export class HttpService {
     requestId?: string,
     env?: string
   ): Promise<{ responses: ResponseData[]; requestPreviews: RequestPreview[] }> {
-    try {
-      console.log('[HTTP Service] Executing chain with', requests.length, 'requests');
-      const envName = this.normalizeEnvName(env);
-
-    // Sync initial variables into the backend so server-side placeholder resolution
-    // (including updates from scripts/responses) starts from the same base.
-    try {
-      await Promise.all(
-        Object.entries(variables || {}).map(([key, value]) =>
-          this.backend.setVariable(key, String(value ?? ''))
-        )
-      );
-    } catch (e) {
-      console.warn('[HTTP Service] Failed to sync initial variables to backend', e);
-    }
-
-      // Convert requests to format expected by Go backend
-      const requestsData: Array<Record<string, any>> = [];
-      const previews: RequestPreview[] = [];
-      for (const req of requests) {
-  		// For chains: keep {{placeholders}} intact so the backend can resolve them
-  		// as scripts and prior responses update variables.
-  		const prepared = await this.prepareBackendRequestForChain(req, envName);
-        requestsData.push(prepared.backend);
-        previews.push(prepared.preview);
-      }
-
-      console.log('[HTTP Service] Calling ExecuteRequests with data:', requestsData);
-
-      const responseStr = requestId
-        ? await this.backend.executeRequestsWithID(requestId, requestsData)
-        : await this.backend.executeRequests(requestsData);
-
-      this.throwIfCancelled(responseStr);
-      console.log('[HTTP Service] ExecuteRequests returned:', responseStr);
-
-      // Parse responses (Go returns concatenated responses)
-      const responses: ResponseData[] = [];
-      const lines = responseStr.split('\n\n');
-
-      console.log('[HTTP Service] Split into', lines.length, 'response parts');
-
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (line.trim()) {
-          console.log('[HTTP Service] Parsing response part', i, ':', line.substring(0, 100) + '...');
-          try {
-            const response = this.parseGoResponse(line, 0);
-            const preview = previews[i];
-            if (preview) {
-              response.requestPreview = preview;
-              response.processedUrl = preview.url;
-            }
-            responses.push(response);
-          } catch (parseError) {
-            console.error('[HTTP Service] Failed to parse response part', i, ':', parseError);
-            // Create a fallback response for failed parsing
-            responses.push({
-              status: 0,
-              statusText: 'Parse Error',
-              headers: {},
-              body: `Failed to parse response: ${parseError}\n\nRaw response:\n${line}`,
-              responseTime: 0
-            });
-          }
-        }
-      }
-
-      console.log('[HTTP Service] Parsed', responses.length, 'responses');
-      return { responses, requestPreviews: previews };
-    } catch (error: any) {
-      if (error?.cancelled) {
-        throw error;
-      }
-      console.error('[HTTP Service] Chain execution error:', error);
-      throw {
-        status: 0,
-        statusText: 'Chain Execution Error',
-        headers: {},
-        body: error.message || 'Failed to execute request chain',
-        responseTime: 0
-      } as ResponseData;
-    }
+    return await executeChainHelper(requests, variables, requestId, env, {
+      backend: {
+        executeRequests: (r) => this.backend.executeRequests(r),
+        executeRequestsWithID: (id, r) => this.backend.executeRequestsWithID(id, r),
+        setVariable: (key, value) => this.backend.setVariable(key, value),
+      },
+      normalizeEnvName: (e) => this.normalizeEnvName(e),
+      syncInitialVariablesToBackend,
+      prepareBackendRequestForChain: (req, envName) => this.prepareBackendRequestForChain(req, envName),
+      parseConcatenatedChainResponses,
+      parseGoResponse: (s, t) => this.parseGoResponse(s, t),
+      throwIfCancelled: (s) => this.throwIfCancelled(s),
+      log: { log: console.log, error: console.error, warn: console.warn },
+    });
   }
 
   async cancelRequest(requestId: string): Promise<void> {
@@ -724,167 +195,7 @@ export class HttpService {
   }
 
   private throwIfCancelled(responseStr: string) {
-    if (responseStr === this.CANCELLED_RESPONSE) {
-      const cancellationError: any = new Error('Request cancelled');
-      cancellationError.cancelled = true;
-      throw cancellationError;
-    }
-  }
-
-  private sleep(ms: number): Promise<void> {
-    const safe = Number.isFinite(ms) ? Math.max(0, ms) : 0;
-    return new Promise(resolve => setTimeout(resolve, safe));
-  }
-
-  private parseDurationMs(value: unknown): number | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === 'number' && Number.isFinite(value)) {
-      // Bare numbers are treated as milliseconds for delay-like fields.
-      return Math.max(0, value);
-    }
-
-    const raw = String(value).trim();
-    if (!raw.length) return null;
-
-    // Accept forms like: 250ms, 2s, 1.5m, 1h
-    const m = raw.match(/^(-?\d+(?:\.\d+)?)\s*(ms|s|m|h)?$/i);
-    if (!m) return null;
-    const n = parseFloat(m[1]);
-    if (!Number.isFinite(n) || n < 0) return null;
-    const unit = (m[2] || 'ms').toLowerCase();
-    const mult = unit === 'h' ? 3600000 : unit === 'm' ? 60000 : unit === 's' ? 1000 : 1;
-    return Math.round(n * mult);
-  }
-
-  private normalizeLoadTestConfig(config: any): {
-    iterations: number | null;
-    durationMs: number | null;
-    startUsers: number;
-    maxUsers: number;
-    spawnRate: number | null;
-    rampUpMs: number | null;
-    delayMs: number;
-    waitMinMs: number | null;
-    waitMaxMs: number | null;
-    requestsPerSecond: number | null;
-    failureRateThreshold: number | null; // fraction 0..1
-
-    adaptiveEnabled: boolean;
-    adaptiveFailureRate: number | null; // fraction 0..1
-    adaptiveWindowSec: number;
-    adaptiveStableSec: number;
-    adaptiveCooldownMs: number;
-    adaptiveBackoffStepUsers: number;
-  } {
-    const toInt = (v: any): number | null => {
-      const n = typeof v === 'number' ? v : parseInt(String(v ?? ''), 10);
-      if (!Number.isFinite(n)) return null;
-      return Math.trunc(n);
-    };
-
-    const iterations = toInt(config?.iterations);
-    const durationMs = this.parseDurationMs(config?.duration);
-
-    const concurrent = toInt(config?.concurrent);
-    const users = toInt(config?.users);
-    const start = toInt(config?.start);
-    const startUsers = toInt(config?.startUsers);
-    const max = toInt(config?.max);
-    const maxUsers = toInt(config?.maxUsers);
-
-    const startU = Math.max(0, startUsers ?? start ?? concurrent ?? users ?? 1);
-    const maxU = Math.max(1, maxUsers ?? max ?? concurrent ?? users ?? 1);
-    const normalizedStartUsers = Math.min(startU, maxU);
-
-    const spawnRate = toInt(config?.spawnRate);
-    const rampUpMs = this.parseDurationMs(config?.rampUp);
-
-    const delayMs = this.parseDurationMs(config?.delay) ?? 0;
-    const waitMinMs = this.parseDurationMs(config?.waitMin);
-    const waitMaxMs = this.parseDurationMs(config?.waitMax);
-
-    const rps = toInt(config?.requestsPerSecond);
-
-    const parseFailureRateThreshold = (value: unknown): number | null => {
-      if (value === null || value === undefined) return null;
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        const frac = value > 1 ? value / 100 : value;
-        return Math.min(1, Math.max(0, frac));
-      }
-      const s = String(value).trim();
-      if (!s) return null;
-      const percent = s.match(/^(-?\d+(?:\.\d+)?)\s*%$/);
-      if (percent) {
-        const p = parseFloat(percent[1]);
-        if (!Number.isFinite(p) || p < 0) return null;
-        return Math.min(1, Math.max(0, p / 100));
-      }
-      const n = parseFloat(s);
-      if (!Number.isFinite(n) || n < 0) return null;
-      const frac = n > 1 ? n / 100 : n;
-      return Math.min(1, Math.max(0, frac));
-    };
-
-    const failureRateThreshold = parseFailureRateThreshold(config?.failureRateThreshold);
-
-    const parseBool = (value: unknown): boolean => {
-      if (value === true) return true;
-      if (value === false) return false;
-      if (typeof value === 'number') return value !== 0;
-      const s = String(value ?? '').trim().toLowerCase();
-      if (!s) return false;
-      return ['1', 'true', 'yes', 'y', 'on', 'enable', 'enabled'].includes(s);
-    };
-
-    const adaptiveEnabled = parseBool(config?.adaptive);
-    const adaptiveFailureRateRaw = parseFailureRateThreshold(config?.adaptiveFailureRate);
-    const adaptiveFailureRate = adaptiveEnabled
-      ? (adaptiveFailureRateRaw ?? 0.01)
-      : null;
-
-    const parseSeconds = (value: unknown, fallbackSec: number): number => {
-      const ms = this.parseDurationMs(value);
-      if (ms !== null && ms > 0) {
-        return Math.max(1, Math.round(ms / 1000));
-      }
-      const n = typeof value === 'number' ? value : parseInt(String(value ?? ''), 10);
-      if (Number.isFinite(n) && n > 0) {
-        return Math.max(1, Math.trunc(n));
-      }
-      return fallbackSec;
-    };
-
-    const adaptiveWindowSec = parseSeconds(config?.adaptiveWindow, 15);
-    const adaptiveStableSec = parseSeconds(config?.adaptiveStable, 20);
-    const adaptiveCooldownMs = parseSeconds(config?.adaptiveCooldown, 5) * 1000;
-    const adaptiveBackoffStepUsers = Math.max(1, toInt(config?.adaptiveBackoffStep) ?? 2);
-
-    let normalizedIterations = iterations && iterations > 0 ? iterations : null;
-    const normalizedDurationMs = durationMs && durationMs > 0 ? durationMs : null;
-    if (normalizedIterations === null && normalizedDurationMs === null) {
-      normalizedIterations = 10;
-    }
-
-    return {
-      iterations: normalizedIterations,
-      durationMs: normalizedDurationMs,
-      startUsers: normalizedStartUsers,
-      maxUsers: maxU,
-      spawnRate: spawnRate && spawnRate > 0 ? spawnRate : null,
-      rampUpMs: rampUpMs && rampUpMs > 0 ? rampUpMs : null,
-      delayMs: Math.max(0, delayMs),
-      waitMinMs: waitMinMs !== null ? Math.max(0, waitMinMs) : null,
-      waitMaxMs: waitMaxMs !== null ? Math.max(0, waitMaxMs) : null,
-      requestsPerSecond: rps && rps > 0 ? rps : null,
-      failureRateThreshold,
-
-      adaptiveEnabled,
-      adaptiveFailureRate,
-      adaptiveWindowSec,
-      adaptiveStableSec,
-      adaptiveCooldownMs,
-      adaptiveBackoffStepUsers,
-    };
+    throwIfCancelledResponse(responseStr, this.CANCELLED_RESPONSE);
   }
 
   // Execute load test
@@ -903,61 +214,26 @@ export class HttpService {
 
   // Calculate load test metrics
   calculateLoadTestMetrics(results: LoadTestResults): LoadTestMetrics {
-    const sortedTimes = [...results.responseTimes].sort((a, b) => a - b);
-    const duration = (results.endTime - results.startTime) / 1000; // seconds
-
-    return {
-      totalRequests: results.totalRequests,
-      successfulRequests: results.successfulRequests,
-      failedRequests: results.failedRequests,
-      failureStatusCounts: results.failureStatusCounts || {},
-      requestsPerSecond: duration > 0 ? (results.totalRequests / duration) : 0,
-      averageResponseTime: sortedTimes.reduce((a, b) => a + b, 0) / sortedTimes.length || 0,
-      p50: sortedTimes[Math.floor(sortedTimes.length * 0.5)] || 0,
-      p95: sortedTimes[Math.floor(sortedTimes.length * 0.95)] || 0,
-      p99: sortedTimes[Math.floor(sortedTimes.length * 0.99)] || 0,
-      minResponseTime: sortedTimes[0] || 0,
-      maxResponseTime: sortedTimes[sortedTimes.length - 1] || 0,
-      errorRate: (results.failedRequests / results.totalRequests) * 100 || 0,
-      duration,
-      cancelled: results.cancelled,
-      aborted: results.aborted,
-      abortReason: results.abortReason,
-      plannedDuration: results.plannedDurationMs ? results.plannedDurationMs / 1000 : undefined,
-      adaptive: results.adaptive,
-    };
+    return calculateLoadTestMetricsHelper(results);
   }
 
   private normalizeEnvName(env?: string): string {
-    const trimmed = (env || '').trim();
-    return trimmed.length ? trimmed : 'default';
+    return normalizeEnvNameHelper(env);
   }
 
   private async hydrateText(value: string, variables: { [key: string]: string }, env: string): Promise<string> {
-    if (!value) {
-      return value;
-    }
-    const withSecrets = await this.secretService.replaceSecrets(value, env);
-    return this.replaceVariables(withSecrets, variables);
+    return await hydrateTextHelper(value, variables, env, (text, e) => this.secretService.replaceSecrets(text, e));
   }
 
   private async hydrateTextSecretsOnly(value: string, env: string): Promise<string> {
-    if (!value) {
-      return value;
-    }
-    return await this.secretService.replaceSecrets(value, env);
+    return await hydrateTextSecretsOnlyHelper(value, env, (text, e) => this.secretService.replaceSecrets(text, e));
   }
 
   private async hydrateHeadersSecretsOnly(
     headers: { [key: string]: string } | undefined,
     env: string
   ): Promise<{ [key: string]: string }> {
-    const source = headers || {};
-    const result: { [key: string]: string } = {};
-    for (const [key, value] of Object.entries(source)) {
-      result[key] = await this.hydrateTextSecretsOnly(value, env);
-    }
-    return result;
+    return await hydrateHeadersSecretsOnlyHelper(headers, env, (text, e) => this.secretService.replaceSecrets(text, e));
   }
 
   private async hydrateHeaders(
@@ -965,81 +241,16 @@ export class HttpService {
     variables: { [key: string]: string },
     env: string
   ): Promise<{ [key: string]: string }> {
-    const source = headers || {};
-    const result: { [key: string]: string } = {};
-    for (const [key, value] of Object.entries(source)) {
-      result[key] = await this.hydrateText(value, variables, env);
-    }
-    return result;
-  }
-
-  private async prepareBackendRequest(
-    req: Request,
-    variables: { [key: string]: string },
-    env: string
-  ): Promise<{ backend: Record<string, any>; preview: RequestPreview }> {
-    const url = await this.hydrateText(req.url, variables, env);
-    const headers = await this.hydrateHeaders(req.headers, variables, env);
-    let body = '';
-    let bodyPlaceholder: string | undefined;
-    if (req.body && !(req.body instanceof FormData)) {
-      body = await this.hydrateText(String(req.body), variables, env);
-    } else if (req.body instanceof FormData) {
-      bodyPlaceholder = '[FormData]';
-    }
-
-    const backend = {
-      method: req.method,
-      url,
-      headers,
-      body,
-      preScript: req.preScript,
-      postScript: req.postScript
-    };
-
-    const preview: RequestPreview = {
-      name: req.name,
-      method: req.method,
-      url,
-      headers: { ...headers },
-      body: body || bodyPlaceholder
-    };
-
-    return { backend, preview };
+    return await hydrateHeadersHelper(headers, variables, env, (text, e) => this.secretService.replaceSecrets(text, e));
   }
 
   private async prepareBackendRequestForChain(
     req: Request,
     env: string
   ): Promise<{ backend: Record<string, any>; preview: RequestPreview }> {
-    const url = await this.hydrateTextSecretsOnly(req.url, env);
-    const headers = await this.hydrateHeadersSecretsOnly(req.headers, env);
-    let body = '';
-    let bodyPlaceholder: string | undefined;
-    if (req.body && !(req.body instanceof FormData)) {
-      body = await this.hydrateTextSecretsOnly(String(req.body), env);
-    } else if (req.body instanceof FormData) {
-      bodyPlaceholder = '[FormData]';
-    }
-
-    const backend = {
-      method: req.method,
-      url,
-      headers,
-      body,
-      preScript: req.preScript,
-      postScript: req.postScript,
-      options: req.options || undefined,
-    };
-
-    const preview: RequestPreview = {
-      name: req.name,
-      method: req.method,
-      url,
-      headers: { ...headers },
-      body: body || bodyPlaceholder,
-    };
-
-    return { backend, preview };
+    return await prepareBackendRequestForChainHelper(req, env, {
+      hydrateTextSecretsOnly: (value, e) => this.hydrateTextSecretsOnly(value, e),
+      hydrateHeadersSecretsOnly: (headers, e) => this.hydrateHeadersSecretsOnly(headers, e),
+    });
   }
 }

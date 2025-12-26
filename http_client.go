@@ -14,9 +14,10 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"os"
-	"runtime"
 	"strings"
 	"time"
+
+	hcl "rawrequest/internal/httpclientlogic"
 )
 
 // SendRequest sends an HTTP request and returns the response.
@@ -43,19 +44,15 @@ func (a *App) SendRequestWithTimeout(requestID, method, url, headersJson, body s
 }
 
 func (a *App) performRequest(ctx context.Context, method, url, headersJson, body string, timeoutMs int) string {
-	var headers map[string]string
-	if headersJson != "" {
-		json.Unmarshal([]byte(headersJson), &headers)
-	}
+	headers := hcl.ParseHeadersJSON(headersJson)
 
 	var reqBody io.Reader
 	var contentType string
 
 	// Check if this is a file upload request
-	if strings.Contains(body, "Content-Type: multipart/form-data") || strings.Contains(body, "< ") {
+	if hcl.IsFileUploadBody(body) {
 		// Handle file upload
-		if strings.HasPrefix(strings.TrimSpace(body), "< ") {
-			filePath := strings.TrimPrefix(strings.TrimSpace(body), "< ")
+		if filePath, ok := hcl.ExtractFileReferencePath(body); ok {
 			if fileContent, err := os.ReadFile(filePath); err == nil {
 				reqBody = strings.NewReader(string(fileContent))
 			} else {
@@ -82,20 +79,14 @@ func (a *App) performRequest(ctx context.Context, method, url, headersJson, body
 	}
 
 	// If no Content-Type specified and body exists, set default
-	if contentType == "" && body != "" {
+	if hcl.ShouldSetDefaultContentType(contentType, body) {
 		req.Header.Set("Content-Type", "application/json")
 	}
 
 	// Default User-Agent so servers don't see the generic Go client UA.
 	// Respect any user-provided header.
 	if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
-		version := strings.TrimSpace(Version)
-		ua := "RawRequest"
-		if version != "" {
-			ua = fmt.Sprintf("RawRequest/%s", version)
-		}
-		ua = fmt.Sprintf("%s (Wails; %s/%s)", ua, runtime.GOOS, runtime.GOARCH)
-		req.Header.Set("User-Agent", ua)
+		req.Header.Set("User-Agent", hcl.BuildDefaultUserAgent(Version))
 	}
 
 	// Timing variables

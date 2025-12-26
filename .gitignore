@@ -9,6 +9,12 @@
 *.so
 *.dylib
 
+# Local build artifacts
+/rawrequest
+/RawRequest
+/RawRequest.app/
+/build/bin/
+
 # Test binary, built with `go test -c`
 *.test
 
@@ -45,6 +51,9 @@ bower_components/
 # IDEs and editors
 .idea/
 .vscode/
+
+# Allow sharing workspace tasks
+!.vscode/tasks.json
 
 # misc
 .sass-cache/

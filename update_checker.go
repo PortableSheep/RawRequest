@@ -1,14 +1,12 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
+
+	"rawrequest/internal/updatechecklogic"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -55,17 +53,11 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 		CurrentVersion: Version,
 	}
 
-	// Fetch latest release from GitHub
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/latest", githubOwner, githubRepo)
-
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := updatechecklogic.BuildLatestReleaseRequest(githubOwner, githubRepo, "RawRequest-UpdateChecker")
 	if err != nil {
 		return info, fmt.Errorf("failed to create request: %w", err)
 	}
-
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	req.Header.Set("User-Agent", "RawRequest-UpdateChecker")
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -87,25 +79,19 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 		return info, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	var release GitHubRelease
-	if err := json.Unmarshal(body, &release); err != nil {
+	rel, err := updatechecklogic.ParseLatestReleaseJSON(body)
+	if err != nil {
 		return info, fmt.Errorf("failed to parse release: %w", err)
 	}
 
-	// Skip prereleases and drafts
-	if release.Prerelease || release.Draft {
-		return info, nil
-	}
-
-	// Parse versions and compare
-	latestVersion := strings.TrimPrefix(release.TagName, "v")
-	if isNewerVersion(latestVersion, Version) {
+	decision := updatechecklogic.DecideUpdate(Version, rel)
+	if decision.Available {
 		info.Available = true
-		info.LatestVersion = latestVersion
-		info.ReleaseURL = release.HTMLURL
-		info.ReleaseNotes = release.Body
-		info.ReleaseName = release.Name
-		info.PublishedAt = release.PublishedAt.Format("January 2, 2006")
+		info.LatestVersion = decision.LatestVersion
+		info.ReleaseURL = decision.ReleaseURL
+		info.ReleaseNotes = decision.ReleaseNotes
+		info.ReleaseName = decision.ReleaseName
+		info.PublishedAt = decision.PublishedAt
 	}
 
 	return info, nil
@@ -115,43 +101,4 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 func (a *App) OpenReleaseURL(url string) error {
 	runtime.BrowserOpenURL(a.ctx, url)
 	return nil
-}
-
-// isNewerVersion compares two semantic version strings
-// Returns true if latest is newer than current
-func isNewerVersion(latest, current string) bool {
-	latestParts := parseVersion(latest)
-	currentParts := parseVersion(current)
-
-	for i := 0; i < 3; i++ {
-		if latestParts[i] > currentParts[i] {
-			return true
-		}
-		if latestParts[i] < currentParts[i] {
-			return false
-		}
-	}
-	return false
-}
-
-// parseVersion extracts major, minor, patch from a version string
-func parseVersion(v string) [3]int {
-	// Remove any leading 'v' and trailing metadata
-	v = strings.TrimPrefix(v, "v")
-
-	// Handle versions like "1.0.0-beta.1" by taking only the numeric part
-	re := regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?`)
-	matches := re.FindStringSubmatch(v)
-
-	var parts [3]int
-	if len(matches) > 1 && matches[1] != "" {
-		parts[0], _ = strconv.Atoi(matches[1])
-	}
-	if len(matches) > 2 && matches[2] != "" {
-		parts[1], _ = strconv.Atoi(matches[2])
-	}
-	if len(matches) > 3 && matches[3] != "" {
-		parts[2], _ = strconv.Atoi(matches[3])
-	}
-	return parts
 }

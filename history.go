@@ -6,7 +6,8 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strings"
+
+	hl "rawrequest/internal/historylogic"
 )
 
 // SaveFileHistory writes per-file history JSON to disk
@@ -77,8 +78,7 @@ func (a *App) LoadFileHistoryFromRunLocation(fileID string) string {
 
 // sanitizeFileID converts a file ID to a safe filename
 func (a *App) sanitizeFileID(fileID string) string {
-	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "-")
-	return replacer.Replace(fileID)
+	return hl.SanitizeFileID(fileID)
 }
 
 // SaveFileHistoryToDir writes per-file history JSON to the specified directory

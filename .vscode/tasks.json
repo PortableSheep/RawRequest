@@ -1,0 +1,499 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "go test ./...",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./..."
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "frontend npm test",
+			"type": "shell",
+			"command": "npm",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"args": [
+				"test"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "frontend npm test --runInBand",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "jest load-test-backend.spec",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/http/load-test-backend.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "jest load-test-backend.spec (rerun)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/http/load-test-backend.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "capture jest failure (load-test-backend)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/http/load-test-backend.spec.ts --verbose > /tmp/jest-loadtest-backend.txt 2>&1; head -n 140 /tmp/jest-loadtest-backend.txt; echo '---TAIL---'; tail -n 120 /tmp/jest-loadtest-backend.txt; exit 0",
+			"isBackground": false
+		},
+		{
+			"label": "summarize jest failure (load-test-backend)",
+			"type": "shell",
+			"command": "grep -nE \"^FAIL|ReferenceError|TypeError|\\u25CF|Error:|expect\\(|Received|Expected\" /tmp/jest-loadtest-backend.txt | head -n 120",
+			"isBackground": false
+		},
+		{
+			"label": "show jest diff section",
+			"type": "shell",
+			"command": "sed -n '8,45p' /tmp/jest-loadtest-backend.txt",
+			"isBackground": false
+		},
+		{
+			"label": "show jest first failure diff",
+			"type": "shell",
+			"command": "sed -n '1,40p' /tmp/jest-loadtest-backend.txt",
+			"isBackground": false
+		},
+		{
+			"label": "extract load-test-backend failure snippet",
+			"type": "shell",
+			"command": "awk 'NR>=5 && NR<=35 {print NR \":\" $0}' /tmp/jest-loadtest-backend.txt",
+			"isBackground": false
+		},
+		{
+			"label": "extract jest diff lines 10-26",
+			"type": "shell",
+			"command": "awk 'NR>=10 && NR<=26 {print NR \":\" $0}' /tmp/jest-loadtest-backend.txt",
+			"isBackground": false
+		},
+		{
+			"label": "jest load-test-backend.spec (after test fix)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/http/load-test-backend.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (confirm)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (confirm after send-request)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (confirm after send-request, rerun)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (final confirm)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (ensure completion)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (capture final summary)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand | tail -n 25",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (confirm after execute-chain)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand | tail -n 20",
+			"isBackground": false
+		},
+		{
+			"label": "frontend npm test --runInBand (confirm after HttpService cleanup)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand | tail -n 25",
+			"isBackground": false
+		},
+		{
+			"label": "jest parser tests (in-band)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts src/app/services/parser/load-config.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "capture parse-http-file failure output",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts --verbose > /tmp/jest-parse-http-file.txt 2>&1; tail -n 120 /tmp/jest-parse-http-file.txt",
+			"isBackground": false
+		},
+		{
+			"label": "show jest parse-http-file diff lines",
+			"type": "shell",
+			"command": "grep -nE \"FAIL|\\u25CF|Expected|Received|toBe|toEqual\" /tmp/jest-parse-http-file.txt | head -n 120",
+			"isBackground": false
+		},
+		{
+			"label": "show diff section parse-http-file",
+			"type": "shell",
+			"command": "sed -n '10,30p' /tmp/jest-parse-http-file.txt",
+			"isBackground": false
+		},
+		{
+			"label": "jest parse-http-file.spec rerun",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "capture parse-http-file failure (after patch)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts --verbose > /tmp/jest-parse-http-file.txt 2>&1; tail -n 120 /tmp/jest-parse-http-file.txt",
+			"isBackground": false
+		},
+		{
+			"label": "show current parse-http-file failure diff",
+			"type": "shell",
+			"command": "grep -nE \"FAIL|\\u25CF|Expected|Received|toBe|toEqual\" /tmp/jest-parse-http-file.txt | head -n 140",
+			"isBackground": false
+		},
+		{
+			"label": "jest group meta debug",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts -t \"collects groups\"",
+			"isBackground": false
+		},
+		{
+			"label": "capture debug output group meta",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts -t \"collects groups\" --verbose > /tmp/jest-groupmeta.txt 2>&1; grep -n \"parsed(group meta)=\" /tmp/jest-groupmeta.txt | head -n 5; tail -n 40 /tmp/jest-groupmeta.txt",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest parse-http-file.spec",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/services/parser/parse-http-file.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full (wait)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full ci mode",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --silent",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest hydration only",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --silent src/app/services/http/hydration.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full (tail summary)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --silent | tail -n 40",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest json summary",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile /tmp/jest-summary.json >/dev/null && node -e \"const j=require('/tmp/jest-summary.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'passedSuites=',j.numPassedTestSuites,'totalSuites=',j.numTotalTestSuites,'passedTests=',j.numPassedTests,'totalTests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "loc scan ts/go",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"echo '--- Frontend TS (top 30) ---'; find frontend/src -name '*.ts' -not -path '*/wailsjs/*' -print0 | xargs -0 wc -l | sort -nr | head -n 31; echo; echo '--- Backend Go (top 30) ---'; find . -name '*.go' -not -path './frontend/*' -not -path './build/*' -print0 | xargs -0 wc -l | sort -nr | head -n 31"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "loc scan ts/go (bash)",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"echo \"--- Frontend TS (top 30) ---\"; find frontend/src -name \"*.ts\" -not -path \"*/wailsjs/*\" -not -path \"*/node_modules/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31; echo; echo \"--- Backend Go (top 30) ---\"; find . -name \"*.go\" -not -path \"./frontend/*\" -not -path \"./build/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "loc scan write file",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd /Users/portablesheep/repos/RawRequest && { echo \"--- Frontend TS (top 30) ---\"; find frontend/src -name \"*.ts\" -not -path \"*/wailsjs/*\" -not -path \"*/node_modules/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31; echo; echo \"--- Backend Go (top 30) ---\"; find . -name \"*.go\" -not -path \"./frontend/*\" -not -path \"./build/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31; } > /tmp/rawrequest-loc.txt"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "loc scan write workspace file",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd /Users/portablesheep/repos/RawRequest && { echo \"--- Frontend TS (top 30) ---\"; find frontend/src -name \"*.ts\" -not -path \"*/wailsjs/*\" -not -path \"*/node_modules/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31; echo; echo \"--- Backend Go (top 30) ---\"; find . -name \"*.go\" -not -path \"./frontend/*\" -not -path \"./build/*\" -print0 | xargs -0 wc -l | sort -nr | head -n 31; } > .loc-scan.txt"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest request-manager helpers",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && npm test -- --runInBand --ci --watchAll=false src/app/components/request-manager/request-manager.helpers.spec.ts"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "check jest-preset-angular exists",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && ls -la node_modules/jest-preset-angular 2>/dev/null | head"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "node require jest-preset-angular",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && node -e \"require('jest-preset-angular'); console.log('ok')\""
+			],
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full after request-manager helpers",
+			"type": "shell",
+			"command": "bash",
+			"args": [
+				"-lc",
+				"cd frontend && npm test -- --runInBand --ci --watchAll=false"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full (no bash login)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false",
+			"isBackground": false
+		},
+		{
+			"label": "go test ./...",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./..."
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test main pkg",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"."
+			],
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full (no bash)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest summary json",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest workspace-facade helpers",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false src/app/services/workspace-facade/workspace-facade.helpers.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest summary json (rerun)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest script-runner only",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false src/app/services/http/script-runner.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full (verify)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest json summary (verify)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "print jest summary from file",
+			"type": "shell",
+			"command": "cd frontend && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest update-logic",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false src/app/services/update/update-logic.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full after update refactor",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "print jest summary after update refactor",
+			"type": "shell",
+			"command": "cd frontend && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest script-snippet helpers",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false src/app/services/script-snippet/snippet-helpers.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest full after script-snippet refactor",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand --ci --watchAll=false --json --outputFile jest-results.json >/dev/null && node -e \"const j=require('./jest-results.json'); console.log('success=',j.success,'failedSuites=',j.numFailedTestSuites,'failedTests=',j.numFailedTests,'suites=',j.numTotalTestSuites,'tests=',j.numTotalTests);\"",
+			"isBackground": false
+		},
+		{
+			"label": "go test .",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"."
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/...",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/..."
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/historylogic",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/historylogic"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/httpclientlogic",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/httpclientlogic"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "frontend jest app.component.logic.spec (in-band)",
+			"type": "shell",
+			"command": "cd frontend && npm test -- --runInBand src/app/app.component.logic.spec.ts",
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/loadtestpayload",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/loadtestpayload"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/loadtestpayload (confirm)",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/loadtestpayload"
+			],
+			"isBackground": false
+		},
+		{
+			"label": "go test ./internal/loadtestrunlogic",
+			"type": "shell",
+			"command": "go",
+			"args": [
+				"test",
+				"./internal/loadtestrunlogic"
+			],
+			"isBackground": false
+		}
+	]
+}

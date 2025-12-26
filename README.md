@@ -4,11 +4,11 @@ A modern, lightweight HTTP client for developers. Built with [Wails](https://wai
 
 ## Screenshots
 
-![Main window](MainWindow.png)
+![Main window](docs/MainWindow.png)
 
-![Load test in progress](LoadTestInProgress.png)
+![Load test in progress](docs/LoadTestInProgress.png)
 
-![Load test results](LoadTestResult.png)
+![Load test results](docs/LoadTestResult.png)
 
 ## Features
 
@@ -104,7 +104,7 @@ See the [examples.http](./examples/examples.http) file to see how features can b
 ## Development
 
 ### Prerequisites
-- Go 1.21+
+- Go 1.24+
 - Node.js 20+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation)
 

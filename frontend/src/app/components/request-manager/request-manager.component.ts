@@ -1,7 +1,6 @@
-import { Component, input, output, inject, OnInit, OnDestroy, signal, effect } from '@angular/core';
+import { Component, input, output, inject } from '@angular/core';
 
 import { HttpService } from '../../services/http.service';
-import { ParserService } from '../../services/parser.service';
 import { NotificationService } from '../../services/notification.service';
 import {
   Request,
@@ -13,6 +12,19 @@ import {
   ResponsePreview,
   ActiveRunProgress
 } from '../../models/http.models';
+import { getActiveEnvNameForFile, getCombinedVariablesForFile } from './env-vars';
+import { buildRequestChain } from './request-chain';
+import { buildChainItems, ensureRequestPreview, toResponsePreview } from './chain-items';
+import {
+  applyResponseDataForRequest,
+  buildCancelledResponse,
+  buildFailureResponse,
+  buildHistoryItem,
+  buildLoadTestSummaryResponse,
+  buildRequestId,
+  decideLoadTestStatusText,
+  shouldSkipDuplicateExecution
+} from './request-manager.logic';
 
 @Component({
   selector: 'app-request-manager',
@@ -23,7 +35,6 @@ import {
 })
 export class RequestManagerComponent {
   private httpService = inject(HttpService);
-  private parserService = inject(ParserService);
   private notificationService = inject(NotificationService);
 
   // Inputs
@@ -47,7 +58,13 @@ export class RequestManagerComponent {
   // Execute a request by index
   async executeRequestByIndex(requestIndex: number, requestId?: string): Promise<void> {
     // Prevent duplicate execution of the same request
-    if (this.executingRequest && this.lastExecutedRequestIndex === requestIndex) {
+    if (
+      shouldSkipDuplicateExecution({
+        executingRequest: this.executingRequest,
+        lastExecutedRequestIndex: this.lastExecutedRequestIndex,
+        requestIndex
+      })
+    ) {
       return;
     }
 
@@ -66,9 +83,7 @@ export class RequestManagerComponent {
     const request = currentFile.requests[requestIndex];
     const variables = this.getCombinedVariables();
     const envName = this.getActiveEnvName();
-
-    const supportsCancellation = true; // All request types now support cancellation
-    this.activeRequestId = requestId ?? this.createRequestId(currentFile.id, requestIndex);
+    this.activeRequestId = requestId ?? buildRequestId(currentFile.id, requestIndex, Date.now());
 
     try {
       // Check if this is a load test
@@ -89,19 +104,15 @@ export class RequestManagerComponent {
       const responseWithChain = { ...response, chainItems };
 
       // Update response data
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = responseWithChain;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, responseWithChain);
       this.filesChange.emit(updatedFiles);
 
-      const historyItem: HistoryItem = {
-        timestamp: new Date(),
+      const historyItem: HistoryItem = buildHistoryItem({
+        now: new Date(),
         method: request.method,
-        url: responseWithChain.processedUrl || request.url,
-        status: response.status,
-        statusText: response.statusText,
-        responseTime: response.responseTime,
-        responseData: responseWithChain
-      };
+        fallbackUrl: request.url,
+        response: responseWithChain
+      });
 
       console.log('[RequestManager] Adding to history:', historyItem);
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
@@ -126,35 +137,25 @@ export class RequestManagerComponent {
         this.handleCancelledRequest(currentFile.id, request, requestIndex);
         return;
       }
-      const errorResponse: ResponseData = {
-        status: error.status || 0,
-        statusText: error.statusText || 'Network Error',
-        headers: error.headers || {},
-        body: error.body || error.message || 'Unknown error',
-        responseTime: error.responseTime || 0
-      };
-      if (error?.requestPreview) {
-        errorResponse.requestPreview = error.requestPreview;
-        errorResponse.processedUrl = error.requestPreview.url;
-      }
+      const errorResponse = buildFailureResponse({
+        error,
+        fallbackStatusText: 'Network Error',
+        fallbackBody: 'Unknown error'
+      });
 
       const errorChain = this.buildChainItems([request], [errorResponse.requestPreview], [errorResponse], 0);
       const decoratedError = { ...errorResponse, chainItems: errorChain };
 
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = decoratedError;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedError);
       this.filesChange.emit(updatedFiles);
 
       // Add error to history too
-      const errorHistoryItem: HistoryItem = {
-        timestamp: new Date(),
+      const errorHistoryItem: HistoryItem = buildHistoryItem({
+        now: new Date(),
         method: request.method,
-        url: decoratedError.processedUrl || request.url,
-        status: errorResponse.status,
-        statusText: errorResponse.statusText,
-        responseTime: errorResponse.responseTime,
-        responseData: decoratedError
-      };
+        fallbackUrl: request.url,
+        response: decoratedError
+      });
       await this.pushHistoryEntry(currentFile.id, errorHistoryItem, currentFile.filePath);
 
       this.requestExecuted.emit({ requestIndex, response: decoratedError });
@@ -166,27 +167,12 @@ export class RequestManagerComponent {
 
   private getCombinedVariables(): { [key: string]: string } {
     const currentFile = this.files()[this.currentFileIndex()];
-    if (!currentFile) return {};
-
-    const variables = { ...currentFile.variables };
-
-    const activeEnvName = this.getActiveEnvName();
-
-    const envVars = (activeEnvName && currentFile.environments)
-      ? currentFile.environments[activeEnvName] || {}
-      : {};
-    Object.assign(variables, envVars);
-
-    return variables;
+    return getCombinedVariablesForFile(currentFile, this.currentEnv());
   }
 
   private getActiveEnvName(): string {
     const currentFile = this.files()[this.currentFileIndex()];
-    if (currentFile?.selectedEnv && currentFile.selectedEnv.length) {
-      return currentFile.selectedEnv;
-    }
-    const env = this.currentEnv();
-    return env && env.length ? env : 'default';
+    return getActiveEnvNameForFile(currentFile, this.currentEnv());
   }
 
   // Execute chained requests
@@ -211,20 +197,16 @@ export class RequestManagerComponent {
       const chainItems = this.buildChainItems(chain, execution.requestPreviews, responses, chain.length - 1);
       const decoratedLastResponse = { ...lastResponse, chainItems };
 
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = decoratedLastResponse;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedLastResponse);
       this.filesChange.emit(updatedFiles);
 
       // Add to history
-      const historyItem: HistoryItem = {
-        timestamp: new Date(),
+      const historyItem: HistoryItem = buildHistoryItem({
+        now: new Date(),
         method: request.method,
-        url: decoratedLastResponse.processedUrl || request.url,
-        status: decoratedLastResponse.status,
-        statusText: decoratedLastResponse.statusText,
-        responseTime: decoratedLastResponse.responseTime,
-        responseData: decoratedLastResponse
-      };
+        fallbackUrl: request.url,
+        response: decoratedLastResponse
+      });
 
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
 
@@ -240,16 +222,13 @@ export class RequestManagerComponent {
         return;
       }
       console.error('[RequestManager] Chained request error:', error);
-      const errorResponse: ResponseData = {
-        status: error.status || 0,
-        statusText: error.statusText || 'Chain Error',
-        headers: error.headers || {},
-        body: error.body || error.message || 'Chain execution failed',
-        responseTime: error.responseTime || 0
-      };
+      const errorResponse = buildFailureResponse({
+        error,
+        fallbackStatusText: 'Chain Error',
+        fallbackBody: 'Chain execution failed'
+      });
 
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = errorResponse;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
       this.filesChange.emit(updatedFiles);
 
       this.requestExecuted.emit({ requestIndex, response: errorResponse });
@@ -261,31 +240,7 @@ export class RequestManagerComponent {
   // Build chain of requests by following @depends
   private buildRequestChain(requestIndex: number): Request[] {
     const currentFile = this.files()[this.currentFileIndex()];
-    const chain: Request[] = [];
-    const visited = new Set<number>();
-
-    const addToChain = (index: number) => {
-      if (visited.has(index)) {
-        throw new Error('Circular dependency detected in request chain');
-      }
-      visited.add(index);
-
-      const req = currentFile.requests[index];
-      if (!req) return;
-
-      // If this request depends on another, add that one first
-      if (req.depends) {
-        const dependsIndex = currentFile.requests.findIndex(r => r.name === req.depends);
-        if (dependsIndex !== -1) {
-          addToChain(dependsIndex);
-        }
-      }
-
-      chain.push(req);
-    };
-
-    addToChain(requestIndex);
-    return chain;
+    return buildRequestChain(currentFile.requests, requestIndex);
   }
 
   private buildChainItems(
@@ -294,52 +249,15 @@ export class RequestManagerComponent {
     responses: Array<ResponseData | null | undefined>,
     primaryIndex: number
   ): ChainEntryPreview[] {
-    return chain.map((req, idx) => {
-      const preview = this.ensureRequestPreview(req, previews[idx]);
-      const responsePreview = this.toResponsePreview(responses[idx]);
-      return {
-        id: `${req.name || req.method}-${idx}`,
-        label: req.name || `${req.method} ${preview.url}`.trim(),
-        request: preview,
-        response: responsePreview,
-        isPrimary: idx === primaryIndex
-      };
-    });
+    return buildChainItems(chain, previews, responses, primaryIndex);
   }
 
   private ensureRequestPreview(request: Request, preview?: RequestPreview | null): RequestPreview {
-    if (preview) {
-      return {
-        name: preview.name || request.name,
-        method: preview.method || request.method,
-        url: preview.url,
-        headers: { ...preview.headers },
-        body: preview.body
-      };
-    }
-
-    return {
-      name: request.name,
-      method: request.method,
-      url: request.url,
-      headers: { ...request.headers },
-      body: typeof request.body === 'string' ? request.body : undefined
-    };
+    return ensureRequestPreview(request, preview);
   }
 
   private toResponsePreview(response?: ResponseData | null): ResponsePreview | null {
-    if (!response) {
-      return null;
-    }
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers || {},
-      body: response.body,
-      responseTime: response.responseTime,
-      timing: response.timing,
-      size: response.size
-    };
+    return toResponsePreview(response);
   }
 
   // Execute load test
@@ -358,24 +276,15 @@ export class RequestManagerComponent {
       );
       const metrics = this.httpService.calculateLoadTestMetrics(results);
 
-      const statusText = results.cancelled
-        ? 'Load Test Cancelled'
-        : results.aborted
-          ? 'Load Test Aborted'
-          : 'Load Test Complete';
+      const statusText = decideLoadTestStatusText(results);
 
-      // Create a summary response
-      const summaryResponse: ResponseData = {
-        status: 200,
-        statusText,
-        headers: {},
-        body: JSON.stringify(metrics, null, 2),
-        loadTestMetrics: metrics as any,
-        responseTime: results.endTime - results.startTime
-      };
+      const summaryResponse: ResponseData = buildLoadTestSummaryResponse({
+        metrics,
+        results,
+        statusText
+      });
 
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = summaryResponse;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, summaryResponse);
       this.filesChange.emit(updatedFiles);
 
       // Emit results for display in modal
@@ -385,15 +294,12 @@ export class RequestManagerComponent {
       });
 
       // Add to history
-      const historyItem: HistoryItem = {
-        timestamp: new Date(),
+      const historyItem: HistoryItem = buildHistoryItem({
+        now: new Date(),
         method: request.method + ' (Load Test)',
-        url: request.url,
-        status: 200,
-        statusText,
-        responseTime: results.endTime - results.startTime,
-        responseData: summaryResponse
-      };
+        fallbackUrl: request.url,
+        response: summaryResponse
+      });
 
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
 
@@ -406,16 +312,13 @@ export class RequestManagerComponent {
       );
 
     } catch (error: any) {
-      const errorResponse: ResponseData = {
-        status: 0,
-        statusText: 'Load Test Error',
-        headers: {},
-        body: error.message || 'Load test failed',
-        responseTime: 0
-      };
+      const errorResponse: ResponseData = buildFailureResponse({
+        error,
+        fallbackStatusText: 'Load Test Error',
+        fallbackBody: 'Load test failed'
+      });
 
-      const updatedFiles = [...this.files()];
-      updatedFiles[this.currentFileIndex()].responseData[requestIndex] = errorResponse;
+      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
       this.filesChange.emit(updatedFiles);
 
       this.requestExecuted.emit({ requestIndex, response: errorResponse });
@@ -467,7 +370,7 @@ export class RequestManagerComponent {
   }
 
   private createRequestId(fileId: string, requestIndex: number): string {
-    return `${fileId}-${requestIndex}-${Date.now()}`;
+    return buildRequestId(fileId, requestIndex, Date.now());
   }
 
   private isCancellationError(error: any): boolean {
@@ -475,16 +378,9 @@ export class RequestManagerComponent {
   }
 
   private handleCancelledRequest(fileId: string, request: Request, requestIndex: number) {
-    const cancelledResponse: ResponseData = {
-      status: 0,
-      statusText: 'Cancelled',
-      headers: {},
-      body: 'Request was cancelled before completion.',
-      responseTime: 0
-    };
+    const cancelledResponse = buildCancelledResponse();
 
-    const updatedFiles = [...this.files()];
-    updatedFiles[this.currentFileIndex()].responseData[requestIndex] = cancelledResponse;
+    const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, cancelledResponse);
     this.filesChange.emit(updatedFiles);
 
     this.requestExecuted.emit({ requestIndex, response: cancelledResponse });
