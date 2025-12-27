@@ -1,5 +1,7 @@
 import { Component, input, output } from '@angular/core';
 
+import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime';
+
 import { FormsModule } from '@angular/forms';
 
 @Component({
@@ -12,9 +14,24 @@ import { FormsModule } from '@angular/forms';
 export class DonationModalComponent {
   isOpen = input<boolean>(false);
 
+  private readonly donateUrl = 'https://donate.stripe.com/6oU4gz41RbihdYI4Hk5Ne00';
+
   // Internal form state
   customAmount = 10;
 
   onClose = output<void>();
   onDonate = output<number>();
+
+  openDonate(): void {
+    // Close immediately so the user sees feedback even if the external open is slow.
+    this.onClose.emit();
+
+    // Wails-preferred path: open in the system browser.
+    // No fallback to window.open.
+    try {
+      BrowserOpenURL(this.donateUrl);
+    } catch (error) {
+      console.error('Failed to open donation URL', error);
+    }
+  }
 }
