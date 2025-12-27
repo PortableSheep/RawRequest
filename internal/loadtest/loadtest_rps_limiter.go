@@ -22,8 +22,6 @@ func NewRpsLimiter(start time.Time, rps int64) *RpsLimiter {
 	return &RpsLimiter{interval: interval, nextAllowed: start}
 }
 
-// Reserve returns how long the caller should wait before sending the next request.
-// It mirrors the previous loadtest.go throttle closure behavior.
 func (l *RpsLimiter) Reserve(now time.Time) time.Duration {
 	if l == nil {
 		return 0

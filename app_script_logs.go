@@ -1,6 +1,3 @@
-// Script console logging for RawRequest.
-// This file contains the console log buffer and event emission for script output.
-
 package main
 
 import (
@@ -12,7 +9,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// appendScriptLog adds a log entry to the console buffer and emits it to the frontend.
 func (a *App) appendScriptLog(level, source, message string) {
 	message = strings.TrimSpace(message)
 	if message == "" {
@@ -38,12 +34,10 @@ func (a *App) appendScriptLog(level, source, message string) {
 	}
 }
 
-// RecordScriptLog enables the frontend to push logs into the shared console
 func (a *App) RecordScriptLog(level, source, message string) {
 	a.appendScriptLog(level, source, message)
 }
 
-// GetScriptLogs returns the accumulated script console entries
 func (a *App) GetScriptLogs() []ScriptLogEntry {
 	a.scriptLogMutex.Lock()
 	defer a.scriptLogMutex.Unlock()
@@ -53,7 +47,6 @@ func (a *App) GetScriptLogs() []ScriptLogEntry {
 	return a.scriptLogs.Items()
 }
 
-// ClearScriptLogs wipes the in-memory console buffer
 func (a *App) ClearScriptLogs() {
 	a.scriptLogMutex.Lock()
 	if a.scriptLogs != nil {

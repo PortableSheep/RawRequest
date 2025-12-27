@@ -18,7 +18,6 @@ describe('http-file-analysis', () => {
     expect(isSeparatorLine('  ### Hello')).toBe(true);
     expect(isSeparatorLine('###')).toBe(false);
 
-	// Visual dividers should not count as request separators.
 	expect(isSeparatorLine('### #######')).toBe(false);
 	expect(isSeparatorLine('### ############################')).toBe(false);
   });

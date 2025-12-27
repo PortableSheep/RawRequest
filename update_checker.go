@@ -14,7 +14,6 @@ import (
 // Version is set at build time via ldflags
 var Version = "1.0.0"
 
-// GitHubRelease represents a release from the GitHub API
 type GitHubRelease struct {
 	TagName     string    `json:"tag_name"`
 	Name        string    `json:"name"`
@@ -25,7 +24,6 @@ type GitHubRelease struct {
 	Draft       bool      `json:"draft"`
 }
 
-// UpdateInfo contains information about an available update
 type UpdateInfo struct {
 	Available      bool   `json:"available"`
 	CurrentVersion string `json:"currentVersion"`
@@ -41,7 +39,6 @@ const (
 	githubRepo  = "RawRequest"
 )
 
-// GetAppVersion returns the current application version
 func (a *App) GetAppVersion() string {
 	return Version
 }
@@ -97,7 +94,6 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 	return info, nil
 }
 
-// OpenReleaseURL opens the release URL in the default browser
 func (a *App) OpenReleaseURL(url string) error {
 	runtime.BrowserOpenURL(a.ctx, url)
 	return nil

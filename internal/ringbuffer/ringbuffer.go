@@ -18,7 +18,6 @@ func New[T any](cap int) *Buffer[T] {
 	return &Buffer[T]{cap: cap}
 }
 
-// Append adds an item and trims the buffer to its configured cap.
 func (b *Buffer[T]) Append(item T) {
 	if b == nil {
 		return
@@ -33,7 +32,6 @@ func (b *Buffer[T]) Append(item T) {
 	}
 }
 
-// Items returns a copy of the current contents.
 func (b *Buffer[T]) Items() []T {
 	if b == nil {
 		return nil
@@ -43,7 +41,6 @@ func (b *Buffer[T]) Items() []T {
 	return out
 }
 
-// Clear removes all items.
 func (b *Buffer[T]) Clear() {
 	if b == nil {
 		return
@@ -51,7 +48,6 @@ func (b *Buffer[T]) Clear() {
 	b.items = nil
 }
 
-// Len returns the current number of stored items.
 func (b *Buffer[T]) Len() int {
 	if b == nil {
 		return 0

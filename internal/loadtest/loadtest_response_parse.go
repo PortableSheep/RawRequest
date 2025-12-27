@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// ParseStatusAndTiming parses the response string produced by performRequest.
-// It mirrors the previous inline logic in loadtest.go.
 func ParseStatusAndTiming(result string) (status int, timingMs int64) {
 	status = 0
 	timingMs = 0

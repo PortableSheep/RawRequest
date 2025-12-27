@@ -1,6 +1,3 @@
-// File history persistence for RawRequest.
-// This file contains functions for saving and loading per-file history.
-
 package main
 
 import (
@@ -10,7 +7,6 @@ import (
 	hl "rawrequest/internal/historylogic"
 )
 
-// SaveFileHistory writes per-file history JSON to disk
 func (a *App) SaveFileHistory(fileID string, historyJson string) {
 	if fileID == "" {
 		return
@@ -30,7 +26,6 @@ func (a *App) SaveFileHistory(fileID string, historyJson string) {
 	_ = os.WriteFile(filePath, []byte(historyJson), 0644)
 }
 
-// LoadFileHistory retrieves stored history JSON for a file
 func (a *App) LoadFileHistory(fileID string) string {
 	if fileID == "" {
 		return "[]"
@@ -76,13 +71,10 @@ func (a *App) LoadFileHistoryFromRunLocation(fileID string) string {
 	return a.LoadFileHistoryFromDir(fileID, wd)
 }
 
-// sanitizeFileID converts a file ID to a safe filename
 func (a *App) sanitizeFileID(fileID string) string {
 	return hl.SanitizeFileID(fileID)
 }
 
-// SaveFileHistoryToDir writes per-file history JSON to the specified directory
-// dir should be the base directory where a "history" subfolder will be created.
 func (a *App) SaveFileHistoryToDir(fileID string, historyJson string, dir string) {
 	if fileID == "" {
 		return
@@ -102,7 +94,6 @@ func (a *App) SaveFileHistoryToDir(fileID string, historyJson string, dir string
 	_ = os.WriteFile(filePath, []byte(historyJson), 0644)
 }
 
-// SaveFileHistoryToRunLocation saves history under the current working directory's "history" folder
 func (a *App) SaveFileHistoryToRunLocation(fileID string, historyJson string) {
 	wd, err := os.Getwd()
 	if err != nil {

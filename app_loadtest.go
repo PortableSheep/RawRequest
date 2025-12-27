@@ -70,7 +70,7 @@ func (a *App) StartLoadTest(requestID, method, url, headersJSON, body, loadConfi
 	return nil
 }
 
-func (a *App) runLoadTest(ctx context.Context, cancel context.CancelFunc, requestID, method, url, headersJSON, body string, cfg lt.NormalizedConfig) {
+func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, method, url, headersJSON, body string, cfg lt.NormalizedConfig) {
 	start := time.Now()
 	startMs := start.UnixMilli()
 	var plannedDurationMs *int64
@@ -342,10 +342,6 @@ func (a *App) runLoadTest(ctx context.Context, cancel context.CancelFunc, reques
 	go func() {
 		if remaining <= 0 {
 			return
-		}
-		if cfg.AdaptiveEnabled {
-			// Adaptive mode: ramp is managed by allowedUsers and controller backoff.
-			// We still optionally ramp up toward MaxUsers unless instability triggers.
 		}
 		if !cfg.HasSpawnRate || spawnRate <= 0 {
 			// No explicit spawn control; allow full concurrency immediately.

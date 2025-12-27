@@ -73,7 +73,6 @@ type ScriptLogEntry struct {
 	Message   string `json:"message"`
 }
 
-// NewApp creates a new App application struct
 func NewApp() *App {
 	return &App{
 		variables:      make(map[string]string),
@@ -88,7 +87,6 @@ func NewApp() *App {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
-	// a.LoadData()
 }
 
 // onDomReady is called when the frontend DOM is ready
@@ -139,8 +137,6 @@ func (a *App) resolveResponseReferences(input string, responseStore map[string]m
 	return tpl.Resolve(input, a.variablesSnapshot(), a.currentEnvVarsSnapshot(), responseStore)
 }
 
-// parseResponse parses the response string into structured data for scripts
-// Response format: "Status: 200 OK\nHeaders: {...json...}\nBody: ..."
 func (a *App) parseResponse(response string) map[string]interface{} {
 	return rp.Parse(response)
 }
@@ -159,7 +155,6 @@ func (a *App) executeScript(rawScript string, ctx *sr.ExecutionContext, stage st
 	})
 }
 
-// ParseResponseForVariables parses JSON response and sets variables
 func (a *App) ParseResponseForVariables(responseBody string) {
 	a.variablesMu.Lock()
 	defer a.variablesMu.Unlock()
@@ -199,27 +194,3 @@ func (a *App) currentEnvVarsSnapshot() map[string]string {
 	}
 	return out
 }
-
-// SaveData saves environments and variables to files
-// func (a *App) SaveData() {
-// 	// Save environments
-// 	envData, _ := json.Marshal(a.environments)
-// 	os.WriteFile("environments.json", envData, 0644)
-
-// 	// Save variables
-// 	varData, _ := json.Marshal(a.variables)
-// 	os.WriteFile("variables.json", varData, 0644)
-// }
-
-// LoadData loads environments and variables from files
-// func (a *App) LoadData() {
-// 	// Load environments
-// 	if data, err := os.ReadFile("environments.json"); err == nil {
-// 		json.Unmarshal(data, &a.environments)
-// 	}
-
-// 	// Load variables
-// 	if data, err := os.ReadFile("variables.json"); err == nil {
-// 		json.Unmarshal(data, &a.variables)
-// 	}
-// }

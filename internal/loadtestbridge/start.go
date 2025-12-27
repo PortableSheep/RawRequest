@@ -8,7 +8,6 @@ import (
 	lt "rawrequest/internal/loadtest"
 )
 
-// NormalizeStartArgs trims and validates required parameters for starting a load test.
 func NormalizeStartArgs(requestID, method, url string) (string, string, string, error) {
 	requestID = strings.TrimSpace(requestID)
 	if requestID == "" {
@@ -24,7 +23,6 @@ func NormalizeStartArgs(requestID, method, url string) (string, string, string, 
 	return requestID, method, url, nil
 }
 
-// ParseAndNormalizeConfig parses JSON into a loadtest Config and normalizes it.
 func ParseAndNormalizeConfig(loadConfigJSON string) (lt.NormalizedConfig, error) {
 	var cfg lt.Config
 	if err := json.Unmarshal([]byte(loadConfigJSON), &cfg); err != nil {

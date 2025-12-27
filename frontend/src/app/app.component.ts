@@ -246,8 +246,6 @@ export class AppComponent implements OnInit, OnDestroy {
     this.restoreSplitState();
     this.refreshSplitLayoutState();
 
-    // Load initial data
-    // this.loadEnvironmentPreference();
     this.loadFiles();
     this.refreshSecrets(true);
 
@@ -263,9 +261,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.secretService
       .onMissingSecret()
       .pipe(takeUntil(this.destroy$))
-      .subscribe(({ env, key }) => {
-        // this.showAlert(`Secret "${key}" is missing in environment "${env}"`, 'warning');
-      });
+      .subscribe(() => {});
   }
 
   @HostListener('window:resize')
@@ -806,14 +802,6 @@ export class AppComponent implements OnInit, OnDestroy {
   lastResponseSummary(): { status: string; time: string; code: number } | null {
     return buildLastResponseSummary(this.currentFile, this.lastExecutedRequestIndex);
   }
-  //
-  // private loadEnvironmentPreference(): void {
-  //   this.currentEnv = localStorage.getItem('rawrequest_environment') || '';
-  // }
-  //
-  // private saveEnvironmentPreference(): void {
-  //   localStorage.setItem('rawrequest_environment', this.currentEnv);
-  // }
 
   private syncCurrentEnvWithFile(index: number): void {
     const synced = this.workspace.syncCurrentEnvWithFile(this.files, index);

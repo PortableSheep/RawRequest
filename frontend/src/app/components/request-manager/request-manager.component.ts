@@ -327,34 +327,6 @@ export class RequestManagerComponent {
     }
   }
 
-  // Environment management
-  // getEnvironments(): string[] {
-  //   const currentFile = this.files()[this.currentFileIndex()];
-  //   if (!currentFile) return ['local'];
-  //
-  //   // Extract environment names from the nested structure
-  //   const envs = Object.keys(currentFile.environments);
-  //
-  //   // If no environments defined, return a default
-  //   return envs.length > 0 ? envs : ['local'];
-  // }
-
-  // History management
-  // private loadHistory(): void {
-  //   this.history = this.httpService.loadHistory();
-  //   this.historyUpdated.emit(this.history);
-  // }
-
-  // viewHistoryItem(item: HistoryItem): void {
-  //   // This could open a modal or update the current request
-  //   console.log('Viewing history item:', item);
-  // }
-
-  // File operations
-  // saveFiles(): void {
-  //   this.httpService.saveFiles(this.files());
-  // }
-
   private async pushHistoryEntry(fileId: string, entry: HistoryItem, filePath?: string) {
     const history = await this.httpService.addToHistory(fileId, entry, filePath);
     this.history = history;

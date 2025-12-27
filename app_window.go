@@ -1,6 +1,3 @@
-// Window management functionality for RawRequest.
-// This file contains window state persistence, file dialogs, and file operations.
-
 package main
 
 import (
@@ -24,20 +21,16 @@ func (a *App) RevealInFinder(filePath string) error {
 		return errors.New("no file path provided")
 	}
 
-	// Check if the file exists
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		return errors.New("file does not exist: " + filePath)
 	}
 
 	switch goruntime.GOOS {
 	case "darwin":
-		// macOS: Use `open -R` to reveal in Finder
 		return exec.Command("open", "-R", filePath).Start()
 	case "windows":
-		// Windows: Use explorer with /select flag
 		return exec.Command("explorer", "/select,", filePath).Start()
 	case "linux":
-		// Linux: Open the parent directory with xdg-open
 		parentDir := filepath.Dir(filePath)
 		return exec.Command("xdg-open", parentDir).Start()
 	default:
@@ -45,7 +38,6 @@ func (a *App) RevealInFinder(filePath string) error {
 	}
 }
 
-// OpenFileDialog opens a native file dialog and returns the selected file paths
 func (a *App) OpenFileDialog() ([]string, error) {
 	files, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "Open HTTP File",
@@ -60,7 +52,6 @@ func (a *App) OpenFileDialog() ([]string, error) {
 	return files, nil
 }
 
-// ReadFileContents reads a file and returns its contents
 func (a *App) ReadFileContents(filePath string) (string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -69,7 +60,6 @@ func (a *App) ReadFileContents(filePath string) (string, error) {
 	return string(content), nil
 }
 
-// getWindowStatePath returns the path to the window state file
 func (a *App) getWindowStatePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
@@ -82,14 +72,12 @@ func (a *App) getWindowStatePath() (string, error) {
 	return filepath.Join(configDir, "window-state.json"), nil
 }
 
-// SaveWindowState saves the current window position and size
 func (a *App) SaveWindowState() error {
 	statePath, err := a.getWindowStatePath()
 	if err != nil {
 		return err
 	}
 
-	// Get current window position and size
 	x, y := runtime.WindowGetPosition(a.ctx)
 	width, height := runtime.WindowGetSize(a.ctx)
 	maximized := runtime.WindowIsMaximised(a.ctx)
@@ -110,7 +98,6 @@ func (a *App) SaveWindowState() error {
 	return os.WriteFile(statePath, data, 0644)
 }
 
-// LoadWindowState loads the saved window state
 func (a *App) LoadWindowState() (*WindowState, error) {
 	statePath, err := a.getWindowStatePath()
 	if err != nil {
@@ -132,15 +119,12 @@ func (a *App) LoadWindowState() (*WindowState, error) {
 
 	return &state, nil
 }
-
-// RestoreWindowState restores the window to its saved position and size
 func (a *App) RestoreWindowState() {
 	state, err := a.LoadWindowState()
 	if err != nil || state == nil {
-		return // Use defaults if no saved state
+		return
 	}
 
-	// Validate the state - ensure window is at least partially visible
 	if state.Width < 400 {
 		state.Width = 1024
 	}
@@ -158,7 +142,6 @@ func (a *App) RestoreWindowState() {
 	}
 }
 
-// SaveFileContents writes the given content to the provided file path and returns the path.
 func (a *App) SaveFileContents(filePath string, content string) (string, error) {
 	if filePath == "" {
 		return "", errors.New("no file path provided")
@@ -173,7 +156,6 @@ func (a *App) SaveFileContents(filePath string, content string) (string, error) 
 	return filePath, nil
 }
 
-// SaveResponseFile saves a response payload next to the HTTP file and returns the saved path.
 func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string, error) {
 	if httpFilePath == "" {
 		return "", errors.New("no http file path provided")
@@ -190,8 +172,6 @@ func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string
 	return outPath, nil
 }
 
-// SaveResponseFileToRunLocation saves a response payload under the current working directory
-// in a "responses" folder. This is used for unsaved tabs.
 func (a *App) SaveResponseFileToRunLocation(fileID string, responseJson string) (string, error) {
 	if fileID == "" {
 		return "", errors.New("no file id provided")
@@ -214,7 +194,6 @@ func (a *App) SaveResponseFileToRunLocation(fileID string, responseJson string) 
 	return outPath, nil
 }
 
-// ShowSaveDialog opens a native save dialog and returns the chosen path.
 func (a *App) ShowSaveDialog(defaultName string) (string, error) {
 	p, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
 		Title:           "Save HTTP File",

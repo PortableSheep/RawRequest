@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Parse parses the response string into structured data for scripts.
-// Response format: "Status: 200 OK\nHeaders: {...json...}\nBody: ..."
 func Parse(response string) map[string]interface{} {
 	result := make(map[string]interface{})
 	lines := strings.Split(response, "\n")

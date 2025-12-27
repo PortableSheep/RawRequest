@@ -6,7 +6,6 @@ import (
 	"strings"
 )
 
-// ArchiveSuffixFromURL returns a recognized archive suffix for the given URL.
 func ArchiveSuffixFromURL(url string) string {
 	lower := strings.ToLower(strings.TrimSpace(url))
 	switch {
