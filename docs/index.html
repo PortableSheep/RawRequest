@@ -29,7 +29,7 @@
         <div class="hero-text">
           <p class="eyebrow">Desktop HTTP client</p>
           <h1>Simple HTTP client for builders.</h1>
-          <p class="subhead">RawRequest is a HTTP client with folding, linting, scripts, secrets, and portable history.</p>
+          <p class="subhead">RawRequest is an HTTP client with folding, linting, scripts, secrets, and portable history.</p>
           <div class="hero-actions">
             <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
             <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
@@ -41,21 +41,28 @@
         <div class="hero-card">
           <div class="card-header">requests.http</div>
           <pre class="code"><code># Environments
-@env.dev.baseUrl http://localhost:3000
+@env.dev.baseUrl = http://localhost:3000
 @env.prod.baseUrl https://api.example.com
 
+# Globals (optional)
+@contentType = application/json
+
 ### Login
+@name login
+@timeout 15000
 POST {{baseUrl}}/auth/login
-Content-Type: application/json
+Content-Type: {{contentType}}
 {
   "email": "dev@rawrequest.dev",
   "password": "{{secret:password}}"
 }
 > {
+  assert(response.status === 200, `Expected 200, got ${response.status}`);
   setVar('token', response.json.token);
 }
 
 ### Get Profile
+@depends login
 GET {{baseUrl}}/profile
 Authorization: Bearer {{token}}
 Accept: application/json
@@ -66,24 +73,24 @@ Accept: application/json
       <section id="features" class="features">
         <div class="section-title">
           <h2>Built for builders</h2>
-          <p>Everything you need to move fast, nothing you don’t.</p>
+          <p>Focused features for day-to-day API work.</p>
         </div>
         <div class="grid">
           <div class="card">
             <h3>Code-first editor</h3>
-            <p>CodeMirror 6 with search, folding, linting, and smart variable diagnostics.</p>
+            <p>CodeMirror 6 with search, folding, linting, and variable diagnostics that match your current file + env.</p>
           </div>
           <div class="card">
             <h3>Secrets & envs</h3>
-            <p>Encrypted vault with global + per-environment keys. No accidental diff leaks.</p>
+            <p>Use <code>{{secret:key}}</code> placeholders and environment variables without sprinkling secrets into request files.</p>
           </div>
           <div class="card">
             <h3>Portable history</h3>
-            <p>History and responses live beside your .http file (or cwd). Predictable, reviewable.</p>
+            <p>History and responses live beside your .http file (or working directory for unsaved files). Predictable, reviewable.</p>
           </div>
           <div class="card">
             <h3>Scripts & chaining</h3>
-            <p>Pre/post scripts with goja, setVar chaining, response parsing helpers.</p>
+            <p>Pre/post scripts (goja) with <code>setVar</code>/<code>getVar</code>, request patching, and simple assertions via <code>assert(...)</code>.</p>
           </div>
         </div>
       </section>
@@ -91,21 +98,21 @@ Accept: application/json
       <section id="workflow" class="workflow">
         <div class="section-title">
           <h2>A workflow that sticks</h2>
-          <p>Keep requests, history, and scripts in text — ready for git.</p>
+          <p>Keep requests and scripts in text, keep outputs nearby, and ship changes with confidence.</p>
         </div>
         <div class="steps">
           <div class="step">
             <div class="step-num">1</div>
             <div>
               <h3>Author .http files</h3>
-              <p>Organize requests with headings, env placeholders, and scripts. Run any section instantly.</p>
+              <p>Organize requests with <code>###</code> separators, env placeholders, and scripts. Run any request instantly.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
             <div>
               <h3>Wire secrets + envs</h3>
-              <p>Pull from secure vaults and system env vars. Lint catches unknown keys early.</p>
+              <p>Use the vault + per-environment vars; lint catches missing placeholders before you hit “send”.</p>
             </div>
           </div>
           <div class="step">

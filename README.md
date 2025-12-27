@@ -17,7 +17,7 @@ A modern, lightweight HTTP client for developers. Built with [Wails](https://wai
 - ⚡ **Load Testing** - Built-in load testing with `@load`
 - 🔐 **Secrets Management** - Encrypted vault for sensitive data
 - 🌍 **Environments** - Switch between dev, staging, prod
-- 📜 **Pre/Post Scripts** - JavaScript scripts for dynamic requests
+- 📜 **Pre/Post Scripts** - JavaScript pre/post blocks for dynamic requests
 
 ## Installation
 
@@ -58,8 +58,11 @@ Create a file called `requests.http`:
 
 ```http
 # Environment variables
-@env.dev.baseUrl http://localhost:3000
+@env.dev.baseUrl = http://localhost:3000
 @env.prod.baseUrl https://api.example.com
+
+# Optional globals (useful for defaults + autocomplete)
+@contentType = application/json
 
 ### Simple GET request
 GET {{baseUrl}}/users
@@ -76,8 +79,9 @@ Content-Type: application/json
 
 ### Request with pre/post scripts
 @name login
+@timeout 15000
 POST {{baseUrl}}/auth/login
-Content-Type: application/json
+Content-Type: {{contentType}}
 
 {
   "username": "admin",
@@ -85,7 +89,7 @@ Content-Type: application/json
 }
 
 > {
-  // Store the token from response
+  assert(response.status === 200, `Expected 200, got ${response.status}`);
   setVar('token', response.json.token);
   console.log('Logged in!');
 }
@@ -96,6 +100,10 @@ Content-Type: application/json
 GET {{baseUrl}}/profile
 Authorization: Bearer {{token}}
 ```
+
+Notes:
+- Env vars support either whitespace or an equals sign (e.g. `@env.dev.baseUrl https://...` or `@env.dev.baseUrl = https://...`).
+- Assertions are done in scripts via `assert(...)`.
 
 ## Documentation
 
