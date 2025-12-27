@@ -1173,12 +1173,4 @@ Content-Type: application/json
 # - request.headers        → Request headers object
 # - request.body           → Request body
 #
-# TIPS:
-# - Use Ctrl+Enter to execute the request at cursor
-# - Click play button (▶) in gutter to run specific request
-# - Click chain button (🔗) to run dependent request chain
-# - Click lightning (⚡) to run load test
-# - View history in sidebar to replay past requests
-# - Use secrets for sensitive data - never commit API keys!
-#
 ###############################################################################
