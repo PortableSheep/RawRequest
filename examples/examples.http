@@ -24,7 +24,6 @@
 @env.dev.apiKey dev-api-key-67890
 @env.dev.timeout 60000
 
-
 @env.test.baseUrl https://test-api.example.com
 @env.test.apiKey test-api-key-abcde
 @env.test.timeout 60000
@@ -126,8 +125,6 @@ HEAD https://httpbun.com/get
 ### OPTIONS request (check available methods)
 OPTIONS https://httpbun.com/get
 
-###
-
 ###############################################################################
 # 4. REQUEST CHAINING & DEPENDENCIES
 ###############################################################################
@@ -160,8 +157,6 @@ Content-Type: application/json
   setVar('userId', 'user-' + Math.floor(Math.random() * 1000));
 }
 
-###
-
 ### Get User Profile - Depends on login
 @name getUserProfile
 @depends login
@@ -175,8 +170,6 @@ Accept: application/json
   setVar('userEmail', 'user@example.com');
   setVar('userName', 'Test User');
 }
-
-###
 
 ### Update User Profile - Depends on getUserProfile
 @name updateProfile
@@ -196,8 +189,6 @@ Content-Type: application/json
   console.log('Profile updated successfully!');
   setVar('profileUpdated', true);
 }
-
-###
 
 ###############################################################################
 # 5. PRE & POST SCRIPTS
@@ -230,8 +221,6 @@ GET https://httpbun.com/delay/1
   }
 }
 
-###
-
 ###############################################################################
 # 6. ASSERTIONS
 ###############################################################################
@@ -250,8 +239,6 @@ GET https://httpbun.com/get
   const responseUrl = String(response.json?.url ?? '');
   assert(responseUrl.includes('httpbun.com/get'), `Expected response.json.url to include httpbun.com/get, got ${responseUrl}`);
 }
-
-###
 
 ###############################################################################
 # 7. LOAD TESTING
@@ -324,8 +311,6 @@ GET https://httpbun.com/get
 @load users=10 duration=30s failureRateThreshold=5%
 GET https://httpbun.com/status/503
 
-###
-
 ### Adaptive backoff (ramp up, then back off until stable, then stop)
 @name loadTestAdaptiveBackoff
 @load start=1 max=50 spawnRate=5 duration=2m rps=100 \
@@ -356,8 +341,6 @@ Authorization: Bearer {{token}}
 X-API-Key: {{apiKey}}
 X-Client-ID: client-demo
 
-###
-
 ###############################################################################
 # 9. COMPLEX WORKFLOWS
 ###############################################################################
@@ -376,8 +359,6 @@ Content-Type: application/json
   setVar('sessionId', 'sess-' + Math.random().toString(36).substr(2, 12));
   console.log('Session initialized:', getVar('sessionId'));
 }
-
-###
 
 ### Step 2: Create resource
 @name createResource
@@ -398,8 +379,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource created:', resourceId);
 }
 
-###
-
 ### Step 3: Read resource
 @name readResource
 @depends createResource
@@ -410,8 +389,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource retrieved:', getVar('resourceId'));
   setVar('resourceData', JSON.stringify(response.json));
 }
-
-###
 
 ### Step 4: Update resource
 @name updateResource
@@ -430,8 +407,6 @@ X-Session-ID: {{sessionId}}
   console.log('Resource updated successfully');
 }
 
-###
-
 ### Step 5: Delete resource
 @name deleteResource
 @depends updateResource
@@ -442,8 +417,6 @@ X-Session-ID: {{sessionId}}
   console.log('Workflow completed - resource deleted');
   console.log('Session:', getVar('sessionId'));
 }
-
-###
 
 ###############################################################################
 # 10. ERROR HANDLING
@@ -460,8 +433,6 @@ GET https://httpbun.com/status/404
   }
 }
 
-###
-
 ### Handle 500 error
 @name handle500
 GET https://httpbun.com/status/500
@@ -472,8 +443,6 @@ GET https://httpbun.com/status/500
     setVar('serverError', true);
   }
 }
-
-###
 
 ###############################################################################
 # 11. GRAPHQL REQUESTS
@@ -492,8 +461,6 @@ X-Request-Type: GraphQL
   }
 }
 
-###
-
 ### GraphQL mutation
 @name graphqlMutation
 POST https://httpbun.com/post
@@ -508,8 +475,6 @@ Content-Type: application/json
     }
   }
 }
-
-###
 
 ###############################################################################
 # 12. FILE UPLOAD (MULTIPART)
@@ -543,8 +508,6 @@ Content-Disposition: form-data; name="category"
 documents
 --boundary123--
 
-###
-
 ###############################################################################
 # 13. CUSTOM HEADERS & AUTHENTICATION
 ###############################################################################
@@ -555,22 +518,16 @@ GET https://httpbun.com/basic-auth/user/passwd
 ### group: Authentication ###
 Authorization: Basic dXNlcjpwYXNzd2Q=
 
-###
-
 ### Bearer Token Authentication
 @name bearerAuth
 GET https://httpbun.com/bearer
 Authorization: Bearer {{token}}
-
-###
 
 ### API Key Authentication
 @name apiKeyAuth
 GET https://httpbun.com/get
 X-API-Key: {{apiKey}}
 X-Client-ID: client-123
-
-###
 
 ### Custom Headers
 @name customHeaders
@@ -581,8 +538,6 @@ X-Request-ID: {{requestId}}
 X-Correlation-ID: corr-{{sessionId}}
 Accept-Language: en-US,en;q=0.9
 Cache-Control: no-cache
-
-###
 
 ###############################################################################
 # 14. DIFFERENT CONTENT TYPES
@@ -600,12 +555,13 @@ Content-Type: application/json
   }
 }
 
-###
-
 ### XML request
 @name xmlRequest
 POST https://httpbun.com/post
 Content-Type: application/xml
+
+# Note: The echo service responds with JSON; your XML payload is preserved verbatim
+# and returned as a string (typically under a field like "data"), not parsed into a structure.
 
 <?xml version="1.0" encoding="UTF-8"?>
 <request>
@@ -616,16 +572,12 @@ Content-Type: application/xml
   </data>
 </request>
 
-###
-
 ### Form URL encoded
 @name formRequest
 POST https://httpbun.com/post
 Content-Type: application/x-www-form-urlencoded
 
 name=John+Doe&email=john@example.com&age=30&subscribe=true
-
-###
 
 ### Plain text request
 @name textRequest
@@ -635,8 +587,6 @@ Content-Type: text/plain
 This is plain text content.
 It can span multiple lines.
 
-###
-
 ###############################################################################
 # 15. QUERY PARAMETERS & DYNAMIC URLS
 ###############################################################################
@@ -645,13 +595,9 @@ It can span multiple lines.
 @name queryParams
 GET https://httpbun.com/get?search={{userName}}&page=1&limit=10&sort=desc
 
-###
-
 ### Dynamic URL construction
 @name dynamicUrl
 GET {{baseUrl}}/api/{{apiVersion}}/users/{{userId}}/profile?include=posts,comments
-
-###
 
 ###############################################################################
 # 16. TESTING & DEBUGGING
@@ -679,11 +625,10 @@ GET https://httpbun.com/get
 > {
   console.log('=== DEBUG RESPONSE ===');
   console.log('Status:', response.status);
+  setVar('lastResponseTime', String(response.responseTime || 0));
   console.log('Response time:', getVar('lastResponseTime'), 'ms');
   console.log('Response body:', JSON.stringify(response.json, null, 2));
 }
-
-###
 
 ### Performance test
 @name performanceTest
@@ -702,8 +647,6 @@ GET https://httpbun.com/delay/2
   }
 }
 
-###
-
 ###############################################################################
 # 17. DYNAMIC JAVASCRIPT EXPRESSIONS IN VARIABLES
 ###############################################################################
@@ -718,7 +661,6 @@ Content-Type: application/json
   setVar('timestamp', new Date().toISOString());
   setVar('randomId', Math.random().toString(36).substr(2, 9));
   setVar('unixTime', String(Date.now()));
-  // Avoid relying on crypto.randomUUID() availability
   setVar('uuid', 'id-' + Date.now() + '-' + Math.random().toString(16).slice(2));
 }
 
@@ -728,8 +670,6 @@ Content-Type: application/json
   "unixTime": "{{unixTime}}",
   "uuid": "{{uuid}}"
 }
-
-###
 
 ###############################################################################
 # 18. CONDITIONAL LOGIC IN SCRIPTS
@@ -761,8 +701,6 @@ GET https://httpbun.com/get
   }
 }
 
-###
-
 ###############################################################################
 # 19. RESPONSE DATA EXTRACTION & MANIPULATION
 ###############################################################################
@@ -771,6 +709,11 @@ GET https://httpbun.com/get
 @name dataExtraction
 POST https://httpbun.com/post
 Content-Type: application/json
+
+< {
+  // Capture start time so we can compute response time in the post-script.
+  setVar('requestStartTime', String(Date.now()));
+}
 
 {
   "slideshow": {
@@ -807,20 +750,44 @@ Content-Type: application/json
     setVar('title', slideshow.title);
     setVar('author', slideshow.author);
     setVar('slides', JSON.stringify(slideshow.slides));
+
+    // Manipulation: derive normalized/aggregated fields.
+    const slides = Array.isArray(slideshow.slides) ? slideshow.slides : [];
+    const slideTitles = slides
+      .map((s) => String(s?.title || '').trim())
+      .filter(Boolean);
+
+    setVar('slideCount', String(slides.length));
+    setVar('slideTitles', JSON.stringify(slideTitles));
+
+    const totalBulletItems = slides.reduce((sum, s) => {
+      return sum + (Array.isArray(s?.items) ? s.items.length : 0);
+    }, 0);
+    setVar('totalBulletItems', String(totalBulletItems));
+
+    const authorSlug = String(slideshow.author || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
+    setVar('authorSlug', authorSlug);
   }
 
   // Transform and store
   setVar('dataSize', JSON.stringify(data || {}).length);
-  setVar('responseTime', Date.now() - getVar('requestStartTime') || 0);
+  const startMs = Number(getVar('requestStartTime') || '0');
+  const responseTimeMs = startMs ? Math.max(0, Date.now() - startMs) : 0;
+  setVar('responseTimeMs', String(responseTimeMs));
 
   console.log('Extracted:', {
     title: getVar('title'),
     author: getVar('author'),
+    slideCount: getVar('slideCount'),
+    totalBulletItems: getVar('totalBulletItems'),
+    authorSlug: getVar('authorSlug'),
+    responseTimeMs: getVar('responseTimeMs'),
     size: getVar('dataSize') + ' bytes'
   });
 }
-
-###
 
 ###############################################################################
 # 20. COMPREHENSIVE WORKFLOW - E-COMMERCE CHECKOUT
@@ -834,11 +801,12 @@ Content-Type: application/json
 
 {
   "action": "init_checkout",
-  "timestamp": "{{new Date().toISOString()}}"
+  "timestamp": "{{timestamp}}"
 }
 
 < {
   console.log('🛒 Starting checkout flow...');
+  setVar('timestamp', new Date().toISOString());
   setVar('checkoutStartTime', Date.now());
 }
 
@@ -847,8 +815,6 @@ Content-Type: application/json
   setVar('checkoutSessionId', sessionId);
   console.log('Session initialized:', sessionId);
 }
-
-###
 
 ### Step 2: Add Items to Cart (depends on session)
 @name addToCart
@@ -872,8 +838,6 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Cart total: $' + total.toFixed(2));
 }
 
-###
-
 ### Step 3: Apply Discount Code
 @name applyDiscount
 @depends addToCart
@@ -894,8 +858,6 @@ X-Session-ID: {{checkoutSessionId}}
   console.log('Discount applied: -$' + discount.toFixed(2));
   console.log('Final total: $' + finalTotal.toFixed(2));
 }
-
-###
 
 ### Step 4: Process Payment
 @name processPayment
@@ -922,8 +884,6 @@ Authorization: Bearer {{token}}
     throw new Error('Payment processing failed');
   }
 }
-
-###
 
 ### Step 5: Script helper & console showcase (optional)
 @name helperShowcase
@@ -961,13 +921,15 @@ GET https://httpbun.com/any
   console.log('Console output is visible live inside the Script Console tray.');
 }
 
-###
-
 ### Step 6: Send Confirmation Email
 @name sendConfirmation
 @depends processPayment
 POST https://httpbun.com/post
 Content-Type: application/json
+
+< {
+  setVar('timestamp', new Date().toISOString());
+}
 
 {
   "to": "customer@example.com",
@@ -975,7 +937,7 @@ Content-Type: application/json
   "orderId": "{{checkoutSessionId}}",
   "transactionId": "{{transactionId}}",
   "amount": {{finalTotal}},
-  "timestamp": "{{new Date().toISOString()}}"
+  "timestamp": "{{timestamp}}"
 }
 
 > {
@@ -988,8 +950,6 @@ Content-Type: application/json
 
 	assert(response.status === 200, `Expected status 200, got ${response.status}`);
 }
-
-###
 
 ###############################################################################
 # 21. SCRIPT CONSOLE & HELPER QUICK REFERENCE
@@ -1037,44 +997,8 @@ Content-Type: application/json
   setVar('totalUsersCreated', userIds.length);
 }
 
-###
-
 ###############################################################################
-# 23. RETRY LOGIC AND ERROR RECOVERY
-###############################################################################
-
-### Request with retry logic
-@name retryExample
-GET https://httpbun.com/status/503
-
-< {
-  if (!getVar('retryCount')) {
-    setVar('retryCount', 0);
-  }
-}
-
-> {
-  if (response.status >= 500) {
-    const retryCount = parseInt(getVar('retryCount') || '0');
-
-    if (retryCount < 3) {
-      setVar('retryCount', retryCount + 1);
-      console.warn(`Request failed (attempt ${retryCount + 1}/3). Retry needed.`);
-      setVar('shouldRetry', true);
-    } else {
-      console.error('Max retries reached. Request failed permanently.');
-      setVar('shouldRetry', false);
-    }
-  } else {
-    console.log('Request succeeded!');
-    setVar('retryCount', 0);
-  }
-}
-
-###
-
-###############################################################################
-# 24. DATA VALIDATION & TESTING
+# 23. DATA VALIDATION & TESTING
 ###############################################################################
 
 ### Comprehensive validation test
@@ -1135,8 +1059,6 @@ Content-Type: application/json
     setVar('validationPassed', true);
   }
 }
-
-###
 
 ###############################################################################
 # END OF EXAMPLES

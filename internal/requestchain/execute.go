@@ -41,15 +41,54 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 	}
 
 	readTimeoutMs := func(req map[string]interface{}) int {
-		timeoutMs := 0
-		if options, exists := req["options"].(map[string]interface{}); exists {
+		// Support a few shapes depending on how the data reaches Go (Wails/runtime, tests, etc).
+		readTimeoutFromOptions := func(options map[string]interface{}) int {
+			if options == nil {
+				return 0
+			}
 			if timeout, ok := options["timeout"].(float64); ok {
-				timeoutMs = int(timeout)
-			} else if timeout, ok := options["timeout"].(int); ok {
-				timeoutMs = timeout
+				return int(timeout)
+			}
+			if timeout, ok := options["timeout"].(int); ok {
+				return timeout
+			}
+			if timeout, ok := options["timeout"].(int64); ok {
+				return int(timeout)
+			}
+			if timeout, ok := options["timeout"].(string); ok {
+				// Be lenient: treat non-empty numeric strings as ms.
+				// (If parsing fails, fall back to 0.)
+				var n int
+				_, _ = fmt.Sscanf(strings.TrimSpace(timeout), "%d", &n)
+				return n
+			}
+			return 0
+		}
+
+		if raw, exists := req["options"]; exists {
+			switch opt := raw.(type) {
+			case map[string]interface{}:
+				return readTimeoutFromOptions(opt)
+			case map[string]float64:
+				if v, ok := opt["timeout"]; ok {
+					return int(v)
+				}
+			case map[string]int:
+				if v, ok := opt["timeout"]; ok {
+					return v
+				}
 			}
 		}
-		return timeoutMs
+
+		// Back-compat: allow a top-level "timeout" field.
+		if v, ok := req["timeout"].(float64); ok {
+			return int(v)
+		}
+		if v, ok := req["timeout"].(int); ok {
+			return v
+		}
+
+		return 0
 	}
 
 	readHeaders := func(req map[string]interface{}) map[string]string {
@@ -113,6 +152,13 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 		result := deps.PerformRequest(ctx, method, url, string(headersJSON), body, timeoutMs)
 		if result == deps.CancelledResponse {
 			return deps.CancelledResponse
+		}
+
+		// On any request error (including timeout), stop the chain and return partial results.
+		// The caller can parse/display the error response as the final chain step.
+		if strings.HasPrefix(result, "Error:") || strings.HasPrefix(result, "Error ") {
+			results = append(results, result)
+			break
 		}
 		results = append(results, result)
 

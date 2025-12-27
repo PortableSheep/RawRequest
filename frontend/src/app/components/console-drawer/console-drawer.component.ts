@@ -55,6 +55,31 @@ export class ConsoleDrawerComponent {
       }
       this.syncAnimatedState(isOpen);
     });
+
+    effect(() => {
+      // Keep a global CSS var updated so other fixed UI can sit above the console.
+      // This avoids the "load test running" bar being hidden behind the drawer.
+      if (typeof document === 'undefined') {
+        return;
+      }
+
+      const visible = this.isDrawerVisible();
+      // Track height changes (resize) as well.
+      void this.panelHeight();
+
+      const root = document.documentElement;
+      if (!visible) {
+        root.style.setProperty('--rr-console-offset', '0px');
+        return;
+      }
+
+      // Measure after layout.
+      requestAnimationFrame(() => {
+        const shell = this.drawerShell?.nativeElement;
+        const rectHeight = shell ? shell.getBoundingClientRect().height : 0;
+        root.style.setProperty('--rr-console-offset', `${Math.ceil(rectHeight)}px`);
+      });
+    });
   }
 
   ngAfterViewInit(): void {

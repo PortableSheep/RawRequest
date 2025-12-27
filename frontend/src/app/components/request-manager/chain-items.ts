@@ -49,7 +49,7 @@ export function buildChainItems(
   primaryIndex: number
 ): ChainEntryPreview[] {
   return chain.map((req, idx) => {
-    const preview = ensureRequestPreview(req, previews[idx]);
+    const preview = ensureRequestPreview(req, responses[idx]?.requestPreview ?? previews[idx]);
     const responsePreview = toResponsePreview(responses[idx]);
 
     return {

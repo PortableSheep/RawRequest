@@ -170,20 +170,20 @@ html, body {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: color-mix(in srgb, var(--color-zinc-800), transparent 75%);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-zinc-800);
+  background: var(--color-zinc-600);
   border-radius: 4px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-zinc-600);
+  background: var(--color-zinc-400);
   border: 2px solid transparent;
   background-clip: content-box;
 }

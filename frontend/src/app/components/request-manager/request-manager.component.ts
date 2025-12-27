@@ -194,7 +194,8 @@ export class RequestManagerComponent {
       console.log('[RequestManager] Chain execution completed with', responses.length, 'responses');
 
       const lastResponse = responses[responses.length - 1];
-      const chainItems = this.buildChainItems(chain, execution.requestPreviews, responses, chain.length - 1);
+      const primaryIndex = Math.max(0, responses.length - 1);
+      const chainItems = this.buildChainItems(chain, execution.requestPreviews, responses, primaryIndex);
       const decoratedLastResponse = { ...lastResponse, chainItems };
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedLastResponse);
@@ -213,7 +214,7 @@ export class RequestManagerComponent {
       // Send notification if app is in background
       const totalDuration = responses.reduce((sum, r) => sum + (r?.responseTime || 0), 0);
       const allSuccessful = responses.every(r => r && r.status >= 200 && r.status < 300);
-      this.notificationService.notifyChainComplete(chain.length, totalDuration, allSuccessful);
+      this.notificationService.notifyChainComplete(responses.length, totalDuration, allSuccessful);
 
       this.requestExecuted.emit({ requestIndex, response: decoratedLastResponse });
     } catch (error: any) {

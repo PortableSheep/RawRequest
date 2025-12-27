@@ -24,6 +24,7 @@ import type { SecretIndex } from '../../services/secret.service';
 import {
   extractDependsTarget,
   extractSetVarKeys,
+  isMethodLine,
   isSeparatorLine,
   ENV_PLACEHOLDER_REGEX,
   REQUEST_REF_PLACEHOLDER_REGEX,
@@ -652,7 +653,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       getVariables: () => this.variables(),
       getEnvironments: () => this.environments(),
       getCurrentEnv: () => this.currentEnv(),
-      getSecrets: () => this.secrets() || {}
+      getSecrets: () => this.secrets() || {},
+      getRequests: () => this.requests(),
+      getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos)
     });
   }
 
@@ -767,6 +770,22 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       }
     }
 
-    return null;
+    // Fallback: compute request index by counting method lines up to `pos`.
+    // This is slower (O(lines)) but robust when Lezer doesn't produce RequestBlock ranges
+    // (e.g., when top-level annotations confuse the parser).
+    let idx = -1;
+    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
+      const line = state.doc.line(lineNo);
+      if (isMethodLine(line.text)) {
+        idx++;
+      }
+      if (pos <= line.to) {
+        break;
+      }
+    }
+
+    if (idx < 0) return null;
+    if (idx >= this.requests().length) return null;
+    return idx;
   }
 }

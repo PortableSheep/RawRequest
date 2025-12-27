@@ -3,6 +3,14 @@ import { Request, ResponseData, RequestPreview } from '../../models/http.models'
 export type SendRequestBackend = {
   sendRequest: (method: string, url: string, headersJson: string, bodyStr: string) => Promise<string>;
   sendRequestWithID: (requestId: string, method: string, url: string, headersJson: string, bodyStr: string) => Promise<string>;
+  sendRequestWithTimeout: (
+    requestId: string,
+    method: string,
+    url: string,
+    headersJson: string,
+    bodyStr: string,
+    timeoutMs: number
+  ) => Promise<string>;
 };
 
 export type SendRequestDeps = {
@@ -77,23 +85,17 @@ export async function sendRequest(
       body: processedBody ?? bodyPlaceholder,
     };
 
-    if (request.options?.timeout) {
-      // Note: backend call isn't actually aborted by this, but preserve the existing side effect.
-      if (typeof AbortController !== 'undefined') {
-        const controller = new AbortController();
-        requestOptions.signal = controller.signal;
-        setTimeout(() => controller.abort(), request.options.timeout);
-      }
-    }
-
     const headersJson = JSON.stringify(processedHeaders);
     const bodyStr = requestOptions.body ? String(requestOptions.body) : '';
 
     deps.log?.debug?.('[HTTP Service] Sending request:', { method: request.method, url: processedUrl });
 
-    const responseStr = requestId
-      ? await deps.backend.sendRequestWithID(requestId, request.method, processedUrl, headersJson, bodyStr)
-      : await deps.backend.sendRequest(request.method, processedUrl, headersJson, bodyStr);
+    const timeoutMs = request.options?.timeout;
+    const responseStr = typeof timeoutMs === 'number' && timeoutMs > 0
+      ? await deps.backend.sendRequestWithTimeout(requestId ?? '', request.method, processedUrl, headersJson, bodyStr, timeoutMs)
+      : requestId
+        ? await deps.backend.sendRequestWithID(requestId, request.method, processedUrl, headersJson, bodyStr)
+        : await deps.backend.sendRequest(request.method, processedUrl, headersJson, bodyStr);
 
     deps.throwIfCancelled(responseStr);
 

@@ -31,6 +31,9 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 	if ctx == nil {
 		ctx = &sr.ExecutionContext{}
 	}
+	if ctx.Request == nil {
+		ctx.Request = map[string]interface{}{}
+	}
 	ctx.Stage = stage
 	if ctx.Variables == nil {
 		ctx.Variables = safeSnapshot(deps.VariablesSnapshot)
@@ -50,6 +53,16 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 
 	vm := goja.New()
 	_ = vm.Set("context", ctx)
+
+	// Provide top-level aliases commonly used by scripts/examples.
+	// `request` is always available (mutable via helpers).
+	// `response` is always defined; for pre-scripts it is null.
+	_ = vm.Set("request", ctx.Request)
+	if ctx.Response == nil {
+		_ = vm.Set("response", goja.Null())
+	} else {
+		_ = vm.Set("response", ctx.Response)
+	}
 	source := sr.BuildSource(ctx)
 
 	appendLog := deps.AppendLog
@@ -149,7 +162,18 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 		}
 	}()
 
-	if _, err := vm.RunString(cleanScript); err != nil {
+	// Execute inside a wrapper function that provides common globals as parameters.
+	// This avoids ReferenceError issues if scripts assume `response` exists even in pre-scripts
+	// and keeps any script-provided 'use strict' directive valid.
+	wrappedScript := fmt.Sprintf(
+		"(function(__g){\n"+
+			"(function(context, request, response){\n%s\n"+
+			"})(__g.context, __g.request, __g.response);\n"+
+			"})(Function('return this')());",
+		cleanScript,
+	)
+
+	if _, err := vm.RunString(wrappedScript); err != nil {
 		log("error", fmt.Sprintf("runtime error: %v", err))
 	}
 }

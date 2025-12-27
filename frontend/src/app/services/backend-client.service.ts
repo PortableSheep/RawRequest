@@ -9,6 +9,7 @@ import {
   LoadFileHistoryFromDir,
   LoadFileHistoryFromRunLocation,
   SendRequestWithID,
+  SendRequestWithTimeout,
   ExecuteRequestsWithID,
   CancelRequest,
   SaveResponseFile,
@@ -25,6 +26,17 @@ export class BackendClientService {
 
   sendRequestWithID(id: string, method: string, url: string, headersJson: string, body: string): Promise<string> {
     return SendRequestWithID(id, method, url, headersJson, body);
+  }
+
+  sendRequestWithTimeout(
+    id: string,
+    method: string,
+    url: string,
+    headersJson: string,
+    body: string,
+    timeoutMs: number
+  ): Promise<string> {
+    return SendRequestWithTimeout(id, method, url, headersJson, body, timeoutMs);
   }
 
   executeRequests(requests: Array<Record<string, any>>): Promise<string> {

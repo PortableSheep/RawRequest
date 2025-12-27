@@ -21,6 +21,7 @@ describe('send-request', () => {
     const backend = {
       sendRequest: jest.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
       sendRequestWithID: jest.fn(async () => ''),
+      sendRequestWithTimeout: jest.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
     };
 
     const throwIfCancelled = jest.fn();
@@ -84,6 +85,7 @@ describe('send-request', () => {
         throw new Error('boom');
       }),
       sendRequestWithID: jest.fn(async () => ''),
+      sendRequestWithTimeout: jest.fn(async () => ''),
     };
 
     await expect(
@@ -124,7 +126,10 @@ describe('send-request', () => {
     const backend = {
       sendRequest: jest.fn(async () => '__CANCELLED__'),
       sendRequestWithID: jest.fn(async () => ''),
+      sendRequestWithTimeout: jest.fn(async () => ''),
     };
+
+    expect(backend.sendRequestWithTimeout).not.toHaveBeenCalled();
 
     const cancelled: any = new Error('Request cancelled');
     cancelled.cancelled = true;
@@ -154,5 +159,42 @@ describe('send-request', () => {
         }
       )
     ).rejects.toBe(cancelled);
+  });
+
+  it('uses backend timeout call when request.options.timeout is set', async () => {
+    const backend = {
+      sendRequest: jest.fn(async () => ''),
+      sendRequestWithID: jest.fn(async () => ''),
+      sendRequestWithTimeout: jest.fn(async () => 'Status: 200 OK\nHeaders: {}\nBody: ok'),
+    };
+
+    await sendRequest(
+      {
+        method: 'GET',
+        url: 'https://example.com',
+        headers: {},
+        options: { timeout: 123 },
+      } as any,
+      {},
+      'rid',
+      undefined,
+      {
+        backend,
+        normalizeEnvName: (e) => e || '',
+        hydrateText: async (t) => t,
+        hydrateHeaders: async (h) => h || {},
+        executeScript: async () => {},
+        parseGoResponse: (s: string, t: number) => ({ status: 200, statusText: 'OK', headers: {}, body: s, responseTime: t } as any),
+        throwIfCancelled: () => {},
+        now: (() => {
+          let t = 100;
+          return () => (t += 5);
+        })(),
+      }
+    );
+
+    expect(backend.sendRequestWithTimeout).toHaveBeenCalledTimes(1);
+    expect(backend.sendRequest).not.toHaveBeenCalled();
+    expect(backend.sendRequestWithID).not.toHaveBeenCalled();
   });
 });

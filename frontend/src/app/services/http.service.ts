@@ -95,6 +95,8 @@ export class HttpService {
         sendRequest: (method, url, headersJson, bodyStr) => this.backend.sendRequest(method, url, headersJson, bodyStr),
         sendRequestWithID: (id, method, url, headersJson, bodyStr) =>
           this.backend.sendRequestWithID(id, method, url, headersJson, bodyStr),
+        sendRequestWithTimeout: (id, method, url, headersJson, bodyStr, timeoutMs) =>
+          this.backend.sendRequestWithTimeout(id, method, url, headersJson, bodyStr, timeoutMs),
       },
       now: () => Date.now(),
       normalizeEnvName: (e) => this.normalizeEnvName(e),

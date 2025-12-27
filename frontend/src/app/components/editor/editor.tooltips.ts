@@ -1,11 +1,17 @@
 import type { Extension } from '@codemirror/state';
 import { hoverTooltip } from '@codemirror/view';
 
+import { findChainVarOriginText } from './editor.chain-vars';
+
 export type TooltipDeps = {
   getVariables: () => { [key: string]: string };
   getEnvironments: () => { [env: string]: { [key: string]: string } };
   getCurrentEnv: () => string;
   getSecrets: () => Partial<Record<string, string[]>>;
+
+  // Optional: enables chain provenance for variables created via setVar(...) in pre/post scripts.
+  getRequests?: () => any[];
+  getRequestIndexAtPos?: (state: any, pos: number) => number | null;
 };
 
 export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extension {
@@ -31,6 +37,13 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
       const secrets = deps.getSecrets() || {};
       const currentEnvVars = currentEnvName ? envs[currentEnvName] || {} : {};
 
+      const requestIndex = deps.getRequests && deps.getRequestIndexAtPos
+        ? deps.getRequestIndexAtPos(view.state as any, start)
+        : null;
+      const chainOrigin = requestIndex !== null && deps.getRequests
+        ? findChainVarOriginText(varName, requestIndex, deps.getRequests())
+        : null;
+
       // Check if it's a regular variable
       if (vars[varName] !== undefined) {
         return {
@@ -46,6 +59,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
               <div class="tooltip-header">📦 Variable</div>
               <div class="tooltip-name">${escapeHtml(varName)}</div>
               <div class="tooltip-value">${escapeHtml(displayValue)}</div>
+              ${chainOrigin ? `<div class="tooltip-hint">${escapeHtml(chainOrigin)}</div>` : ''}
             `;
             return { dom };
           }
@@ -136,6 +150,25 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
               <div class="tooltip-header">🔗 Request Reference</div>
               <div class="tooltip-name">${escapeHtml(reqMatch[1])}.${escapeHtml(reqMatch[2])}</div>
               <div class="tooltip-hint">Value resolved at runtime from previous request</div>
+            `;
+            return { dom };
+          }
+        };
+      }
+
+      // Variable isn't defined yet, but will be created by setVar(...) earlier in the chain.
+      if (chainOrigin) {
+        return {
+          pos: start,
+          end: end,
+          above: true,
+          create() {
+            const dom = document.createElement('div');
+            dom.className = 'cm-variable-tooltip';
+            dom.innerHTML = `
+              <div class="tooltip-header">🔗 Chain Variable</div>
+              <div class="tooltip-name">${escapeHtml(varName)}</div>
+              <div class="tooltip-hint">${escapeHtml(chainOrigin)}</div>
             `;
             return { dom };
           }

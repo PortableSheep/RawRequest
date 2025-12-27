@@ -100,3 +100,60 @@ func TestExecute_ImmediateCancelReturnsCancelledResponse(t *testing.T) {
 		t.Fatalf("got %q want %q", got, "__CANCELLED__")
 	}
 }
+
+func TestExecute_ReadsTimeoutFromOptions(t *testing.T) {
+	var gotTimeout int
+	deps := Dependencies{
+		CancelledResponse: "__CANCELLED__",
+		PerformRequest: func(_ context.Context, _ string, _ string, _ string, _ string, timeoutMs int) string {
+			gotTimeout = timeoutMs
+			return "Status: 200 OK\nHeaders: {}\nBody: {}"
+		},
+		ParseResponse: func(_ string) map[string]interface{} {
+			return map[string]interface{}{"body": "{}"}
+		},
+	}
+
+	requests := []map[string]interface{}{
+		{
+			"method":  "GET",
+			"url":     "x",
+			"options": map[string]interface{}{"timeout": float64(123)},
+		},
+	}
+
+	_ = Execute(context.Background(), requests, deps)
+	if gotTimeout != 123 {
+		t.Fatalf("got timeout %d want %d", gotTimeout, 123)
+	}
+}
+
+func TestExecute_ErrorStopsChain(t *testing.T) {
+	called := 0
+	deps := Dependencies{
+		CancelledResponse: "__CANCELLED__",
+		PerformRequest: func(_ context.Context, _ string, url string, _ string, _ string, _ int) string {
+			called++
+			if url == "first" {
+				return "Error: Request timeout after 1ms"
+			}
+			return "Status: 200 OK\nHeaders: {}\nBody: {}"
+		},
+		ParseResponse: func(_ string) map[string]interface{} {
+			return map[string]interface{}{"body": "{}"}
+		},
+	}
+
+	requests := []map[string]interface{}{
+		{"method": "GET", "url": "first"},
+		{"method": "GET", "url": "second"},
+	}
+
+	got := Execute(context.Background(), requests, deps)
+	if called != 1 {
+		t.Fatalf("expected chain to stop after error; called=%d", called)
+	}
+	if got != "Error: Request timeout after 1ms" {
+		t.Fatalf("got %q", got)
+	}
+}

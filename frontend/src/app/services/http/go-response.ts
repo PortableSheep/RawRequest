@@ -20,6 +20,7 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
   let body = '';
   let timing: any = null;
   let size: number | undefined;
+  let requestPreview: { method: string; url: string; headers: { [key: string]: string }; body?: string } | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -28,6 +29,23 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
       const parts = statusLine.split(' ');
       status = parseInt(parts[0]) || 0;
       statusText = parts.slice(1).join(' ');
+    } else if (line.startsWith('Request: ')) {
+      try {
+        const requestStr = line.substring(9).trim();
+        if (requestStr) {
+          const parsed = JSON.parse(requestStr);
+          if (parsed && typeof parsed === 'object') {
+            requestPreview = {
+              method: String(parsed.method ?? ''),
+              url: String(parsed.url ?? ''),
+              headers: (parsed.headers && typeof parsed.headers === 'object' ? parsed.headers : {}) as any,
+              body: typeof parsed.body === 'string' ? parsed.body : undefined
+            };
+          }
+        }
+      } catch (e) {
+        // Ignore request metadata parse errors; not critical for response parsing.
+      }
     } else if (line.startsWith('Headers: ')) {
       try {
         const headersStr = line.substring(9).trim();
@@ -79,6 +97,11 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
     timing,
     size
   };
+
+
+  if (requestPreview?.method && requestPreview?.url) {
+    responseData.requestPreview = requestPreview as any;
+  }
 
   // Try to parse JSON
   if (body) {

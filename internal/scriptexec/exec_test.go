@@ -119,3 +119,46 @@ func TestExecute_AssertPanicRecoveredAndLogged(t *testing.T) {
 		t.Fatalf("message=%q want prefix panic:", got.message)
 	}
 }
+
+func TestExecute_ResponseIsDefinedInPreScripts(t *testing.T) {
+	ctx := &sr.ExecutionContext{
+		Request: map[string]interface{}{
+			"method": "GET",
+			"url":    "http://example.com",
+		},
+	}
+	count := 0
+	Execute("if (typeof response === 'undefined') { throw new Error('missing') }; if (response !== null) { throw new Error('expected null') }", ctx, "pre", Dependencies{
+		VariablesSnapshot: func() map[string]string { return map[string]string{} },
+		AppendLog: func(level, source, message string) {
+			count++
+		},
+	})
+
+	if count != 0 {
+		t.Fatalf("unexpected error logs: %d", count)
+	}
+}
+
+func TestExecute_ResponseIsAvailableInPostScripts(t *testing.T) {
+	ctx := &sr.ExecutionContext{
+		Request: map[string]interface{}{
+			"method": "GET",
+			"url":    "http://example.com",
+		},
+		Response: map[string]interface{}{
+			"status": 200,
+		},
+	}
+	count := 0
+	Execute("if (response.status !== 200) { throw new Error('bad status') }", ctx, "post", Dependencies{
+		VariablesSnapshot: func() map[string]string { return map[string]string{} },
+		AppendLog: func(level, source, message string) {
+			count++
+		},
+	})
+
+	if count != 0 {
+		t.Fatalf("unexpected error logs: %d", count)
+	}
+}

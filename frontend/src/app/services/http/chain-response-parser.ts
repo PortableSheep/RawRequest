@@ -29,8 +29,12 @@ export function parseConcatenatedChainResponses(
       const response = parseGoResponse(part, 0);
       const preview = previews[i];
       if (preview) {
-        response.requestPreview = preview;
-        response.processedUrl = preview.url;
+        if (!response.requestPreview) {
+          response.requestPreview = preview;
+        }
+        if (!response.processedUrl) {
+          response.processedUrl = (response.requestPreview || preview).url;
+        }
       }
       responses.push(response);
     } catch (parseError) {

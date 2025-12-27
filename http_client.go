@@ -89,6 +89,27 @@ func (a *App) performRequest(ctx context.Context, method, url, headersJson, body
 		req.Header.Set("User-Agent", hcl.BuildDefaultUserAgent(Version))
 	}
 
+	// Capture the effective request (after placeholder resolution and default headers).
+	// This is included in the response string so the frontend can show what was actually sent.
+	effectiveHeaders := make(map[string]string)
+	for k, values := range req.Header {
+		if len(values) > 0 {
+			effectiveHeaders[k] = values[0]
+		}
+	}
+	requestMeta := struct {
+		Method  string            `json:"method"`
+		URL     string            `json:"url"`
+		Headers map[string]string `json:"headers"`
+		Body    string            `json:"body,omitempty"`
+	}{
+		Method:  method,
+		URL:     url,
+		Headers: effectiveHeaders,
+		Body:    body,
+	}
+	requestMetaJSON, _ := json.Marshal(requestMeta)
+
 	// Timing variables
 	var dnsStart, dnsEnd time.Time
 	var connectStart, connectEnd time.Time
@@ -122,6 +143,13 @@ func (a *App) performRequest(ctx context.Context, method, url, headersJson, body
 	}
 
 	req = req.WithContext(httptrace.WithClientTrace(ctx, trace))
+
+	// For cancelable/timeout requests, avoid reusing connections.
+	// If a request is cancelled mid-flight, some servers may respond with a late 4xx
+	// which can show up as "unsolicited response on idle HTTP channel" from net/http.
+	if timeoutMs > 0 || ctx.Done() != nil {
+		req.Close = true
+	}
 
 	// Apply timeout if specified
 	client := &http.Client{}
@@ -183,7 +211,13 @@ func (a *App) performRequest(ctx context.Context, method, url, headersJson, body
 	}
 	metadataJSON, _ := json.Marshal(metadata)
 
-	return fmt.Sprintf("Status: %s\nHeaders: %s\nBody: %s", resp.Status, string(metadataJSON), string(respBody))
+	return fmt.Sprintf(
+		"Status: %s\nRequest: %s\nHeaders: %s\nBody: %s",
+		resp.Status,
+		string(requestMetaJSON),
+		string(metadataJSON),
+		string(respBody),
+	)
 }
 
 func (a *App) registerCancel(requestID string, cancel context.CancelFunc) {

@@ -45,4 +45,23 @@ describe('chain-response-parser', () => {
     expect(responses[1].body).toContain('Failed to parse response');
     expect(responses[1].body).toContain('boom');
   });
+
+  it('does not overwrite a response-provided requestPreview', () => {
+    const responseStr = 'r1';
+    const previews: RequestPreview[] = [{ method: 'GET', url: 'preview-url', headers: {}, name: 'Preview' }];
+
+    const parseGoResponse = (s: string): ResponseData => ({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      body: s,
+      responseTime: 0,
+      requestPreview: { method: 'GET', url: 'effective-url', headers: { A: '1' } }
+    });
+
+    const responses = parseConcatenatedChainResponses(responseStr, previews, (s, t) => parseGoResponse(s));
+    expect(responses).toHaveLength(1);
+    expect(responses[0].requestPreview?.url).toBe('effective-url');
+    expect(responses[0].processedUrl).toBe('effective-url');
+  });
 });

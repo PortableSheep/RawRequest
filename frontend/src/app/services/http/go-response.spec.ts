@@ -11,6 +11,7 @@ describe('go-response', () => {
   it('parses status, headers metadata, and JSON body', () => {
     const responseStr = [
       'Status: 200 OK',
+      'Request: {"method":"GET","url":"https://example.com","headers":{"X-Test":"1"}}',
       'Headers: {"headers":{"Content-Type":"application/json"},"timing":{"total":42},"size":10}',
       'Body: {"ok":true}'
     ].join('\n');
@@ -22,6 +23,11 @@ describe('go-response', () => {
     expect(r.responseTime).toBe(42);
     expect(r.size).toBe(10);
     expect(r.json).toEqual({ ok: true });
+    expect(r.requestPreview).toEqual({
+      method: 'GET',
+      url: 'https://example.com',
+      headers: { 'X-Test': '1' }
+    });
   });
 
   it('treats unparseable content as Parse Error', () => {
