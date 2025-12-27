@@ -46,4 +46,14 @@ describe('hydration', () => {
     expect(headers['Authorization']).toBe('Bearer S');
     expect(headers['X']).toBe('{{x}}');
   });
+
+  it('replaces variables multiple times', async () => {
+    const v = await hydrateText('Hello {{name}} and {{name}}!', { name: 'Ada' }, 'env', async (t) => t);
+    expect(v).toBe('Hello Ada and Ada!');
+  });
+
+  it('leaves unknown placeholders intact', async () => {
+    const v = await hydrateText('Hello {{name}} {{missing}}', { name: 'Ada' }, 'env', async (t) => t);
+    expect(v).toBe('Hello Ada {{missing}}');
+  });
 });

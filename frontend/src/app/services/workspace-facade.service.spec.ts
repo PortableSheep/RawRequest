@@ -1,7 +1,6 @@
 import { Injector, inject, runInInjectionContext } from '@angular/core';
 import type { FileTab } from '../models/http.models';
 import { HttpService } from './http.service';
-import { ParserService } from './parser.service';
 import { HistoryStoreService } from './history-store.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
 
@@ -19,7 +18,6 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
       providers: [
         WorkspaceFacadeService,
         { provide: HttpService, useValue: httpMock },
-        { provide: ParserService, useValue: {} },
         { provide: HistoryStoreService, useValue: {} }
       ]
     });
@@ -51,7 +49,6 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
       providers: [
         WorkspaceFacadeService,
         { provide: HttpService, useValue: httpMock },
-        { provide: ParserService, useValue: {} },
         { provide: HistoryStoreService, useValue: {} }
       ]
     });

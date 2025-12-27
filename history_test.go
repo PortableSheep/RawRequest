@@ -46,3 +46,16 @@ func TestSaveFileHistoryToRunLocation(t *testing.T) {
 		t.Fatalf("history content mismatch in run location, got: %s", string(data))
 	}
 }
+
+func TestSanitizeFileID(t *testing.T) {
+	app := NewApp()
+	got := app.sanitizeFileID("unsaved:tab 123")
+	if got != "unsaved_tab-123" {
+		t.Fatalf("sanitizeFileID()=%q want %q", got, "unsaved_tab-123")
+	}
+
+	got = app.sanitizeFileID("a/b\\c:d")
+	if got != "a_b_c_d" {
+		t.Fatalf("sanitizeFileID()=%q want %q", got, "a_b_c_d")
+	}
+}

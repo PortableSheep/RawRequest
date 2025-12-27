@@ -1,5 +1,5 @@
 import type { FileTab } from '../../models/http.models';
-import type { ParsedHttpFile } from '../parser.service';
+import type { ParsedHttpFile } from '../parser/parse-http-file';
 import { computeSelectedEnvAfterParse } from './tab-selection';
 
 export function deriveFileDisplayName(raw: string | undefined, fallback?: string): string | undefined {

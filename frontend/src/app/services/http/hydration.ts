@@ -1,6 +1,13 @@
-import { replaceVariables } from './replace-variables';
-
 export type ReplaceSecretsFn = (text: string, env: string) => Promise<string>;
+
+function replaceVariables(text: string, variables: { [key: string]: string }): string {
+  let result = text;
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, value);
+  }
+  return result;
+}
 
 export function normalizeEnvName(env?: string): string {
   const trimmed = (env || '').trim();

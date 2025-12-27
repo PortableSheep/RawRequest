@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import type { FileTab } from '../models/http.models';
-import { ParserService } from './parser.service';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
+import { parseHttpFile } from './parser/parse-http-file';
 import { generateFileId, normalizeFileTab } from '../utils/file-tab-utils';
 import { createNewUntitledTab } from './workspace-facade/tab-factories';
 import { computeSelectedEnvAfterParse, deriveNextCurrentIndexAfterClose } from './workspace-facade/tab-selection';
@@ -30,7 +30,6 @@ export type WorkspaceInitUpdate = WorkspaceStateUpdate & {
 @Injectable({ providedIn: 'root' })
 export class WorkspaceFacadeService {
   private readonly http = inject(HttpService);
-  private readonly parser = inject(ParserService);
   private readonly historyStore = inject(HistoryStoreService);
 
   normalizeFiles(files: FileTab[]): FileTab[] {
@@ -189,7 +188,7 @@ export class WorkspaceFacadeService {
     content: string,
     filePath?: string
   ): WorkspaceStateUpdate {
-    const parsed = this.parser.parseHttpFile(content);
+    const parsed = parseHttpFile(content);
     const newFile = buildNewFileTabFromParsed({
       id: filePath && filePath.length ? filePath : generateFileId(),
       name: fileName,
@@ -227,7 +226,7 @@ export class WorkspaceFacadeService {
       return { files, currentFileIndex: fileIndex };
     }
 
-    const parsed = this.parser.parseHttpFile(content);
+    const parsed = parseHttpFile(content);
     const updatedFile = buildUpdatedFileTabFromParsed({ previousFile, content, parsed });
 
     const updatedFiles = [...files];
@@ -243,7 +242,7 @@ export class WorkspaceFacadeService {
   }
 
   upsertExamplesTab(lastSessionKey: string, files: FileTab[], content: string, name: string): WorkspaceStateUpdate {
-    const parsed = this.parser.parseHttpFile(content);
+    const parsed = parseHttpFile(content);
     const examplesId = '__examples__';
 
     const examplesTab: FileTab = normalizeFileTab(

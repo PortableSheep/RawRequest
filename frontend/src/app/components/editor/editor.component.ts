@@ -4,14 +4,14 @@ import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, RangeSetBuilder, Compartment } from '@codemirror/state';
 import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, Tooltip } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { foldKeymap, foldService, syntaxTree } from '@codemirror/language';
+import { foldKeymap, foldService, syntaxTree, LRLanguage, LanguageSupport } from '@codemirror/language';
 import { highlightSelectionMatches, searchKeymap } from '@codemirror/search';
 
 import { createEditorKeymap } from './editor-keymap';
 import { createRequestGutter } from './editor-request-gutter';
 import { createAutocompleteExtension } from './editor.autocomplete';
 import { createEditorLintExtensions } from './editor.lint';
-import { rawRequestHttpSupport } from './editor.language';
+import { parser as rawRequestHttpParser } from './rawrequest-http-parser';
 import { createVariableHoverTooltipExtension } from './editor.tooltips';
 import {
   computeContextMenuLocalPosition,
@@ -30,6 +30,9 @@ import {
   REQUEST_REF_PLACEHOLDER_REGEX,
   SECRET_PLACEHOLDER_REGEX
 } from '../../utils/http-file-analysis';
+
+const rawRequestHttpLanguage = LRLanguage.define({ parser: rawRequestHttpParser });
+const rawRequestHttpSupport = new LanguageSupport(rawRequestHttpLanguage);
 
 @Component({
   selector: 'app-editor',

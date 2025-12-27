@@ -3,8 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
-
-	hl "rawrequest/internal/historylogic"
+	"strings"
 )
 
 func (a *App) SaveFileHistory(fileID string, historyJson string) {
@@ -72,7 +71,9 @@ func (a *App) LoadFileHistoryFromRunLocation(fileID string) string {
 }
 
 func (a *App) sanitizeFileID(fileID string) string {
-	return hl.SanitizeFileID(fileID)
+	// Keep history filenames safe + stable across OS/filesystems.
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "-")
+	return replacer.Replace(fileID)
 }
 
 func (a *App) SaveFileHistoryToDir(fileID string, historyJson string, dir string) {
