@@ -37,6 +37,7 @@ describe('response-panel.logic', () => {
         headers: { 'content-type': 'application/json' },
         body: '{"ok":true}',
         responseTime: 12,
+        assertions: [{ passed: true, message: 'ok', stage: 'post' }],
         requestPreview: {
           name: 'Test',
           method: 'GET',
@@ -58,6 +59,7 @@ describe('response-panel.logic', () => {
         body: '{"in":1}'
       });
       expect(result[0].response?.status).toBe(200);
+      expect(result[0].response?.assertions).toEqual([{ passed: true, message: 'ok', stage: 'post' }]);
       expect(result[0].isPrimary).toBe(true);
 
       // Ensure clone semantics for headers

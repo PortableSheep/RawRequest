@@ -40,6 +40,13 @@ export interface ResponsePreview {
   responseTime: number;
   timing?: TimingBreakdown;
   size?: number;  // Response body size in bytes
+  assertions?: AssertionResult[];
+}
+
+export interface AssertionResult {
+  passed: boolean;
+  message: string;
+  stage?: 'pre' | 'post' | 'custom' | string;
 }
 
 export interface ChainEntryPreview {
@@ -173,6 +180,7 @@ export interface ResponseData {
   processedUrl?: string;
   requestPreview?: RequestPreview;
   chainItems?: ChainEntryPreview[];
+  assertions?: AssertionResult[];
 }
 
 export interface FileTab {

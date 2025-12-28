@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import {
+  AssertionResult,
   Request,
   ResponseData,
   FileTab,
@@ -113,7 +114,7 @@ export class HttpService {
     return parseGoResponseHelper(responseStr, responseTime);
   }
 
-  private async executeScript(script: string, context: any, stage: 'pre' | 'post' | 'custom' = 'custom'): Promise<void> {
+  private async executeScript(script: string, context: any, stage: 'pre' | 'post' | 'custom' = 'custom'): Promise<AssertionResult[]> {
     return await runScript(script, context, stage, {
       cleanScript: (raw) => cleanScriptContent(raw),
       recordConsole: (level, source, message) => {

@@ -1,4 +1,4 @@
-import { ResponseData } from '../../models/http.models';
+import { AssertionResult, ResponseData } from '../../models/http.models';
 
 export function parseGoResponse(responseStr: string, responseTime: number): ResponseData {
   // Check if this is an error response from Go backend
@@ -21,6 +21,7 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
   let timing: any = null;
   let size: number | undefined;
   let requestPreview: { method: string; url: string; headers: { [key: string]: string }; body?: string } | undefined;
+  let assertions: AssertionResult[] | undefined;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -74,6 +75,18 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
         body += '\n' + lines.slice(i + 1).join('\n');
       }
       break;
+    } else if (line.startsWith('Asserts: ')) {
+      try {
+        const assertsStr = line.substring(9).trim();
+        if (assertsStr) {
+          const parsed = JSON.parse(assertsStr);
+          if (Array.isArray(parsed)) {
+            assertions = parsed as AssertionResult[];
+          }
+        }
+      } catch {
+        // Ignore assertion parse errors.
+      }
     }
   }
 
@@ -97,6 +110,10 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
     timing,
     size
   };
+
+  if (assertions && assertions.length) {
+    responseData.assertions = assertions;
+  }
 
 
   if (requestPreview?.method && requestPreview?.url) {

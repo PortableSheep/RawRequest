@@ -96,27 +96,29 @@ func TestExecute_RuntimeErrorLogged(t *testing.T) {
 	}
 }
 
-func TestExecute_AssertPanicRecoveredAndLogged(t *testing.T) {
+func TestExecute_AssertRecordsAndLogs(t *testing.T) {
 	ctx := &sr.ExecutionContext{}
-	var got logEntry
-	count := 0
+	logs := make([]logEntry, 0, 2)
 
-	Execute("assert(false, 'nope')", ctx, "pre", Dependencies{
+	Execute("assert(true, 'ok'); assert(false, 'nope')", ctx, "pre", Dependencies{
 		VariablesSnapshot: func() map[string]string { return map[string]string{} },
 		AppendLog: func(level, source, message string) {
-			got = logEntry{level: level, source: source, message: message}
-			count++
+			logs = append(logs, logEntry{level: level, source: source, message: message})
 		},
 	})
 
-	if count != 1 {
-		t.Fatalf("logs=%d want 1", count)
+	if len(logs) != 0 {
+		t.Fatalf("logs=%d want 0", len(logs))
 	}
-	if got.level != "error" {
-		t.Fatalf("level=%q want error", got.level)
+
+	if len(ctx.Assertions) != 2 {
+		t.Fatalf("assertions=%d want 2", len(ctx.Assertions))
 	}
-	if !strings.HasPrefix(got.message, "panic:") {
-		t.Fatalf("message=%q want prefix panic:", got.message)
+	if !ctx.Assertions[0].Passed || ctx.Assertions[0].Message != "ok" {
+		t.Fatalf("assertion[0]=%+v", ctx.Assertions[0])
+	}
+	if ctx.Assertions[1].Passed || ctx.Assertions[1].Message != "nope" {
+		t.Fatalf("assertion[1]=%+v", ctx.Assertions[1])
 	}
 }
 

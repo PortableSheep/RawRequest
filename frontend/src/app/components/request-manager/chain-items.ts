@@ -38,7 +38,8 @@ export function toResponsePreview(response?: ResponseData | null): ResponsePrevi
     body: response.body,
     responseTime: response.responseTime,
     timing: response.timing,
-    size: response.size
+    size: response.size,
+    assertions: response.assertions
   };
 }
 

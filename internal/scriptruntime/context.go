@@ -2,6 +2,12 @@ package scriptruntime
 
 import "fmt"
 
+type AssertionResult struct {
+	Passed  bool   `json:"passed"`
+	Message string `json:"message"`
+	Stage   string `json:"stage"`
+}
+
 // ExecutionContext is the object exposed to the JS VM as `context`.
 // It is intentionally a simple data bag so it can be unit-tested and reused.
 type ExecutionContext struct {
@@ -10,6 +16,7 @@ type ExecutionContext struct {
 	Variables     map[string]string                 `json:"variables"`
 	ResponseStore map[string]map[string]interface{} `json:"responseStore"`
 	Stage         string                            `json:"stage"`
+	Assertions    []AssertionResult                 `json:"assertions"`
 }
 
 // BuildSource generates a human-readable label used for script logs.

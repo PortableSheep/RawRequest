@@ -3,19 +3,20 @@ import { runScript } from './script-runner';
 describe('script-runner', () => {
   it('no-ops on empty script', async () => {
     const recordConsole = jest.fn();
-    await runScript('', {}, 'custom', {
+    const assertions = await runScript('', {}, 'custom', {
       cleanScript: (s) => s,
       recordConsole,
       setVariable: async () => {}
     });
     expect(recordConsole).not.toHaveBeenCalled();
+    expect(assertions).toEqual([]);
   });
 
   it('records console output and syncs variables', async () => {
     const logs: Array<{ level: string; source: string; message: string }> = [];
     const vars: Record<string, string> = {};
 
-    await runScript(
+    const assertions = await runScript(
       "console.log('hi'); setVar('a', 1);",
       { request: { name: 'R', headers: {} }, variables: vars },
       'pre',
@@ -31,12 +32,13 @@ describe('script-runner', () => {
     expect(vars['a']).toBe('1');
     expect(logs.some(l => l.message.includes('hi'))).toBe(true);
     expect(logs.some(l => l.source === 'pre:R')).toBe(true);
+    expect(assertions).toEqual([]);
   });
 
-  it('records runtime errors', async () => {
+  it('returns assertion failures without logging them', async () => {
     const logs: Array<{ level: string; message: string }> = [];
 
-    await runScript(
+    const assertions = await runScript(
       "assert(false, 'nope')",
       { request: { method: 'GET', url: 'x', headers: {} } },
       'post',
@@ -47,6 +49,7 @@ describe('script-runner', () => {
       }
     );
 
-    expect(logs.some(l => l.level === 'error' && l.message.includes('runtime error'))).toBe(true);
+    expect(logs.length).toBe(0);
+    expect(assertions).toEqual([{ passed: false, message: 'nope', stage: 'post' }]);
   });
 });

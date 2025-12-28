@@ -6,6 +6,7 @@ describe('send-request', () => {
 
     const executeScript = jest.fn(async (_script: string, _ctx: any, stage: any) => {
       calls.push(`script:${stage}`);
+      return [];
     });
 
     const hydrateText = jest.fn(async (value: string) => {
@@ -109,7 +110,7 @@ describe('send-request', () => {
           normalizeEnvName: (e) => e || '',
           hydrateText: async (t) => t,
           hydrateHeaders: async (h) => h || {},
-          executeScript: async () => {},
+          executeScript: async () => [],
           parseGoResponse: () => ({ status: 200 } as any),
           throwIfCancelled: () => {},
         }
@@ -151,7 +152,7 @@ describe('send-request', () => {
           normalizeEnvName: (e) => e || '',
           hydrateText: async (t) => t,
           hydrateHeaders: async (h) => h || {},
-          executeScript: async () => {},
+          executeScript: async () => [],
           parseGoResponse: () => ({ status: 200 } as any),
           throwIfCancelled: () => {
             throw cancelled;
@@ -183,7 +184,7 @@ describe('send-request', () => {
         normalizeEnvName: (e) => e || '',
         hydrateText: async (t) => t,
         hydrateHeaders: async (h) => h || {},
-        executeScript: async () => {},
+        executeScript: async () => [],
         parseGoResponse: (s: string, t: number) => ({ status: 200, statusText: 'OK', headers: {}, body: s, responseTime: t } as any),
         throwIfCancelled: () => {},
         now: (() => {

@@ -30,6 +30,22 @@ describe('go-response', () => {
     });
   });
 
+  it('parses assertions when present', () => {
+    const responseStr = [
+      'Status: 200 OK',
+      'Request: {"method":"GET","url":"https://example.com","headers":{}}',
+      'Headers: {"headers":{},"timing":{"total":1},"size":0}',
+      'Asserts: [{"passed":true,"message":"ok","stage":"post"},{"passed":false,"message":"nope","stage":"post"}]',
+      'Body: hi'
+    ].join('\n');
+
+    const r = parseGoResponse(responseStr, 999);
+    expect(r.assertions).toEqual([
+      { passed: true, message: 'ok', stage: 'post' },
+      { passed: false, message: 'nope', stage: 'post' }
+    ]);
+  });
+
   it('treats unparseable content as Parse Error', () => {
     const r = parseGoResponse('totally not in the expected format', 1);
     expect(r.status).toBe(0);

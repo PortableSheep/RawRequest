@@ -111,6 +111,13 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 			return deps.CancelledResponse
 		}
 
+		scriptCtx := &sr.ExecutionContext{
+			Request:       req,
+			Variables:     safeSnapshot(deps.VariablesSnapshot),
+			ResponseStore: responseStore,
+			Assertions:    make([]sr.AssertionResult, 0),
+		}
+
 		// Ensure headers exists in request map so scripts can safely mutate it.
 		if _, exists := req["headers"]; !exists {
 			req["headers"] = map[string]string{}
@@ -119,11 +126,12 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 		// Run pre-script *before* extracting request fields so updateRequest/setHeader changes apply.
 		if deps.ExecuteScript != nil {
 			if preScript, exists := req["preScript"].(string); exists && strings.TrimSpace(preScript) != "" {
-				deps.ExecuteScript(preScript, &sr.ExecutionContext{
-					Request:       req,
-					Variables:     safeSnapshot(deps.VariablesSnapshot),
-					ResponseStore: responseStore,
-				}, "pre")
+				// Reuse a single context per request so assertions can be collected across pre/post.
+				scriptCtx.Request = req
+				scriptCtx.Variables = safeSnapshot(deps.VariablesSnapshot)
+				scriptCtx.Response = nil
+				scriptCtx.ResponseStore = responseStore
+				deps.ExecuteScript(preScript, scriptCtx, "pre")
 				if ctx.Err() == context.Canceled {
 					return deps.CancelledResponse
 				}
@@ -149,20 +157,19 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 		timeoutMs := readTimeoutMs(req)
 
 		headersJSON, _ := json.Marshal(headers)
-		result := deps.PerformRequest(ctx, method, url, string(headersJSON), body, timeoutMs)
-		if result == deps.CancelledResponse {
+		resultRaw := deps.PerformRequest(ctx, method, url, string(headersJSON), body, timeoutMs)
+		if resultRaw == deps.CancelledResponse {
 			return deps.CancelledResponse
 		}
 
 		// On any request error (including timeout), stop the chain and return partial results.
 		// The caller can parse/display the error response as the final chain step.
-		if strings.HasPrefix(result, "Error:") || strings.HasPrefix(result, "Error ") {
-			results = append(results, result)
+		if strings.HasPrefix(resultRaw, "Error:") || strings.HasPrefix(resultRaw, "Error ") {
+			results = append(results, resultRaw)
 			break
 		}
-		results = append(results, result)
 
-		responseData := deps.ParseResponse(result)
+		responseData := deps.ParseResponse(resultRaw)
 		responseStore[fmt.Sprintf("request%d", i+1)] = responseData
 
 		if deps.ApplyVarsFromBody != nil {
@@ -173,17 +180,24 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 
 		if deps.ExecuteScript != nil {
 			if postScript, exists := req["postScript"].(string); exists && strings.TrimSpace(postScript) != "" {
-				deps.ExecuteScript(postScript, &sr.ExecutionContext{
-					Request:       req,
-					Response:      responseData,
-					Variables:     safeSnapshot(deps.VariablesSnapshot),
-					ResponseStore: responseStore,
-				}, "post")
+				scriptCtx.Request = req
+				scriptCtx.Response = responseData
+				scriptCtx.Variables = safeSnapshot(deps.VariablesSnapshot)
+				scriptCtx.ResponseStore = responseStore
+				deps.ExecuteScript(postScript, scriptCtx, "post")
 				if ctx.Err() == context.Canceled {
 					return deps.CancelledResponse
 				}
 			}
 		}
+
+		result := resultRaw
+		if len(scriptCtx.Assertions) > 0 {
+			if b, err := json.Marshal(scriptCtx.Assertions); err == nil {
+				result += "\nAsserts: " + string(b)
+			}
+		}
+		results = append(results, result)
 	}
 
 	return strings.Join(results, "\n\n")

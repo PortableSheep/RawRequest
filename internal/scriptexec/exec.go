@@ -20,6 +20,17 @@ type Dependencies struct {
 	Sleep             func(time.Duration)
 }
 
+type assertionFailure struct {
+	message string
+}
+
+func (a assertionFailure) Error() string {
+	if a.message == "" {
+		return "Assertion failed"
+	}
+	return a.message
+}
+
 // Execute runs the provided script inside a goja VM.
 // It wires `context`, `setVar`, `getVar`, `setHeader`, `updateRequest`, `assert`, `delay`, and `console.*`.
 //
@@ -117,14 +128,23 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 		if len(call.Arguments) == 0 {
 			return goja.Undefined()
 		}
-		if call.Arguments[0].ToBoolean() {
-			return goja.Undefined()
-		}
-		message := "Assertion failed"
+		passed := call.Arguments[0].ToBoolean()
+		message := ""
 		if len(call.Arguments) > 1 {
 			message = call.Arguments[1].String()
 		}
-		panic(so.Assert(false, message))
+		if passed {
+			if message == "" {
+				message = "Assertion passed"
+			}
+			ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: true, Message: message, Stage: stage})
+			return goja.Undefined()
+		}
+		if message == "" {
+			message = "Assertion failed"
+		}
+		ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: false, Message: message, Stage: stage})
+		panic(assertionFailure{message: message})
 	})
 
 	_ = vm.Set("delay", func(call goja.FunctionCall) goja.Value {
@@ -158,6 +178,9 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 
 	defer func() {
 		if r := recover(); r != nil {
+			if _, ok := r.(assertionFailure); ok {
+				return
+			}
 			log("error", fmt.Sprintf("panic: %v", r))
 		}
 	}()

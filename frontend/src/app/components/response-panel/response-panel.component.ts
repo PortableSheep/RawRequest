@@ -1,7 +1,7 @@
 import { Component, OnDestroy, effect, input, signal, untracked, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SyntaxHighlightPipe } from "../../pipes/syntax-highlight.pipe";
-import { ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
+import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
 
 import {
   formatBytesForResponsePanel,
@@ -29,6 +29,7 @@ export class ResponsePanelComponent implements OnDestroy {
   entryTabs = signal<Record<string, EntryTab>>({});
   copyStates = signal<Record<string, 'idle' | 'copied' | 'error'>>({});
   requestCollapsed = signal<Record<string, boolean>>({});
+  assertionsCollapsed = signal<Record<string, boolean>>({});
   private copyTimers = new Map<string, any>();
 
   // Tooltip state
@@ -179,6 +180,20 @@ export class ResponsePanelComponent implements OnDestroy {
     return formatBytesForResponsePanel(bytes);
   }
 
+  countAssertionsPassed(assertions: AssertionResult[] | null | undefined): number {
+    if (!assertions?.length) {
+      return 0;
+    }
+    return assertions.reduce((acc, a) => acc + (a?.passed ? 1 : 0), 0);
+  }
+
+  countAssertionsFailed(assertions: AssertionResult[] | null | undefined): number {
+    if (!assertions?.length) {
+      return 0;
+    }
+    return assertions.reduce((acc, a) => acc + (!a?.passed ? 1 : 0), 0);
+  }
+
   isRequestCollapsed(entryId: string): boolean {
     // Default to collapsed (true)
     return this.requestCollapsed()[entryId] ?? true;
@@ -188,6 +203,18 @@ export class ResponsePanelComponent implements OnDestroy {
     this.requestCollapsed.update(current => ({
       ...current,
       [entryId]: !this.isRequestCollapsed(entryId)
+    }));
+  }
+
+  isAssertionsCollapsed(entryId: string): boolean {
+    // Default to collapsed (true)
+    return this.assertionsCollapsed()[entryId] ?? true;
+  }
+
+  toggleAssertionsSection(entryId: string): void {
+    this.assertionsCollapsed.update(current => ({
+      ...current,
+      [entryId]: !this.isAssertionsCollapsed(entryId)
     }));
   }
 

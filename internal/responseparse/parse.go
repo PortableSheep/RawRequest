@@ -52,6 +52,18 @@ func Parse(response string) map[string]interface{} {
 			continue
 		}
 
+		// Parse assertions: "Asserts: [...]" (JSON array)
+		if strings.HasPrefix(line, "Asserts: ") {
+			assertsStr := strings.TrimPrefix(line, "Asserts: ")
+			if strings.TrimSpace(assertsStr) != "" {
+				var asserts []map[string]interface{}
+				if err := json.Unmarshal([]byte(assertsStr), &asserts); err == nil {
+					result["assertions"] = asserts
+				}
+			}
+			continue
+		}
+
 		// Parse body: "Body: ..." (may span multiple lines)
 		if strings.HasPrefix(line, "Body: ") {
 			body := strings.TrimPrefix(line, "Body: ")

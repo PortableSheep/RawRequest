@@ -99,6 +99,7 @@ function buildResponsePreview(response: ResponseData): ResponsePreview {
     body: response.body,
     responseTime: response.responseTime,
     timing: response.timing,
-    size: response.size
+    size: response.size,
+    assertions: response.assertions
   };
 }

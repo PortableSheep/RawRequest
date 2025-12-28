@@ -88,7 +88,7 @@ describe('request-manager helpers', () => {
       ];
 
       const responses: ResponseData[] = [
-        { status: 200, statusText: 'OK', headers: {}, body: 'x', responseTime: 10 },
+        { status: 200, statusText: 'OK', headers: {}, body: 'x', responseTime: 10, assertions: [{ passed: true, message: 'ok', stage: 'post' }] },
         { status: 500, statusText: 'ERR', headers: {}, body: 'y', responseTime: 20 }
       ];
 
@@ -99,6 +99,7 @@ describe('request-manager helpers', () => {
       expect(items[0].label).toBe('A');
       expect(items[1].label).toBe('B');
       expect(items[0].response?.status).toBe(200);
+      expect(items[0].response?.assertions).toEqual([{ passed: true, message: 'ok', stage: 'post' }]);
     });
   });
 });

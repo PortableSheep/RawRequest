@@ -1,4 +1,4 @@
-import { Request, ResponseData, RequestPreview } from '../../models/http.models';
+import { AssertionResult, Request, ResponseData, RequestPreview } from '../../models/http.models';
 
 export type SendRequestBackend = {
   sendRequest: (method: string, url: string, headersJson: string, bodyStr: string) => Promise<string>;
@@ -23,7 +23,7 @@ export type SendRequestDeps = {
     variables: { [key: string]: string },
     envName: string
   ) => Promise<{ [key: string]: string }>;
-  executeScript: (script: string, context: any, stage: 'pre' | 'post' | 'custom') => Promise<void>;
+  executeScript: (script: string, context: any, stage: 'pre' | 'post' | 'custom') => Promise<AssertionResult[]>;
   parseGoResponse: (responseStr: string, responseTimeMs: number) => ResponseData;
   throwIfCancelled: (responseStr: string) => void;
   log?: {
@@ -47,10 +47,12 @@ export async function sendRequest(
   let processedBody: string | undefined;
   let requestPreview: RequestPreview | null = null;
   let bodyPlaceholder: string | undefined;
+  const assertions: AssertionResult[] = [];
+  const scriptContext: any = { request, variables, assertions };
 
   try {
     if (request.preScript) {
-      await deps.executeScript(request.preScript, { request, variables }, 'pre');
+      assertions.push(...await deps.executeScript(request.preScript, scriptContext, 'pre'));
     }
 
     processedUrl = await deps.hydrateText(request.url, variables, envName);
@@ -105,10 +107,12 @@ export async function sendRequest(
     const responseData = deps.parseGoResponse(responseStr, responseTime);
 
     if (request.postScript) {
-      await deps.executeScript(request.postScript, { request, response: responseData, variables }, 'post');
+      scriptContext.response = responseData;
+      assertions.push(...await deps.executeScript(request.postScript, scriptContext, 'post'));
     }
 
-    return { ...responseData, processedUrl, requestPreview: requestPreview! };
+    const withAssertions = assertions.length ? { ...responseData, assertions } : responseData;
+    return { ...(withAssertions as any), processedUrl, requestPreview: requestPreview! };
   } catch (error: any) {
     if (error?.cancelled) {
       throw error;
