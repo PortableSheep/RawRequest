@@ -92,7 +92,7 @@ func (c *AdaptiveController) Step(in AdaptiveControllerStepInput, adaptive *Adap
 
 			c.stableSinceSet = false
 			c.lastAdjust = now
-			return AdaptiveControllerStepResult{DisableRamping: true}
+			return AdaptiveControllerStepResult{DisableRamping: true, Stop: false}
 		}
 
 		// Healthy: only consider stable after reaching max.
@@ -117,7 +117,8 @@ func (c *AdaptiveController) Step(in AdaptiveControllerStepInput, adaptive *Adap
 					adaptive.PeakWindowRps = &rpsCopy
 					adaptive.StableWindowRps = &rpsCopy
 				}
-				return AdaptiveControllerStepResult{Stop: true}
+				// If a duration is configured, hold the stable user count until stopAt.
+				return AdaptiveControllerStepResult{DisableRamping: true, Stop: !in.HasDuration}
 			}
 		} else {
 			c.stableSinceSet = false
@@ -174,7 +175,8 @@ func (c *AdaptiveController) Step(in AdaptiveControllerStepInput, adaptive *Adap
 			adaptive.StableWindowFailureRate = &frCopy
 			adaptive.StableWindowRps = &rpsCopy
 		}
-		return AdaptiveControllerStepResult{Stop: true}
+		// If a duration is configured, hold the stable user count until stopAt.
+		return AdaptiveControllerStepResult{DisableRamping: true, Stop: !in.HasDuration}
 	}
 
 	return AdaptiveControllerStepResult{}

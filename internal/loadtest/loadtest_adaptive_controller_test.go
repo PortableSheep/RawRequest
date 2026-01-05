@@ -67,6 +67,64 @@ func TestAdaptiveController_BecomesStableBeforeInstability(t *testing.T) {
 	}
 }
 
+func TestAdaptiveController_BecomesStableBeforeInstability_WithDurationDoesNotStop(t *testing.T) {
+	c := NewAdaptiveController()
+	s := &AdaptiveSummary{Enabled: true, Phase: "ramping"}
+
+	start := time.Unix(1000, 0)
+	now := start
+	stopAt := start.Add(30 * time.Second)
+	maxUsers := int64(10)
+
+	fr := 0.0
+	rps := 5.0
+
+	// First tick after reaching max: sets stableSince.
+	_ = c.Step(AdaptiveControllerStepInput{
+		Now:               now,
+		StartedAt:         start,
+		HasDuration:       true,
+		StopAt:            stopAt,
+		MaxUsers:          maxUsers,
+		AdaptiveFailure:   0.01,
+		AdaptiveStableSec: 2,
+		AdaptiveCooldown:  5 * time.Second,
+		BackoffStepUsers:  2,
+		AllowedUsers:      maxUsers,
+		WindowSent:        25,
+		WindowFR:          &fr,
+		WindowRPS:         &rps,
+	}, s)
+
+	// After stable duration.
+	now = now.Add(2 * time.Second)
+	res := c.Step(AdaptiveControllerStepInput{
+		Now:               now,
+		StartedAt:         start,
+		HasDuration:       true,
+		StopAt:            stopAt,
+		MaxUsers:          maxUsers,
+		AdaptiveFailure:   0.01,
+		AdaptiveStableSec: 2,
+		AdaptiveCooldown:  5 * time.Second,
+		BackoffStepUsers:  2,
+		AllowedUsers:      maxUsers,
+		WindowSent:        25,
+		WindowFR:          &fr,
+		WindowRPS:         &rps,
+	}, s)
+
+	if res.Stop {
+		t.Fatalf("did not expect stop when stable and duration is set")
+	}
+	if s.Stabilized == nil || *s.Stabilized != true {
+		t.Fatalf("expected Stabilized true")
+	}
+	if s.Phase != "stable" {
+		t.Fatalf("expected phase stable, got %q", s.Phase)
+	}
+}
+
 func TestAdaptiveController_FirstInstabilityDisablesRampingAndCapturesPeak(t *testing.T) {
 	c := NewAdaptiveController()
 	s := &AdaptiveSummary{Enabled: true, Phase: "ramping"}
@@ -268,5 +326,78 @@ func TestAdaptiveController_StableAfterBackoff(t *testing.T) {
 	}
 	if s.StableUsers == nil || *s.StableUsers != 3 {
 		t.Fatalf("expected StableUsers=3")
+	}
+}
+
+func TestAdaptiveController_StableAfterBackoff_WithDurationDoesNotStop(t *testing.T) {
+	c := NewAdaptiveController()
+	s := &AdaptiveSummary{Enabled: true, Phase: "ramping"}
+
+	start := time.Unix(1000, 0)
+	stopAt := start.Add(30 * time.Second)
+	maxUsers := int64(10)
+
+	// First instability.
+	frBad := 0.05
+	rps := 1.0
+	now := start.Add(1 * time.Second)
+	_ = c.Step(AdaptiveControllerStepInput{
+		Now:               now,
+		StartedAt:         start,
+		HasDuration:       true,
+		StopAt:            stopAt,
+		MaxUsers:          maxUsers,
+		AdaptiveFailure:   0.01,
+		AdaptiveStableSec: 2,
+		AdaptiveCooldown:  0,
+		BackoffStepUsers:  2,
+		AllowedUsers:      5,
+		WindowSent:        25,
+		WindowFR:          &frBad,
+		WindowRPS:         &rps,
+	}, s)
+
+	// Healthy starts stable timer.
+	frGood := 0.0
+	now = now.Add(1 * time.Second)
+	_ = c.Step(AdaptiveControllerStepInput{
+		Now:               now,
+		StartedAt:         start,
+		HasDuration:       true,
+		StopAt:            stopAt,
+		MaxUsers:          maxUsers,
+		AdaptiveFailure:   0.01,
+		AdaptiveStableSec: 2,
+		AdaptiveCooldown:  0,
+		BackoffStepUsers:  2,
+		AllowedUsers:      3,
+		WindowSent:        25,
+		WindowFR:          &frGood,
+		WindowRPS:         &rps,
+	}, s)
+
+	// After stable duration.
+	now = now.Add(2 * time.Second)
+	res := c.Step(AdaptiveControllerStepInput{
+		Now:               now,
+		StartedAt:         start,
+		HasDuration:       true,
+		StopAt:            stopAt,
+		MaxUsers:          maxUsers,
+		AdaptiveFailure:   0.01,
+		AdaptiveStableSec: 2,
+		AdaptiveCooldown:  0,
+		BackoffStepUsers:  2,
+		AllowedUsers:      3,
+		WindowSent:        25,
+		WindowFR:          &frGood,
+		WindowRPS:         &rps,
+	}, s)
+
+	if res.Stop {
+		t.Fatalf("did not expect stop when stable and duration is set")
+	}
+	if s.Phase != "stable" {
+		t.Fatalf("expected phase stable")
 	}
 }
