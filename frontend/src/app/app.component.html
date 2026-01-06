@@ -98,7 +98,8 @@
                         [responseData]="lastExecutedRequestIndex !== null ? currentFile.responseData[lastExecutedRequestIndex] : null"
                         [request]="lastExecutedRequestIndex !== null ? currentFile.requests[lastExecutedRequestIndex] : null"
                         [isLoading]="isRequestRunning"
-                        [isCancelling]="isCancellingActiveRequest">
+                        [isCancelling]="isCancellingActiveRequest"
+                        (replayRequest)="onReplayRequest($event)">
                     </app-response-panel>
                 </div>
             </div>

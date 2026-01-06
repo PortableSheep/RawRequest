@@ -1,4 +1,4 @@
-import { Component, OnDestroy, effect, input, signal, untracked, HostListener } from '@angular/core';
+import { Component, OnDestroy, effect, input, signal, untracked, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SyntaxHighlightPipe } from "../../pipes/syntax-highlight.pipe";
 import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
@@ -24,6 +24,8 @@ export class ResponsePanelComponent implements OnDestroy {
   request = input<Request | null>(null);
   isLoading = input<boolean>(false);
   isCancelling = input<boolean>(false);
+
+  replayRequest = output<ChainEntryPreview>();
 
   expandedEntryId = signal<string | null>(null);
   entryTabs = signal<Record<string, EntryTab>>({});
@@ -158,6 +160,12 @@ export class ResponsePanelComponent implements OnDestroy {
 
   toggleEntry(id: string) {
     this.expandedEntryId.set(this.expandedEntryId() === id ? null : id);
+  }
+
+  onReplay(entry: ChainEntryPreview, event: MouseEvent) {
+    event.preventDefault();
+    event.stopPropagation();
+    this.replayRequest.emit(entry);
   }
 
   getEntryTab(id: string): EntryTab {

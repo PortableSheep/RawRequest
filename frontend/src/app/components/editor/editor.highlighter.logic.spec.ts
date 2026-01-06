@@ -168,5 +168,33 @@ describe('editor.highlighter.logic', () => {
       });
       expect(res.lineDecorations).toEqual([]);
     });
+
+    it('highlights @name value as cm-request-name', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: '@name GetUsers',
+        leadingWhitespace: 0,
+        lineNodeName: 'AnnotationLine',
+        nodeText: '@name GetUsers'
+      });
+
+      expect(res.decorations).toContainEqual({
+        from: 6,
+        to: 14,
+        cls: 'cm-request-name'
+      });
+    });
+
+    it('adds payload line decoration for BodyLine content', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 10,
+        text: '{"a": 1}',
+        leadingWhitespace: 0,
+        lineNodeName: 'BodyLine',
+        nodeText: '{"a": 1}'
+      });
+
+      expect(res.lineDecorations).toContainEqual({ at: 10, cls: 'cm-payload-line' });
+    });
   });
 });

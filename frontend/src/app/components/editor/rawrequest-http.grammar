@@ -26,7 +26,7 @@ RequestLine { AnnotationLine | HeaderLine | BodyLine | BlankLine }
   MethodLine { $[ \t]* ("GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS") ![\n]* "\n"? }
 
   // Header: Key: value
-  HeaderLine { $[ \t]* $[A-Za-z0-9] $[A-Za-z0-9-]* ":" ![\n]* "\n"? }
+  HeaderLine { $[ \t]* $[A-Za-z0-9_] $[A-Za-z0-9_-]* ":" ![\n]* "\n"? }
 
   // Anything else (including JSON bodies, scripts, comments)
   BodyLine { ![\n]+ "\n"? }

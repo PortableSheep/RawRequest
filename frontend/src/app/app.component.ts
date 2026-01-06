@@ -17,7 +17,7 @@ import {
   ScriptSnippetModalComponent
 } from './components';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
-import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress } from './models/http.models';
+import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress, ChainEntryPreview } from './models/http.models';
 import { HttpService } from './services/http.service';
 import { SecretService, SecretIndex, VaultInfo } from './services/secret.service';
 import { ScriptConsoleService } from './services/script-console.service';
@@ -510,6 +510,34 @@ export class AppComponent implements OnInit, OnDestroy {
       console.error('Request execution failed', error);
       this.resetPendingRequestState();
     });
+  }
+
+  onReplayRequest(entry: ChainEntryPreview) {
+    const activeFile = this.files[this.currentFileIndex];
+    if (!activeFile) {
+      return;
+    }
+
+    const targetName = String(entry?.request?.name || '').trim();
+    let idx = -1;
+
+    if (targetName) {
+      idx = activeFile.requests.findIndex(r => String(r?.name || '').trim() === targetName);
+    }
+
+    // Fallback if the request is unnamed.
+    if (idx < 0) {
+      idx = activeFile.requests.findIndex(
+        r => r?.method === entry.request.method && r?.url === entry.request.url
+      );
+    }
+
+    if (idx < 0) {
+      this.toast.info('Request not found in editor; cannot replay.');
+      return;
+    }
+
+    this.onRequestExecute(idx);
   }
 
   onRequestExecuted(result: { requestIndex: number; response: ResponseData }) {

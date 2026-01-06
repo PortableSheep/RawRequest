@@ -224,6 +224,31 @@ export function getNonScriptLineDecorations(params: {
         );
       }
     }
+
+    // Make request names easier to scan: highlight the @name value.
+    const lower = annTrimmed.toLowerCase();
+    if (lower.startsWith('@name')) {
+      const nameValueStart = params.text.toLowerCase().indexOf('@name') + '@name'.length;
+      let i = Math.max(0, nameValueStart);
+      while (i < params.text.length && /\s/.test(params.text[i])) i++;
+      const end = params.text.trimEnd().length;
+      if (i < end) {
+        decorations.push({
+          from: params.lineFrom + i,
+          to: params.lineFrom + end,
+          cls: 'cm-request-name'
+        });
+      }
+    }
+  }
+
+  // Subtle line-level decoration for payload/body lines.
+  if (params.lineNodeName === 'BodyLine') {
+    const trimmed = params.text.trimStart();
+    // Avoid styling script markers; keep it focused on payload content.
+    if (trimmed && trimmed !== '<' && trimmed !== '>' && !trimmed.startsWith('<') && !trimmed.startsWith('>')) {
+      lineDecorations.push({ at: params.lineFrom, cls: 'cm-payload-line' });
+    }
   }
 
   // Highlight separators

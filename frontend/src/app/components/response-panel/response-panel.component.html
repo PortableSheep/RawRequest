@@ -61,6 +61,16 @@
                             </div>
 
                             <div class="flex items-center gap-2 text-xs">
+                                @if (entry.response) {
+                                    <button
+                                        type="button"
+                                        class="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-[11px] font-semibold text-zinc-200 hover:bg-zinc-700 hover:border-zinc-600 transition-colors"
+                                        title="Replay this request"
+                                        (click)="onReplay(entry, $event)"
+                                    >
+                                        Replay
+                                    </button>
+                                }
                                 <span
                                     class="px-2 py-0.5 rounded-full text-[11px] font-semibold shadow-sm"
                                     [ngClass]="getStatusClass(entry)"

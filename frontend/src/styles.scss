@@ -285,6 +285,16 @@ html, body {
   text-underline-offset: 2px;
 }
 
+.cm-request-name {
+  color: var(--rr-accent) !important;
+  font-weight: 700;
+}
+
+/* Body/payload lines: keep subtle so it doesn't fight normal syntax colors */
+.cm-line.cm-payload-line {
+  background-color: color-mix(in srgb, var(--color-zinc-950), transparent 85%);
+}
+
 /* Separator lines: use a line-level decoration to avoid search-highlighting splitting */
 .cm-line.cm-separator {
   border-bottom: 1px dashed var(--rr-text-secondary);
