@@ -1,4 +1,4 @@
-import { Component, input, computed, ViewChild, effect, untracked, signal } from '@angular/core';
+import { Component, input, computed, ViewChild, effect, untracked, signal, SecurityContext } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -137,7 +137,7 @@ export class VirtualResponseBodyComponent {
     // No highlighting, return plain lines
     return bodyLines.map((line, index) => ({
       lineNumber: index + 1,
-      content: this.sanitizer.sanitize(1, line) || line
+      content: this.sanitizer.sanitize(SecurityContext.HTML, line) || line
     }));
   });
 
@@ -171,14 +171,14 @@ export class VirtualResponseBodyComponent {
       const htmlLines = highlightedHtml.split('\n');
       return htmlLines.map((line, index) => ({
         lineNumber: index + 1,
-        content: this.sanitizer.sanitize(1, line) || line
+        content: this.sanitizer.sanitize(SecurityContext.HTML, line) || line
       }));
     }
     
     // Otherwise return the parsed lines
     return lines.map((line, index) => ({
       lineNumber: index + 1,
-      content: this.sanitizer.sanitize(1, line) || line
+      content: this.sanitizer.sanitize(SecurityContext.HTML, line) || line
     }));
   }
 }
