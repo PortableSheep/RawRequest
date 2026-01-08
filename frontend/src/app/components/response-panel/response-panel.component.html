@@ -133,7 +133,11 @@
                                             @if (entry.request.body) {
                                                 <div>
                                                     <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Body</span>
-                                                    <pre class="max-h-80 overflow-auto rounded-md border border-zinc-800 bg-black p-3 font-mono text-[11px] leading-relaxed text-zinc-300" [innerHTML]="entry.request.body | syntaxHighlight"></pre>
+                                                    <app-virtual-response-body
+                                                        [body]="entry.request.body"
+                                                        [highlightedContent]="entry.request.body | syntaxHighlight"
+                                                        [threshold]="1000"
+                                                    ></app-virtual-response-body>
                                                 </div>
                                             }
                                         </div>
@@ -305,10 +309,11 @@
                                                     }
                                                 </button>
                                             </div>
-                                            <pre
-                                                class="max-h-80 overflow-auto rounded-md border border-zinc-800 bg-black p-3 font-mono text-[11px] leading-relaxed text-zinc-300"
-                                                [innerHTML]="(entry.response!.body || '') | syntaxHighlight"
-                                            ></pre>
+                                            <app-virtual-response-body
+                                                [body]="entry.response!.body || ''"
+                                                [highlightedContent]="(entry.response!.body || '') | syntaxHighlight"
+                                                [threshold]="1000"
+                                            ></app-virtual-response-body>
                                         </div>
                                     } @else {
                                         <p class="text-xs text-zinc-500">Awaiting response...</p>
