@@ -17,79 +17,8 @@ interface HighlightedLine {
   selector: 'app-virtual-response-body',
   standalone: true,
   imports: [CommonModule, ScrollingModule],
-  template: `
-    @if (useVirtualScroll()) {
-      <cdk-virtual-scroll-viewport
-        [itemSize]="lineHeight"
-        class="virtual-scroll-viewport"
-      >
-        <div
-          *cdkVirtualFor="let line of lines()"
-          class="response-line"
-        >
-          <span class="line-number">{{ line.lineNumber }}</span>
-          <span class="line-content" [innerHTML]="line.content"></span>
-        </div>
-      </cdk-virtual-scroll-viewport>
-    } @else {
-      <pre class="traditional-pre" [innerHTML]="highlightedContent()"></pre>
-    }
-  `,
-  styles: [`
-    .virtual-scroll-viewport {
-      height: 320px;
-      width: 100%;
-      overflow: auto;
-      border-radius: 0.375rem;
-      border: 1px solid rgb(39 39 42);
-      background-color: rgb(0 0 0);
-      padding: 0.75rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 11px;
-      line-height: 1.625;
-      color: rgb(212 212 216);
-    }
-
-    .virtual-scroll-viewport ::ng-deep .cdk-virtual-scroll-content-wrapper {
-      width: 100%;
-    }
-
-    .response-line {
-      display: flex;
-      white-space: pre;
-      min-height: 18px;
-    }
-
-    .line-number {
-      display: inline-block;
-      min-width: 48px;
-      text-align: right;
-      padding-right: 12px;
-      color: rgb(113 113 122);
-      user-select: none;
-      flex-shrink: 0;
-    }
-
-    .line-content {
-      flex: 1;
-      min-width: 0;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .traditional-pre {
-      max-height: 320px;
-      overflow: auto;
-      border-radius: 0.375rem;
-      border: 1px solid rgb(39 39 42);
-      background-color: rgb(0 0 0);
-      padding: 0.75rem;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-      font-size: 11px;
-      line-height: 1.625;
-      color: rgb(212 212 216);
-    }
-  `]
+  templateUrl: './virtual-response-body.component.html',
+  styleUrls: ['./virtual-response-body.component.scss']
 })
 export class VirtualResponseBodyComponent {
   /** Raw response body text */

@@ -1,0 +1,17 @@
+<!-- language: html -->
+@if (useVirtualScroll()) {
+  <cdk-virtual-scroll-viewport
+    [itemSize]="lineHeight"
+    class="virtual-scroll-viewport"
+  >
+    <div
+      *cdkVirtualFor="let line of lines()"
+      class="response-line"
+    >
+      <span class="line-number">{{ line.lineNumber }}</span>
+      <span class="line-content" [innerHTML]="line.content"></span>
+    </div>
+  </cdk-virtual-scroll-viewport>
+} @else {
+  <pre class="traditional-pre" [innerHTML]="highlightedContent()"></pre>
+}
