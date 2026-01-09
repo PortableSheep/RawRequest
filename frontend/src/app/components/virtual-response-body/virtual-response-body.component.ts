@@ -109,8 +109,9 @@ export class VirtualResponseBodyComponent {
     const textContent = tempDiv.textContent || tempDiv.innerText || '';
     const textLines = textContent.split('\n');
     
-    // If text lines match the expected count, use them with the original HTML styling
-    if (textLines.length === lineCount && htmlLines.length > 0) {
+    // If text lines match the expected count and we have HTML lines available
+    if (textLines.length === lineCount && htmlLines.length >= lineCount) {
+      // Use the first lineCount HTML lines to preserve highlighting
       return htmlLines.slice(0, lineCount).map((line, index) => ({
         lineNumber: index + 1,
         content: this.sanitizer.bypassSecurityTrustHtml(line)
