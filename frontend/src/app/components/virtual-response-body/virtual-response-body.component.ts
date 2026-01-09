@@ -54,9 +54,14 @@ export class VirtualResponseBodyComponent {
     
     const bodyLines = bodyText.split('\n');
     
-    // If we have highlighted content as HTML string, split it by lines
-    const highlightedStr = typeof highlighted === 'string' ? highlighted : '';
-    const hasHighlighting = highlightedStr && highlightedStr.includes('<span');
+    // If we have highlighted content (string or SafeHtml), normalize it to a string
+    const highlightedStr =
+      typeof highlighted === 'string'
+        ? highlighted
+        : highlighted
+        ? this.sanitizer.sanitize(SecurityContext.HTML, highlighted) || ''
+        : '';
+    const hasHighlighting = highlightedStr.includes('<span');
     
     if (hasHighlighting) {
       // Parse highlighted HTML and extract lines
