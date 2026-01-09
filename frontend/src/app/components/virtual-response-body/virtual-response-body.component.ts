@@ -76,7 +76,7 @@ export class VirtualResponseBodyComponent {
       const bodyText = this.body();
       untracked(() => {
         if (this.viewport) {
-          this.viewport.scrollToIndex(0, 'smooth');
+          this.viewport.scrollToIndex(0, 'auto');
         }
       });
     });
