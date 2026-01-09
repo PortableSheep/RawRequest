@@ -8,7 +8,7 @@
       *cdkVirtualFor="let line of lines()"
       class="response-line"
     >
-      <span class="line-number">{{ line.lineNumber }}</span>
+      <span class="line-number" role="presentation" aria-label="Line {{ line.lineNumber }}">{{ line.lineNumber }}</span>
       <span class="line-content" [innerHTML]="line.content"></span>
     </div>
   </cdk-virtual-scroll-viewport>

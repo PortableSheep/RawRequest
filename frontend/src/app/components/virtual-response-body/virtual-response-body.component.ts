@@ -5,7 +5,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 interface HighlightedLine {
   lineNumber: number;
-  content: SafeHtml;
+  content: string | SafeHtml;
 }
 
 /**
@@ -92,25 +92,33 @@ export class VirtualResponseBodyComponent {
    * This handles the case where syntax highlighting spans multiple lines.
    */
   private parseHighlightedLines(highlightedHtml: string, lineCount: number): HighlightedLine[] {
-    // Create a temporary DOM element to parse the HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = highlightedHtml;
+    // Split the highlighted HTML by newlines to preserve the highlighting
+    const htmlLines = highlightedHtml.split('\n');
     
-    // Get the text content and split by lines
-    const textContent = tempDiv.textContent || tempDiv.innerText || '';
-    const lines = textContent.split('\n');
-    
-    // For simplicity, if the line counts don't match, fall back to innerHTML split
-    if (lines.length !== lineCount && highlightedHtml.split('\n').length === lineCount) {
-      const htmlLines = highlightedHtml.split('\n');
+    // For simplicity, if the line counts match, use the HTML lines directly
+    if (htmlLines.length === lineCount) {
       return htmlLines.map((line, index) => ({
         lineNumber: index + 1,
-        content: this.sanitizer.sanitize(SecurityContext.HTML, line) || line
+        content: this.sanitizer.bypassSecurityTrustHtml(line)
       }));
     }
     
-    // Otherwise return the parsed lines
-    return lines.map((line, index) => ({
+    // If line counts don't match, try to parse the HTML to extract text and reapply
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = highlightedHtml;
+    const textContent = tempDiv.textContent || tempDiv.innerText || '';
+    const textLines = textContent.split('\n');
+    
+    // If text lines match the expected count, use them with the original HTML styling
+    if (textLines.length === lineCount && htmlLines.length > 0) {
+      return htmlLines.slice(0, lineCount).map((line, index) => ({
+        lineNumber: index + 1,
+        content: this.sanitizer.bypassSecurityTrustHtml(line)
+      }));
+    }
+    
+    // Fallback: return plain text lines
+    return textLines.slice(0, lineCount).map((line, index) => ({
       lineNumber: index + 1,
       content: this.sanitizer.sanitize(SecurityContext.HTML, line) || line
     }));
