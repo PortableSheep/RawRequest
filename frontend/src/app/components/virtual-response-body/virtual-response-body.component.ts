@@ -1,4 +1,4 @@
-import { Component, input, computed, ViewChild, effect, untracked, signal, SecurityContext } from '@angular/core';
+import { Component, input, computed, ViewChild, effect, untracked, SecurityContext } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
