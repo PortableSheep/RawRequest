@@ -54,16 +54,6 @@ jobs:
           else
             npm install
           fi
-
-      - name: Debug dependency resolution (Angular CDK)
-        working-directory: frontend
-        run: |
-          set -euo pipefail
-          echo "node=$(node --version) npm=$(npm --version)"
-          node -p "require('./package.json').dependencies['@angular/cdk']" || true
-          node -p "require.resolve('@angular/cdk/package.json')"
-          npm ls @angular/cdk || true
-          ls -la node_modules/@angular | head -n 50 || true
       - name: Run unit tests (Jest)
         working-directory: frontend
         run: npm test -- --runInBand
