@@ -9,7 +9,8 @@
       "node"
     ],
     "paths": {
-      "@wailsjs/*": ["wailsjs/*"]
+      "@wailsjs/*": ["wailsjs/*"],
+      "@angular/cdk/scrolling": ["node_modules/@angular/cdk/types/scrolling.d.ts"]
     }
   },
   "include": [

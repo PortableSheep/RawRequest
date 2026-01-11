@@ -12,7 +12,8 @@ module.exports = {
   },
   transformIgnorePatterns: ['node_modules/(?!.*\\.mjs$|@angular)'],
   moduleNameMapper: {
-    '^@wailsjs/(.*)$': '<rootDir>/wailsjs/$1'
+    '^@wailsjs/(.*)$': '<rootDir>/wailsjs/$1',
+    '^@angular/cdk/scrolling$': '<rootDir>/node_modules/@angular/cdk/fesm2022/scrolling.mjs'
   },
   transform: {
     '^.+\\.(ts|mjs|js|html)$': 'jest-preset-angular'
