@@ -1,6 +1,7 @@
 import { Request } from '../../models/http.models';
 import { parseLoadConfig } from './load-config';
 import { extractScript } from './script-block';
+import { isSeparatorLine, METHOD_LINE_REGEX } from '../../utils/http-file-analysis';
 
 function normalizeDisplayName(value: string): string {
   const trimmed = value.trim();
@@ -55,40 +56,75 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
   let pendingMetadata: PendingMetadata = {};
   let fileDisplayName: string | undefined;
 
+  const finalizeCurrentRequest = () => {
+    if (!currentRequest || !currentRequest.method) return;
+    if (requestBody.trim()) {
+      currentRequest.body = requestBody.trim();
+    }
+    requests.push(currentRequest as Request);
+    currentRequest = null;
+    inRequest = false;
+    inBody = false;
+    requestBody = '';
+  };
+
+  const applySeparatorMeta = (meta: string) => {
+    if (!meta) return;
+
+    const applyTo = inRequest && currentRequest ? currentRequest : pendingMetadata;
+
+    if (meta.startsWith('name:')) {
+      if (applyTo === pendingMetadata) {
+        pendingMetadata.name = meta.substring(5).trim();
+      } else {
+        (applyTo as Partial<Request>).name = meta.substring(5).trim();
+      }
+      return;
+    }
+    if (meta.startsWith('group:')) {
+      const group = meta.substring(6).trim();
+      if (applyTo === pendingMetadata) {
+        (pendingMetadata as any).group = group;
+      } else {
+        (applyTo as Partial<Request>).group = group;
+      }
+      if (group && !groups.includes(group)) {
+        groups.push(group);
+      }
+      return;
+    }
+    if (meta.startsWith('depends:')) {
+      if (applyTo === pendingMetadata) {
+        pendingMetadata.depends = meta.substring(8).trim();
+      } else {
+        (applyTo as Partial<Request>).depends = meta.substring(8).trim();
+      }
+      return;
+    }
+    if (meta.startsWith('tab:')) {
+      fileDisplayName = normalizeName(meta.substring(4));
+      return;
+    }
+  };
+
   let i = 0;
   while (i < lines.length) {
-    const line = lines[i].trim();
+    const rawLine = lines[i];
+    const line = rawLine.trim();
 
-    if (inRequest && line.startsWith('###')) {
+    // Separator lines (### ...) delimit requests. They can also carry optional metadata.
+    if (isSeparatorLine(rawLine)) {
       const metaMatch = line.match(/^###\s*(.+?)\s*###$/);
       const meta = metaMatch
         ? metaMatch[1]
         : line.replace(/^###\s*/, '').replace(/\s*###$/, '').trim();
 
-      if (meta) {
-        if (meta.startsWith('name:')) {
-          currentRequest!.name = meta.substring(5).trim();
-        } else if (meta.startsWith('group:')) {
-          currentRequest!.group = meta.substring(6).trim();
-          if (!groups.includes(currentRequest!.group!)) {
-            groups.push(currentRequest!.group!);
-          }
-        } else if (meta.startsWith('depends:')) {
-          currentRequest!.depends = meta.substring(8).trim();
-        } else if (meta.startsWith('tab:')) {
-          fileDisplayName = normalizeName(meta.substring(4));
-        }
-
-        if (
-          meta.startsWith('name:') ||
-          meta.startsWith('group:') ||
-          meta.startsWith('depends:') ||
-          meta.startsWith('tab:')
-        ) {
-          i++;
-          continue;
-        }
+      applySeparatorMeta(meta);
+      if (inRequest) {
+        finalizeCurrentRequest();
       }
+      i++;
+      continue;
     }
 
     if (line.startsWith('#') || line.startsWith('//')) {
@@ -168,12 +204,12 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
       continue;
     }
 
-    if (line.match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT)\s+/i)) {
-      if (currentRequest && currentRequest.method) {
-        if (requestBody.trim()) {
-          currentRequest.body = requestBody.trim();
-        }
-        requests.push(currentRequest as Request);
+    if (METHOD_LINE_REGEX.test(line)) {
+      // Enforce a single request line per block: once a request starts, another method line
+      // must be separated by a real separator line (### ...) or be commented out.
+      if (inRequest) {
+        i++;
+        continue;
       }
 
       const methodMatch = line.match(/^(\w+)\s+(.+)$/);
@@ -182,7 +218,7 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
           method: methodMatch[1].toUpperCase(),
           url: methodMatch[2],
           headers: {},
-          ...pendingMetadata,
+          ...(pendingMetadata as any)
         };
         pendingMetadata = {};
         inRequest = true;
@@ -219,24 +255,19 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
       const looksLikeHeader = line.match(/^[A-Za-z][\w-]*:\s*.+$/);
       if (!looksLikeHeader) {
         inBody = true;
-        requestBody += lines[i] + '\n';
+        requestBody += rawLine + '\n';
         i++;
         continue;
       }
     }
 
     if (inRequest && inBody) {
-      requestBody += lines[i] + '\n';
+      requestBody += rawLine + '\n';
     }
     i++;
   }
 
-  if (currentRequest && currentRequest.method) {
-    if (requestBody.trim()) {
-      currentRequest.body = requestBody.trim();
-    }
-    requests.push(currentRequest as Request);
-  }
+  finalizeCurrentRequest();
 
   return { requests, environments, variables, groups, fileDisplayName };
 }

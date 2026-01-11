@@ -82,7 +82,8 @@ describe('editor.highlighter.logic', () => {
         text: '  GET https://x',
         leadingWhitespace: 2,
         lineNodeName: 'MethodLine',
-        nodeText: '  GET https://x'
+        nodeText: '  GET https://x',
+        isRequestStart: true
       });
 
       const m = res.decorations.find((d) => d.cls === 'cm-http-method');
@@ -96,7 +97,8 @@ describe('editor.highlighter.logic', () => {
         text: 'X-Test: 1',
         leadingWhitespace: 0,
         lineNodeName: 'HeaderLine',
-        nodeText: 'X-Test: 1'
+        nodeText: 'X-Test: 1',
+        isRequestStart: false
       });
       expect(res.decorations).toContainEqual({ from: 0, to: 6, cls: 'cm-http-header' });
     });
@@ -107,7 +109,8 @@ describe('editor.highlighter.logic', () => {
         text: 'hello @env.prod world',
         leadingWhitespace: 0,
         lineNodeName: 'Text',
-        nodeText: 'hello @env.prod world'
+        nodeText: 'hello @env.prod world',
+        isRequestStart: false
       });
 
       const d = res.decorations.find((x) => x.cls === 'cm-environment');
@@ -122,7 +125,8 @@ describe('editor.highlighter.logic', () => {
         text,
         leadingWhitespace: 0,
         lineNodeName: 'AnnotationLine',
-        nodeText: text
+        nodeText: text,
+        isRequestStart: false
       });
 
       expect(res.decorations).toContainEqual({ from: 0, to: 6, cls: 'cm-annotation' });
@@ -139,7 +143,8 @@ describe('editor.highlighter.logic', () => {
         text,
         leadingWhitespace: 0,
         lineNodeName: 'AnnotationLine',
-        nodeText: text
+        nodeText: text,
+        isRequestStart: false
       });
 
       const d = res.decorations.find((x) => x.cls === 'cm-global-var');
@@ -153,7 +158,8 @@ describe('editor.highlighter.logic', () => {
         text: '### foo',
         leadingWhitespace: 0,
         lineNodeName: 'SeparatorLine',
-        nodeText: '### foo'
+        nodeText: '### foo',
+        isRequestStart: false
       });
       expect(res.lineDecorations).toEqual([{ at: 50, cls: 'cm-separator' }]);
     });
@@ -164,7 +170,8 @@ describe('editor.highlighter.logic', () => {
         text: '### #######',
         leadingWhitespace: 0,
         lineNodeName: 'SeparatorLine',
-        nodeText: '### #######'
+        nodeText: '### #######',
+        isRequestStart: false
       });
       expect(res.lineDecorations).toEqual([]);
     });
@@ -175,7 +182,8 @@ describe('editor.highlighter.logic', () => {
         text: '@name GetUsers',
         leadingWhitespace: 0,
         lineNodeName: 'AnnotationLine',
-        nodeText: '@name GetUsers'
+        nodeText: '@name GetUsers',
+        isRequestStart: false
       });
 
       expect(res.decorations).toContainEqual({
@@ -191,22 +199,37 @@ describe('editor.highlighter.logic', () => {
         text: '{"a": 1}',
         leadingWhitespace: 0,
         lineNodeName: 'BodyLine',
-        nodeText: '{"a": 1}'
+        nodeText: '{"a": 1}',
+        isRequestStart: false
       });
 
       expect(res.lineDecorations).toContainEqual({ at: 10, cls: 'cm-payload-line' });
     });
 
-    it('adds request-start line decoration for MethodLine', () => {
+    it('adds request-start line decoration only for request-start MethodLine', () => {
       const res = getNonScriptLineDecorations({
         lineFrom: 0,
         text: 'GET https://example.com',
         leadingWhitespace: 0,
         lineNodeName: 'MethodLine',
-        nodeText: 'GET https://example.com'
+        nodeText: 'GET https://example.com',
+        isRequestStart: true
       });
 
       expect(res.lineDecorations).toContainEqual({ at: 0, cls: 'cm-request-start' });
+    });
+
+    it('does not add request-start line decoration for non-start MethodLine', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: 'GET https://example.com',
+        leadingWhitespace: 0,
+        lineNodeName: 'MethodLine',
+        nodeText: 'GET https://example.com',
+        isRequestStart: false
+      });
+
+      expect(res.lineDecorations).not.toContainEqual({ at: 0, cls: 'cm-request-start' });
     });
 
     it('adds lightweight JSON highlighting for JSON-ish BodyLine', () => {
@@ -215,7 +238,8 @@ describe('editor.highlighter.logic', () => {
         text: '{"a": 1, "b": true, "c": "x"}',
         leadingWhitespace: 0,
         lineNodeName: 'BodyLine',
-        nodeText: '{"a": 1, "b": true, "c": "x"}'
+        nodeText: '{"a": 1, "b": true, "c": "x"}',
+        isRequestStart: false
       });
 
       expect(res.decorations.some(d => d.cls === 'cm-json-key')).toBe(true);

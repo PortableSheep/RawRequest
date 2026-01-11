@@ -1,6 +1,6 @@
 import { BlockInfo, EditorView, GutterMarker, ViewUpdate, gutter } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
-import { DEPENDS_LINE_REGEX, LOAD_LINE_REGEX, METHOD_LINE_REGEX } from '../../utils/http-file-analysis';
+import { DEPENDS_LINE_REGEX, LOAD_LINE_REGEX, isMethodLine, isSeparatorLine } from '../../utils/http-file-analysis';
 
 class PlayGutterMarker extends GutterMarker {
   constructor(
@@ -67,18 +67,43 @@ export function createRequestGutter(onExecuteRequest: (requestIndex: number) => 
       const lineContent = view.state.doc.line(lineNo).text;
       const trimmedLine = lineContent.trimStart();
 
-      const isRequestLine = (value: string) => METHOD_LINE_REGEX.test(value.trimStart());
+      const isRunnableRequestStart = (targetLineNo: number): { runnable: boolean; index: number } => {
+        let inRequest = false;
+        let requestIndex = -1;
 
-      // Show play button on lines that define a request
-      if (isRequestLine(lineContent)) {
-        let requestIndex = 0;
-        for (let i = 1; i < lineNo; i++) {
-          const prevLine = view.state.doc.line(i).text;
-          if (isRequestLine(prevLine)) {
-            requestIndex++;
+        for (let i = 1; i <= targetLineNo; i++) {
+          const text = view.state.doc.line(i).text;
+
+          if (isSeparatorLine(text)) {
+            inRequest = false;
+            continue;
+          }
+
+          if (isMethodLine(text)) {
+            if (!inRequest) {
+              requestIndex++;
+              inRequest = true;
+              if (i === targetLineNo) {
+                return { runnable: true, index: requestIndex };
+              }
+            } else {
+              if (i === targetLineNo) {
+                return { runnable: false, index: requestIndex };
+              }
+            }
           }
         }
-        return new PlayGutterMarker(onExecuteRequest, requestIndex);
+
+        return { runnable: false, index: -1 };
+      };
+
+      // Show play button only on the first request line in a request block.
+      if (isMethodLine(lineContent)) {
+        const res = isRunnableRequestStart(lineNo);
+        if (res.runnable && res.index >= 0) {
+          return new PlayGutterMarker(onExecuteRequest, res.index);
+        }
+        return null;
       }
 
       if (DEPENDS_LINE_REGEX.test(trimmedLine)) {

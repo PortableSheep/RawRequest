@@ -71,4 +71,26 @@ describe('parser/parse-http-file', () => {
     expect(parsed.groups).toEqual(['Admin']);
     expect(parsed.requests[0].group).toBe('Admin');
   });
+
+  it('does not treat a second method line as a new request without a separator', () => {
+    const parsed = parseHttpFile([
+      'GET https://example.com/one',
+      'GET https://example.com/two',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].url).toBe('https://example.com/one');
+  });
+
+  it('allows multiple requests when separated by a real separator line', () => {
+    const parsed = parseHttpFile([
+      'GET https://example.com/one',
+      '### Next',
+      'GET https://example.com/two',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(2);
+    expect(parsed.requests[0].url).toBe('https://example.com/one');
+    expect(parsed.requests[1].url).toBe('https://example.com/two');
+  });
 });

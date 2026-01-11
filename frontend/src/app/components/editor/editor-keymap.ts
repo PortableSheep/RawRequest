@@ -4,6 +4,55 @@ import type { EditorState } from '@codemirror/state';
 import { foldKeymap } from '@codemirror/language';
 import { searchKeymap } from '@codemirror/search';
 
+function toggleLineCommentAndAdvance(view: { state: EditorState; dispatch: (tr: any) => void }): boolean {
+  const { state } = view;
+  const selection = state.selection.main;
+  const doc = state.doc;
+  const line = doc.lineAt(selection.head);
+  const text = line.text;
+
+  const leadingWhitespace = text.length - text.trimStart().length;
+  const trimmed = text.trimStart();
+
+  let changes: { from: number; to?: number; insert: string } | null = null;
+
+  const uncomment = (prefixLen: number) => {
+    const afterPrefix = trimmed.slice(prefixLen);
+    const removeExtraSpace = afterPrefix.startsWith(' ') ? 1 : 0;
+    changes = {
+      from: line.from + leadingWhitespace,
+      to: line.from + leadingWhitespace + prefixLen + removeExtraSpace,
+      insert: ''
+    };
+  };
+
+  if (trimmed.startsWith('#')) {
+    uncomment(1);
+  } else if (trimmed.startsWith('//')) {
+    uncomment(2);
+  } else if (trimmed.startsWith(';')) {
+    uncomment(1);
+  } else {
+    changes = {
+      from: line.from + leadingWhitespace,
+      insert: '# '
+    };
+  }
+
+  const nextLineNumber = Math.min(doc.lines, line.number + 1);
+  const nextLine = doc.line(nextLineNumber);
+  const nextLineIndent = nextLine.text.length - nextLine.text.trimStart().length;
+  const nextCursor = nextLine.from + Math.min(nextLineIndent, nextLine.text.length);
+
+  view.dispatch(
+    state.update({
+      changes: changes ? [changes] : [],
+      selection: { anchor: nextCursor, head: nextCursor }
+    })
+  );
+  return true;
+}
+
 export interface EditorKeymapOptions {
   getRequestIndexAtPos: (state: EditorState, pos: number) => number | null;
   onExecuteRequest: (requestIndex: number) => void;
@@ -11,6 +60,15 @@ export interface EditorKeymapOptions {
 
 export function createEditorKeymap(opts: EditorKeymapOptions): Extension {
   return keymap.of([
+    {
+      key: 'Mod-/',
+      run: toggleLineCommentAndAdvance
+    },
+    {
+      // On macOS, some keyboards/webviews distinguish Ctrl+/ from Cmd+/.
+      key: 'Ctrl-/',
+      run: toggleLineCommentAndAdvance
+    },
     {
       key: 'Tab',
       run: ({ state, dispatch }) => {

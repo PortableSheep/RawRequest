@@ -8,6 +8,8 @@ import {
   extractPlaceholders,
   extractSetVarKeys,
   ENV_PLACEHOLDER_REGEX,
+  isMethodLine,
+  isSeparatorLine,
   REQUEST_REF_PLACEHOLDER_REGEX,
   SECRET_PLACEHOLDER_REGEX
 } from '../../utils/http-file-analysis';
@@ -65,10 +67,15 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
   const dependsTokenByRequestIndex: Array<{ target: string; from: number; to: number } | null> = [];
   let pendingDepends: { target: string; from: number; to: number } | null = null;
   let requestIndexForLine = -1;
+  let inRequestBlock = false;
 
   for (let lineNo = 1; lineNo <= view.state.doc.lines; lineNo++) {
     const line = view.state.doc.line(lineNo);
     const text = line.text;
+
+    if (isSeparatorLine(text)) {
+      inRequestBlock = false;
+    }
 
     const trimmedStartIndex = text.length - text.trimStart().length;
     const lineType = tree.resolve(line.from + trimmedStartIndex, 1).name;
@@ -102,25 +109,39 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
       pendingDepends = { target: depends.target, from: line.from + depends.start, to: line.from + depends.end };
     }
 
-    // Only count real method lines (Lezer token), not incidental "GET" in bodies.
-    if (lineType === 'MethodLine') {
-      requestIndexForLine++;
-      if (pendingDepends) {
-        dependsTokenByRequestIndex[requestIndexForLine] = pendingDepends;
-        pendingDepends = null;
-      }
-
-      // Method-line diagnostics (must include URL-ish token after method)
-      const methodMatch = text.trimStart().match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(\S+)/i);
-      if (!methodMatch) {
+    // Only count real request-start method lines; additional method lines within the same
+    // request block are treated as invalid (must be separated by a real separator line).
+    if (lineType === 'MethodLine' && isMethodLine(text)) {
+      if (inRequestBlock) {
         const from = line.from + trimmedStartIndex;
         const to = Math.min(line.to, from + text.trimStart().length);
         diagnostics.push({
           from,
           to,
           severity: 'warning',
-          message: 'Method line should include a URL (e.g. GET https://example.com)'
+          message: 'Only one request line allowed per block; add a separator (### ...) before the next request or comment it out'
         });
+      } else {
+        requestIndexForLine++;
+        inRequestBlock = true;
+
+        if (pendingDepends) {
+          dependsTokenByRequestIndex[requestIndexForLine] = pendingDepends;
+          pendingDepends = null;
+        }
+
+        // Method-line diagnostics (must include URL-ish token after method)
+        const methodMatch = text.trimStart().match(/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+(\S+)/i);
+        if (!methodMatch) {
+          const from = line.from + trimmedStartIndex;
+          const to = Math.min(line.to, from + text.trimStart().length);
+          diagnostics.push({
+            from,
+            to,
+            severity: 'warning',
+            message: 'Method line should include a URL (e.g. GET https://example.com)'
+          });
+        }
       }
     }
   }

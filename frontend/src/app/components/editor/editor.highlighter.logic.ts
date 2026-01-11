@@ -197,6 +197,7 @@ export function getNonScriptLineDecorations(params: {
   leadingWhitespace: number;
   lineNodeName: string;
   nodeText: string;
+  isRequestStart: boolean;
 }): { decorations: TextDecoration[]; lineDecorations: Array<{ at: number; cls: string }> } {
   const decorations: TextDecoration[] = [];
   const lineDecorations: Array<{ at: number; cls: string }> = [];
@@ -213,8 +214,10 @@ export function getNonScriptLineDecorations(params: {
       });
     }
 
-    // Make request blocks more obviously "a block" (and thus foldable).
-    lineDecorations.push({ at: params.lineFrom, cls: 'cm-request-start' });
+    // Only mark the first method line in a block as the request start.
+    if (params.isRequestStart) {
+      lineDecorations.push({ at: params.lineFrom, cls: 'cm-request-start' });
+    }
   }
 
   // Highlight headers

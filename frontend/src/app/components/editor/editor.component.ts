@@ -431,6 +431,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         const lineDecorations: Array<{ at: number; cls: string }> = [];
         let inScript = false;
         let scriptBraceDepth = 0;
+        let inRequestBlock = false;
 
         const tree = syntaxTree(view.state);
 
@@ -439,6 +440,10 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           const text = line.text;
           const trimmedText = text.trimStart();
           const leadingWhitespace = text.length - trimmedText.length;
+
+          if (isSeparatorLine(text)) {
+            inRequestBlock = false;
+          }
 
           const resolvePos = line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1));
           const resolved = tree.resolve(resolvePos, 1);
@@ -541,10 +546,15 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             text,
             leadingWhitespace,
             lineNodeName,
-            nodeText: view.state.doc.sliceString(resolved.from, resolved.to)
+            nodeText: view.state.doc.sliceString(resolved.from, resolved.to),
+            isRequestStart: isMethodLine(text) && !inRequestBlock
           });
           decorations.push(...nonScript.decorations);
           lineDecorations.push(...nonScript.lineDecorations);
+
+          if (isMethodLine(text) && !inRequestBlock) {
+            inRequestBlock = true;
+          }
         }
 
         // Sort by position (required by RangeSetBuilder)
@@ -730,16 +740,38 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   private computeRequestBlockIndexFromTree(state: EditorState): Array<{ from: number; to: number; index: number }> {
-    const tree = syntaxTree(state);
     const blocks: Array<{ from: number; to: number; index: number }> = [];
 
+    let inRequest = false;
+    let currentFrom: number | null = null;
     let index = 0;
-    const cursor = tree.cursor();
-    do {
-      if (cursor.name !== 'RequestBlock') continue;
-      blocks.push({ from: cursor.from, to: cursor.to, index });
-      index++;
-    } while (cursor.next());
+
+    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
+      const line = state.doc.line(lineNo);
+      const text = line.text;
+
+      if (isSeparatorLine(text)) {
+        if (inRequest && currentFrom !== null) {
+          const end = line.from - 1;
+          if (end > currentFrom) {
+            blocks.push({ from: currentFrom, to: end, index });
+            index++;
+          }
+        }
+        inRequest = false;
+        currentFrom = null;
+        continue;
+      }
+
+      if (isMethodLine(text) && !inRequest) {
+        inRequest = true;
+        currentFrom = line.from;
+      }
+    }
+
+    if (inRequest && currentFrom !== null) {
+      blocks.push({ from: currentFrom, to: state.doc.length, index });
+    }
 
     return blocks;
   }
@@ -777,11 +809,20 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     // This is slower (O(lines)) but robust when Lezer doesn't produce RequestBlock ranges
     // (e.g., when top-level annotations confuse the parser).
     let idx = -1;
+    let inRequest = false;
     for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
       const line = state.doc.line(lineNo);
-      if (isMethodLine(line.text)) {
-        idx++;
+      const text = line.text;
+
+      if (isSeparatorLine(text)) {
+        inRequest = false;
+      } else if (isMethodLine(text)) {
+        if (!inRequest) {
+          idx++;
+          inRequest = true;
+        }
       }
+
       if (pos <= line.to) {
         break;
       }
