@@ -126,6 +126,71 @@ export function getLoadKeyDecorations(params: {
   return decorations;
 }
 
+function getJsonDecorationsForSegment(params: {
+  lineFrom: number;
+  text: string;
+  startOffset: number;
+  endOffset?: number;
+}): TextDecoration[] {
+  const segment =
+    params.endOffset !== undefined
+      ? params.text.substring(params.startOffset, params.endOffset)
+      : params.text.substring(params.startOffset);
+
+  const trimmed = segment.trimStart();
+  if (!trimmed) return [];
+
+  // Heuristic: only attempt JSON-ish highlighting for lines that look like JSON.
+  // (Avoid impacting scripts and random text.)
+  const looksJson =
+    trimmed.startsWith('{') ||
+    trimmed.startsWith('[') ||
+    trimmed.startsWith('"') ||
+    /^[\d\-]/.test(trimmed) ||
+    trimmed === 'true' ||
+    trimmed === 'false' ||
+    trimmed === 'null' ||
+    /"\s*:\s*/.test(trimmed);
+
+  if (!looksJson) return [];
+
+  const decorations: TextDecoration[] = [];
+  const highlighted: HighlightedRange[] = [];
+  const add = createOverlapSafeAdder({
+    lineFrom: params.lineFrom,
+    startOffset: params.startOffset,
+    highlighted,
+    decorations
+  });
+
+  let m: RegExpExecArray | null;
+
+  // Keys: "...":
+  const keyRx = /"([^"\\]|\\.)*"\s*:/g;
+  while ((m = keyRx.exec(segment)) !== null) {
+    const full = m[0];
+    const quoteStart = full.indexOf('"');
+    const quoteEnd = full.lastIndexOf('"');
+    if (quoteStart >= 0 && quoteEnd > quoteStart) {
+      add(m.index + quoteStart, m.index + quoteEnd + 1, 'cm-json-key');
+    }
+  }
+
+  // Strings (including keys, but overlap-safe means cm-json-key wins)
+  const stringRx = /"([^"\\]|\\.)*"/g;
+  while ((m = stringRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-json-string');
+
+  // Numbers
+  const numRx = /-?\b\d+(?:\.\d+)?\b/g;
+  while ((m = numRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-json-number');
+
+  // true/false/null
+  const litRx = /\b(true|false|null)\b/g;
+  while ((m = litRx.exec(segment)) !== null) add(m.index, m.index + m[0].length, 'cm-json-literal');
+
+  return decorations;
+}
+
 export function getNonScriptLineDecorations(params: {
   lineFrom: number;
   text: string;
@@ -147,6 +212,9 @@ export function getNonScriptLineDecorations(params: {
         cls: 'cm-http-method'
       });
     }
+
+    // Make request blocks more obviously "a block" (and thus foldable).
+    lineDecorations.push({ at: params.lineFrom, cls: 'cm-request-start' });
   }
 
   // Highlight headers
@@ -248,6 +316,14 @@ export function getNonScriptLineDecorations(params: {
     // Avoid styling script markers; keep it focused on payload content.
     if (trimmed && trimmed !== '<' && trimmed !== '>' && !trimmed.startsWith('<') && !trimmed.startsWith('>')) {
       lineDecorations.push({ at: params.lineFrom, cls: 'cm-payload-line' });
+
+      decorations.push(
+        ...getJsonDecorationsForSegment({
+          lineFrom: params.lineFrom,
+          text: params.text,
+          startOffset: 0
+        })
+      );
     }
   }
 

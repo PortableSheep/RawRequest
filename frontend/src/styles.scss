@@ -290,9 +290,36 @@ html, body {
   font-weight: 700;
 }
 
+/* Request blocks: subtle marker on method line to imply foldable block */
+.cm-line.cm-request-start {
+  border-left: 2px solid color-mix(in srgb, var(--rr-primary), transparent 35%);
+  padding-left: 6px;
+  margin-left: -6px;
+  background-color: color-mix(in srgb, var(--color-zinc-950), transparent 88%);
+}
+
 /* Body/payload lines: keep subtle so it doesn't fight normal syntax colors */
 .cm-line.cm-payload-line {
   background-color: color-mix(in srgb, var(--color-zinc-950), transparent 85%);
+}
+
+/* Lightweight JSON highlighting inside payload lines */
+.cm-json-key {
+  color: var(--rr-prose-bold) !important;
+  font-weight: 600;
+}
+
+.cm-json-string {
+  color: var(--rr-accent) !important;
+}
+
+.cm-json-number {
+  color: var(--rr-warning) !important;
+}
+
+.cm-json-literal {
+  color: var(--rr-text-secondary) !important;
+  font-weight: 600;
 }
 
 /* Separator lines: use a line-level decoration to avoid search-highlighting splitting */

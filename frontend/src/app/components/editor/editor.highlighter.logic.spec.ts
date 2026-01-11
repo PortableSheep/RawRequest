@@ -196,5 +196,32 @@ describe('editor.highlighter.logic', () => {
 
       expect(res.lineDecorations).toContainEqual({ at: 10, cls: 'cm-payload-line' });
     });
+
+    it('adds request-start line decoration for MethodLine', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: 'GET https://example.com',
+        leadingWhitespace: 0,
+        lineNodeName: 'MethodLine',
+        nodeText: 'GET https://example.com'
+      });
+
+      expect(res.lineDecorations).toContainEqual({ at: 0, cls: 'cm-request-start' });
+    });
+
+    it('adds lightweight JSON highlighting for JSON-ish BodyLine', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: '{"a": 1, "b": true, "c": "x"}',
+        leadingWhitespace: 0,
+        lineNodeName: 'BodyLine',
+        nodeText: '{"a": 1, "b": true, "c": "x"}'
+      });
+
+      expect(res.decorations.some(d => d.cls === 'cm-json-key')).toBe(true);
+      expect(res.decorations.some(d => d.cls === 'cm-json-string')).toBe(true);
+      expect(res.decorations.some(d => d.cls === 'cm-json-number')).toBe(true);
+      expect(res.decorations.some(d => d.cls === 'cm-json-literal')).toBe(true);
+    });
   });
 });
