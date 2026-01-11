@@ -3,11 +3,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "moduleResolution": "bundler",
+    "moduleResolution": "nodenext",
     "types": [
       "jest",
       "node"
-    ]
+    ],
+    "paths": {
+      "@wailsjs/*": ["wailsjs/*"]
+    }
   },
   "include": [
     "src/**/*.spec.ts",
