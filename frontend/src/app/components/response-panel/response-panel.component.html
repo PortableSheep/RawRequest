@@ -135,8 +135,6 @@
                                                     <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Body</span>
                                                     <app-virtual-response-body
                                                         [body]="entry.request.body"
-                                                        [highlightedContent]="entry.request.body | syntaxHighlight"
-                                                        [threshold]="1000"
                                                     ></app-virtual-response-body>
                                                 </div>
                                             }
@@ -311,8 +309,6 @@
                                             </div>
                                             <app-virtual-response-body
                                                 [body]="entry.response!.body || ''"
-                                                [highlightedContent]="(entry.response!.body || '') | syntaxHighlight"
-                                                [threshold]="1000"
                                             ></app-virtual-response-body>
                                         </div>
                                     } @else {

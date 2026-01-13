@@ -1,6 +1,5 @@
 import { Component, OnDestroy, effect, input, signal, untracked, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SyntaxHighlightPipe } from "../../pipes/syntax-highlight.pipe";
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
 
@@ -16,7 +15,7 @@ type EntryTab = 'response' | 'request';
 @Component({
   selector: 'app-response-panel',
   standalone: true,
-  imports: [CommonModule, SyntaxHighlightPipe, VirtualResponseBodyComponent],
+  imports: [CommonModule, VirtualResponseBodyComponent],
   templateUrl: './response-panel.component.html',
   styleUrls: ['./response-panel.component.scss']
 })

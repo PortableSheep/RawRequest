@@ -239,6 +239,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private destroy$ = new Subject<void>();
   private alertTimeout: any;
+  private parseDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly PARSE_DEBOUNCE_MS = 150;
 
   constructor() {}
 
@@ -348,6 +350,9 @@ export class AppComponent implements OnInit, OnDestroy {
     if (this.alertTimeout) {
       clearTimeout(this.alertTimeout);
     }
+    if (this.parseDebounceTimer) {
+      clearTimeout(this.parseDebounceTimer);
+    }
   }
 
   private loadFiles(): void {
@@ -447,11 +452,32 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   // Editor content change handler
+  // Uses debounced parsing to prevent UI lag when editing large files.
+  // Content is saved immediately; parsing (which extracts requests/environments) is debounced.
   onEditorContentChange(content: string) {
-    const updated = this.workspace.updateFileContent(this.files, this.currentFileIndex, content);
-    this.files = updated.files;
-    this.filesSignal.set(updated.files);
-    this.currentEnvSignal.set(updated.currentEnv || '');
+    // Cancel any pending parse
+    if (this.parseDebounceTimer) {
+      clearTimeout(this.parseDebounceTimer);
+    }
+
+    // Immediately update raw content so the editor stays responsive
+    const currentFile = this.files[this.currentFileIndex];
+    if (currentFile) {
+      const quickUpdate = [...this.files];
+      quickUpdate[this.currentFileIndex] = { ...currentFile, content };
+      this.files = quickUpdate;
+      this.filesSignal.set(quickUpdate);
+      this.httpService.saveFiles(quickUpdate);
+    }
+
+    // Debounce the expensive parsing operation
+    this.parseDebounceTimer = setTimeout(() => {
+      this.parseDebounceTimer = null;
+      const updated = this.workspace.updateFileContent(this.files, this.currentFileIndex, content);
+      this.files = updated.files;
+      this.filesSignal.set(updated.files);
+      this.currentEnvSignal.set(updated.currentEnv || '');
+    }, this.PARSE_DEBOUNCE_MS);
   }
 
   // Request execution

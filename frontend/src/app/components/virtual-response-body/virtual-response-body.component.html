@@ -1,17 +1,22 @@
 <!-- language: html -->
-@if (useVirtualScroll()) {
+<div class="response-container">
+  @if (isProcessing()) {
+    <div class="processing-indicator">
+      <div class="processing-spinner"></div>
+      <span>Highlighting...</span>
+    </div>
+  }
+  
   <cdk-virtual-scroll-viewport
     [itemSize]="lineHeight"
     class="virtual-scroll-viewport"
   >
     <div
-      *cdkVirtualFor="let line of lines()"
+      *cdkVirtualFor="let line of lines(); trackBy: trackByLineNumber"
       class="response-line"
     >
       <span class="line-number" role="presentation" aria-label="Line {{ line.lineNumber }}">{{ line.lineNumber }}</span>
       <span class="line-content" [innerHTML]="line.content"></span>
     </div>
   </cdk-virtual-scroll-viewport>
-} @else {
-  <pre class="traditional-pre" [innerHTML]="highlightedContent()"></pre>
-}
+</div>
