@@ -43,29 +43,38 @@ export class SyntaxHighlightWorkerService implements OnDestroy {
   }
 
   private initWorker(): void {
+    if (typeof Worker === 'undefined') {
+      return;
+    }
     try {
       this.worker = new Worker(new URL('../workers/syntax-highlight.worker', import.meta.url), { type: 'module' });
-
-      this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-        const { id, html, lineCount, isLarge, type } = event.data;
-
-        if (type !== 'highlight-result') return;
-
-        const callback = this.workerCallbacks.get(id);
-        if (callback) {
-          this.workerCallbacks.delete(id);
-          this.ngZone.run(() => {
-            callback({ html, lineCount, isLarge });
-          });
-        }
-      };
-
-      this.worker.onerror = (error) => {
-        console.error('Syntax highlight worker error:', error);
-      };
+      this.setupWorkerHandlers();
     } catch (e) {
-      console.error('Failed to create syntax highlight worker:', e);
+      console.warn('Syntax highlight worker not available, using fallback:', e);
+      this.worker = null;
     }
+  }
+
+  private setupWorkerHandlers(): void {
+    if (!this.worker) return;
+
+    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+      const { id, html, lineCount, isLarge, type } = event.data;
+
+      if (type !== 'highlight-result') return;
+
+      const callback = this.workerCallbacks.get(id);
+      if (callback) {
+        this.workerCallbacks.delete(id);
+        this.ngZone.run(() => {
+          callback({ html, lineCount, isLarge });
+        });
+      }
+    };
+
+    this.worker.onerror = (error) => {
+      console.error('Syntax highlight worker error:', error);
+    };
   }
 
   private terminateWorker(): void {
@@ -124,7 +133,7 @@ export class SyntaxHighlightWorkerService implements OnDestroy {
   }
 
   /**
-   * Minimal fallback if Worker somehow fails - just escape HTML, no highlighting.
+   * Minimal fallback if Worker fails - just escape HTML, no highlighting.
    */
   private plainTextFallback(content: string): HighlightResult {
     const lineCount = (content.match(/\n/g) || []).length + 1;

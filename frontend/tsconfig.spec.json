@@ -3,7 +3,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./out-tsc/spec",
-    "moduleResolution": "bundler",
+    "module": "ES2022",
+    "moduleResolution": "node",
+    "isolatedModules": true,
     "types": [
       "jest",
       "node"
@@ -14,7 +16,7 @@
     }
   },
   "include": [
-    "src/**/*.spec.ts",
+    "src/**/*.ts",
     "src/**/*.d.ts"
   ]
 }

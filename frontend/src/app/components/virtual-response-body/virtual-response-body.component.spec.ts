@@ -7,35 +7,22 @@ describe('VirtualResponseBodyComponent', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('should not use virtual scroll for small bodies', async () => {
+  it('should handle empty body', async () => {
     const { fixture } = await render(VirtualResponseBodyComponent, {
       componentInputs: {
-        body: 'short body\nwith\nfew\nlines',
-        threshold: 1000
+        body: ''
       }
     });
     
-    expect(fixture.componentInstance.useVirtualScroll()).toBe(false);
+    const lines = fixture.componentInstance.lines();
+    expect(lines.length).toBe(0);
   });
 
-  it('should use virtual scroll for large bodies', async () => {
-    const largeBody = Array(1001).fill('line').join('\n');
-    const { fixture } = await render(VirtualResponseBodyComponent, {
-      componentInputs: {
-        body: largeBody,
-        threshold: 1000
-      }
-    });
-    
-    expect(fixture.componentInstance.useVirtualScroll()).toBe(true);
-  });
-
-  it('should split body into lines for virtual scroll', async () => {
+  it('should split body into lines', async () => {
     const testBody = 'line1\nline2\nline3';
     const { fixture } = await render(VirtualResponseBodyComponent, {
       componentInputs: {
-        body: testBody,
-        threshold: 1
+        body: testBody
       }
     });
     
@@ -56,20 +43,16 @@ describe('VirtualResponseBodyComponent', () => {
     
     const { fixture } = await render(VirtualResponseBodyComponent, {
       componentInputs: {
-        body: testBody,
-        threshold: 0 // Force virtual scroll mode
+        body: testBody
       }
     });
     
     // Wait for the async highlighting to complete and trigger change detection multiple times
     // to ensure signals propagate
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 10; i++) {
       await new Promise(resolve => setTimeout(resolve, 20));
       fixture.detectChanges();
     }
-    
-    // Now should be done processing
-    expect(fixture.componentInstance.isProcessing()).toBe(false);
     
     // The highlighting service was invoked and lines should be available
     const lines = fixture.componentInstance.lines();
@@ -81,41 +64,34 @@ describe('VirtualResponseBodyComponent', () => {
     expect(String(lines[1].content)).toContain('key');
   });
 
-  it('should display plain text while highlighting is processing', async () => {
+  it('should display plain text immediately before highlighting completes', async () => {
     const testBody = '{"test": true}';
     
     const { fixture } = await render(VirtualResponseBodyComponent, {
       componentInputs: {
-        body: testBody,
-        threshold: 0
+        body: testBody
       }
     });
     
-    // Lines should still be available immediately (plain text)
+    // Lines should still be available immediately (plain text fallback)
     const lines = fixture.componentInstance.lines();
     expect(lines.length).toBe(1);
     // Content should contain the text, even before highlighting
     expect(String(lines[0].content)).toContain('test');
   });
 
-  it('should respect custom threshold', async () => {
-    const body = Array(100).fill('line').join('\n');
-    
-    const { fixture, rerender } = await render(VirtualResponseBodyComponent, {
+  it('should handle large bodies efficiently', async () => {
+    const largeBody = Array(1000).fill('line content here').join('\n');
+    const { fixture } = await render(VirtualResponseBodyComponent, {
       componentInputs: {
-        body: body,
-        threshold: 50
+        body: largeBody
       }
     });
-    expect(fixture.componentInstance.useVirtualScroll()).toBe(true);
     
-    await rerender({
-      componentInputs: {
-        body: body,
-        threshold: 150
-      }
-    });
-    expect(fixture.componentInstance.useVirtualScroll()).toBe(false);
+    const lines = fixture.componentInstance.lines();
+    expect(lines.length).toBe(1000);
+    expect(lines[0].lineNumber).toBe(1);
+    expect(lines[999].lineNumber).toBe(1000);
   });
 
   it('should have trackByLineNumber function', async () => {
