@@ -296,12 +296,22 @@
           }
 
           @if (isLoadTest() && activeTab === 'raw') {
-            <pre id="tabpanel-raw" role="tabpanel" aria-labelledby="tab-raw" class="absolute inset-0 p-6 text-xs font-mono leading-relaxed text-zinc-300 overflow-auto whitespace-pre-wrap" [innerHTML]="getRawJson() | syntaxHighlight"></pre>
+            <div id="tabpanel-raw" role="tabpanel" aria-labelledby="tab-raw" class="absolute inset-0 p-6 overflow-auto">
+              <app-virtual-response-body
+                [body]="getRawJson()"
+                class="history-modal-body"
+              ></app-virtual-response-body>
+            </div>
           }
 
           <!-- Body Tab (non-load-test) -->
           @if (!isLoadTest() && activeTab === 'body') {
-            <pre id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="absolute inset-0 p-6 text-xs font-mono leading-relaxed text-zinc-300 overflow-auto whitespace-pre-wrap" [innerHTML]="getFormattedResponse() | syntaxHighlight"></pre>
+            <div id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="absolute inset-0 p-6 overflow-auto">
+              <app-virtual-response-body
+                [body]="getFormattedResponse()"
+                class="history-modal-body"
+              ></app-virtual-response-body>
+            </div>
           }
 
           <!-- Headers Tab -->

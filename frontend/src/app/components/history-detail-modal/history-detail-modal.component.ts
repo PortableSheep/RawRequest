@@ -1,12 +1,12 @@
 import { Component, input, output, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { SyntaxHighlightPipe } from "../../pipes/syntax-highlight.pipe";
+import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import type { HistoryItem, LoadTestMetrics } from '../../models/http.models';
 
 @Component({
   selector: 'app-history-detail-modal',
   standalone: true,
-  imports: [CommonModule, SyntaxHighlightPipe],
+  imports: [CommonModule, VirtualResponseBodyComponent],
   templateUrl: './history-detail-modal.component.html',
   styleUrls: ['./history-detail-modal.component.scss']
 })

@@ -4,3 +4,10 @@
 //  max-height: 60vh;
 //  overflow-y: auto;
 //}
+
+// Override virtual response body height for modal context
+::ng-deep .history-modal-body .virtual-scroll-viewport {
+  height: calc(100vh - 400px); // Account for modal header, tabs, footer, etc.
+  max-height: none;
+  min-height: 200px;
+}
