@@ -37,7 +37,6 @@ export function writeLastSessionToStorage(key: string, state: LastSessionState):
   try {
     localStorage.setItem(key, JSON.stringify(state));
   } catch {
-    // Ignore write errors (quota, disabled storage)
   }
 }
 
@@ -45,6 +44,5 @@ export function clearLastSessionInStorage(key: string): void {
   try {
     localStorage.removeItem(key);
   } catch {
-    // Ignore
   }
 }

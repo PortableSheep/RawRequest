@@ -1,16 +1,10 @@
 package ringbuffer
 
-// Buffer is a simple append-only ring buffer that retains at most cap items.
-// When the cap is exceeded, the oldest items are dropped.
-//
-// It is not safe for concurrent use without external synchronization.
 type Buffer[T any] struct {
 	cap   int
 	items []T
 }
 
-// New constructs a new Buffer retaining at most cap items.
-// If cap <= 0, the buffer will retain zero items.
 func New[T any](cap int) *Buffer[T] {
 	if cap < 0 {
 		cap = 0

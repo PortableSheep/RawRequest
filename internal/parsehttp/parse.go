@@ -6,10 +6,6 @@ import (
 
 type readFileFunc func(path string) ([]byte, error)
 
-// Parse parses .http content and returns request maps compatible with the frontend.
-//
-// It intentionally mirrors the previous `(*App).ParseHttp` behavior so we can unit test
-// the pure parsing logic independently of the Wails App.
 func Parse(content string, variables map[string]string, envVars map[string]string, environ []string, readFile readFileFunc) []map[string]interface{} {
 	// First pass: Replace simple variables and env vars.
 	for key, value := range variables {

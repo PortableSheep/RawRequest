@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// Release represents the subset of the GitHub Release payload we care about.
 type Release struct {
 	TagName     string    `json:"tag_name"`
 	Name        string    `json:"name"`
@@ -36,9 +35,6 @@ type UpdateDecision struct {
 	PublishedAt   string
 }
 
-// DecideUpdate computes the update fields given the current version and a GitHub release.
-// It preserves existing behavior: compare numeric major/minor/patch only and format
-// PublishedAt with "January 2, 2006".
 func DecideUpdate(currentVersion string, rel Release) UpdateDecision {
 	decision := UpdateDecision{Available: false}
 	if IsSkippableRelease(rel) {

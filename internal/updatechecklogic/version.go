@@ -8,8 +8,6 @@ import (
 
 var versionRe = regexp.MustCompile(`^(\d+)(?:\.(\d+))?(?:\.(\d+))?`)
 
-// ParseVersion extracts major, minor, patch from a version string.
-// It tolerates a leading "v" and ignores any trailing non-numeric metadata.
 func ParseVersion(v string) [3]int {
 	v = strings.TrimPrefix(v, "v")
 
@@ -28,8 +26,6 @@ func ParseVersion(v string) [3]int {
 	return parts
 }
 
-// IsNewerVersion compares two semantic version strings.
-// Returns true if latest is newer than current.
 func IsNewerVersion(latest, current string) bool {
 	latestParts := ParseVersion(latest)
 	currentParts := ParseVersion(current)

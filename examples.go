@@ -1,7 +1,5 @@
 package main
 
-// ExamplesForFirstRunResponse is the payload returned to the frontend when checking
-// if this is the first run and the embedded examples should be opened.
 type ExamplesForFirstRunResponse struct {
 	Content    string `json:"content"`
 	FilePath   string `json:"filePath"`

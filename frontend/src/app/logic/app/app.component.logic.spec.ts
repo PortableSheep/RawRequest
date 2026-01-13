@@ -182,7 +182,8 @@ describe('app.component.logic', () => {
         ctrlKey: false,
         shiftKey: false,
         showHistoryModal: false,
-        showHistory: false
+        showHistory: false,
+        isRequestRunning: false
       })
     ).toEqual({ action: 'save', shouldPreventDefault: true, shouldStopPropagation: true });
 
@@ -193,7 +194,8 @@ describe('app.component.logic', () => {
         ctrlKey: true,
         shiftKey: true,
         showHistoryModal: false,
-        showHistory: false
+        showHistory: false,
+        isRequestRunning: false
       })
     ).toEqual({ action: 'saveAs', shouldPreventDefault: true, shouldStopPropagation: true });
   });
@@ -219,7 +221,8 @@ describe('app.component.logic', () => {
         ctrlKey: false,
         shiftKey: false,
         showHistoryModal: true,
-        showHistory: true
+        showHistory: true,
+        isRequestRunning: false
       }).action
     ).toBe('closeHistoryModal');
 
@@ -230,7 +233,8 @@ describe('app.component.logic', () => {
         ctrlKey: false,
         shiftKey: false,
         showHistoryModal: false,
-        showHistory: true
+        showHistory: true,
+        isRequestRunning: false
       }).action
     ).toBe('toggleHistory');
 
@@ -241,9 +245,37 @@ describe('app.component.logic', () => {
         ctrlKey: false,
         shiftKey: false,
         showHistoryModal: false,
-        showHistory: false
+        showHistory: false,
+        isRequestRunning: false
       }).action
     ).toBe('none');
+  });
+
+  it('decideGlobalKeydownAction cancels request on Escape when running', () => {
+    expect(
+      decideGlobalKeydownAction({
+        key: 'Escape',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        showHistoryModal: false,
+        showHistory: false,
+        isRequestRunning: true
+      })
+    ).toEqual({ action: 'cancelRequest', shouldPreventDefault: true, shouldStopPropagation: true });
+
+    // Modals take priority over canceling the request
+    expect(
+      decideGlobalKeydownAction({
+        key: 'Escape',
+        metaKey: false,
+        ctrlKey: false,
+        shiftKey: false,
+        showHistoryModal: true,
+        showHistory: false,
+        isRequestRunning: true
+      }).action
+    ).toBe('closeHistoryModal');
   });
 
   it('getRequestTimeoutMs returns positive timeout or null', () => {

@@ -15,6 +15,5 @@ export function writeSplitWidthPxToStorage(storage: StorageLike, key: string, wi
   try {
     storage.setItem(key, String(widthPx));
   } catch {
-    // ignore (quota, disabled storage)
   }
 }

@@ -15,9 +15,28 @@
     <!-- Scrollable content area -->
     <div class="flex-1 overflow-y-auto p-4">
         @if (isLoading() && !chainItems.length) {
+            @let progress = downloadProgress();
             <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-400">
                 <div class="spinner text-emerald-400"></div>
-                <p>Executing request…</p>
+                @if (progress && progress.downloaded > 0) {
+                    <p>Downloading response…</p>
+                    <div class="w-48 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                        <div 
+                            class="h-full bg-emerald-500 transition-all duration-150"
+                            [style.width.%]="progress.total > 0 ? (progress.downloaded / progress.total * 100) : 50"
+                            [class.animate-pulse]="progress.total <= 0"
+                        ></div>
+                    </div>
+                    <p class="text-[11px] text-zinc-500">
+                        @if (progress.total > 0) {
+                            {{ formatBytes(progress.downloaded) }} / {{ formatBytes(progress.total) }}
+                        } @else {
+                            {{ formatBytes(progress.downloaded) }} downloaded
+                        }
+                    </p>
+                } @else {
+                    <p>Executing request…</p>
+                }
             </div>
         } @else if (!chainItems.length && !isLoading()) {
             <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-500">

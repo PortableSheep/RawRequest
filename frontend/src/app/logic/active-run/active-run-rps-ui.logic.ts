@@ -36,7 +36,6 @@ export function sampleAndApplyRpsUiState(input: RpsUiSamplingInput): RpsUiSampli
     input.options
   );
 
-  // If no new sample, only sampler state may have advanced.
   if (sampled.sample === null) {
     return {
       samplingState: sampled.state,

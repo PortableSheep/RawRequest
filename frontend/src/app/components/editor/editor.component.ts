@@ -61,6 +61,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private isUpdatingFromInput = false;
   private autocompleteCompartment = new Compartment();
   private lintCompartment = new Compartment();
+  private readOnlyCompartment = new Compartment();
 
   private requestBlockIndex: Array<{ from: number; to: number; index: number }> = [];
 
@@ -85,6 +86,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       const activeIndex = this.executingRequestIndex();
       const disableAll = this.isBusy();
       this.updateExecutingIndicator(activeIndex, disableAll);
+      // Make editor read-only while a request is running
+      if (this.editorView) {
+        this.editorView.dispatch({
+          effects: this.readOnlyCompartment.reconfigure(EditorState.readOnly.of(disableAll))
+        });
+      }
     });
 
     // Update autocomplete + lint when relevant inputs change
@@ -221,6 +228,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         this.autocompleteCompartment.of(this.createAutocomplete()),
         this.createVariableHoverTooltip(),
         this.lintCompartment.of(this.createLintExtensions()),
+        this.readOnlyCompartment.of(EditorState.readOnly.of(this.isBusy())),
         createEditorKeymap({
           getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos),
           onExecuteRequest: (index) => this.requestExecute.emit(index)

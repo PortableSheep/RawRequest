@@ -217,7 +217,7 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 				return
 			}
 
-			res := a.performRequest(ctx, method, url, headersJSON, body, 0)
+			res := a.performRequest(ctx, "", method, url, headersJSON, body, 0)
 			if res == requestCancelledResponse {
 				return
 			}
@@ -344,7 +344,6 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 			return
 		}
 		if !cfg.HasSpawnRate || spawnRate <= 0 {
-			// No explicit spawn control; allow full concurrency immediately.
 			allowedUsers.Store(cfg.MaxUsers)
 			return
 		}

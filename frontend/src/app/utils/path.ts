@@ -23,7 +23,6 @@ export function dirname(filePath: string): string {
   const normalized = String(filePath ?? '');
   if (!normalized) return '';
 
-  // Trim trailing separators (but keep root '/')
   let end = normalized.length;
   while (end > 1) {
     const ch = normalized[end - 1];

@@ -84,8 +84,6 @@ func ValueToString(val interface{}) string {
 	return ""
 }
 
-// DurationFromValue interprets a value as a millisecond duration.
-// Negative values are clamped to 0.
 func DurationFromValue(val interface{}) (time.Duration, bool) {
 	switch v := val.(type) {
 	case int:

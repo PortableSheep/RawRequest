@@ -12,7 +12,6 @@ export function clampSplitWidthToContainerPx(containerWidthPx: number, leftWidth
 }
 
 export function computeSplitGridTemplateColumns(leftWidthPx: number): string {
-  // editor | splitter | response
   return `minmax(0, ${leftWidthPx}px) ${SPLITTER_COL_WIDTH_PX}px minmax(0, 1fr)`;
 }
 

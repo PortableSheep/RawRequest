@@ -11,7 +11,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// Version is set at build time via ldflags
 var Version = "1.0.0"
 
 type GitHubRelease struct {
@@ -43,7 +42,6 @@ func (a *App) GetAppVersion() string {
 	return Version
 }
 
-// CheckForUpdates checks GitHub releases for a newer version
 func (a *App) CheckForUpdates() (UpdateInfo, error) {
 	info := UpdateInfo{
 		Available:      false,

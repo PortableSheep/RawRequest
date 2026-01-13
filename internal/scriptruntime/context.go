@@ -8,8 +8,6 @@ type AssertionResult struct {
 	Stage   string `json:"stage"`
 }
 
-// ExecutionContext is the object exposed to the JS VM as `context`.
-// It is intentionally a simple data bag so it can be unit-tested and reused.
 type ExecutionContext struct {
 	Request       map[string]interface{}            `json:"request"`
 	Response      map[string]interface{}            `json:"response"`
@@ -19,8 +17,6 @@ type ExecutionContext struct {
 	Assertions    []AssertionResult                 `json:"assertions"`
 }
 
-// BuildSource generates a human-readable label used for script logs.
-// Behavior matches the prior buildScriptSource in app.go.
 func BuildSource(ctx *ExecutionContext) string {
 	stage := "script"
 	if ctx != nil && ctx.Stage != "" {

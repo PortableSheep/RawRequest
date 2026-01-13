@@ -1,4 +1,5 @@
 import { Injectable, inject } from '@angular/core';
+import { Subject } from 'rxjs';
 import {
   AssertionResult,
   Request,
@@ -42,6 +43,12 @@ import {
 import { sendRequest as sendRequestHelper } from './http/send-request';
 import { executeChain as executeChainHelper } from './http/execute-chain';
 
+export interface DownloadProgress {
+  requestId: string;
+  downloaded: number;
+  total: number; // -1 if unknown
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -53,9 +60,27 @@ export class HttpService {
   private readonly FILES_KEY = 'rawrequest_files';
   private readonly CANCELLED_RESPONSE = '__CANCELLED__';
 
+  /** Emits download progress events for large response bodies */
+  readonly downloadProgress$ = new Subject<DownloadProgress>();
+  private downloadProgressCleanup: (() => void) | null = null;
+
   constructor() {
     this.scriptConsole.init().catch(() => {
       // Console UI will surface errors; swallow to avoid blocking requests
+    });
+    this.initDownloadProgressListener();
+  }
+
+  private initDownloadProgressListener(): void {
+    // Listen for download progress events from the backend
+    this.downloadProgressCleanup = EventsOn('request:download-progress', (data: any) => {
+      if (data?.requestId) {
+        this.downloadProgress$.next({
+          requestId: data.requestId,
+          downloaded: data.downloaded ?? 0,
+          total: data.total ?? -1,
+        });
+      }
     });
   }
 

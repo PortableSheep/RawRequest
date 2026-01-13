@@ -118,7 +118,6 @@ export interface LoadTestResults {
   startTime: number;
   endTime: number;
   
-  // Run state
   cancelled?: boolean;
   aborted?: boolean;
   abortReason?: string;

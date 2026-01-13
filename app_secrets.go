@@ -7,8 +7,6 @@ import (
 	"github.com/gen2brain/beeep"
 )
 
-// Secret management API -----------------------------------------------------
-
 func (a *App) ListSecrets() (map[string][]string, error) {
 	vault, err := a.getSecretVault()
 	if err != nil {

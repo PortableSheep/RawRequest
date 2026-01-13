@@ -2,7 +2,7 @@ import type { ActiveRunProgress, FileTab, Request, ScriptLogEntry } from '../../
 
 export type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 
-export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory';
+export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory' | 'cancelRequest';
 
 export interface GlobalKeydownDecision {
   action: GlobalKeydownAction;
@@ -203,6 +203,7 @@ export function decideGlobalKeydownAction(args: {
   shiftKey: boolean;
   showHistoryModal: boolean;
   showHistory: boolean;
+  isRequestRunning?: boolean;
 }): GlobalKeydownDecision {
   const key = args.key || '';
   const isSave = (args.metaKey || args.ctrlKey) && key.toLowerCase() === 's';
@@ -218,12 +219,14 @@ export function decideGlobalKeydownAction(args: {
     return { action: 'none', shouldPreventDefault: false, shouldStopPropagation: false };
   }
 
-  // Close only the topmost layer.
   if (args.showHistoryModal) {
     return { action: 'closeHistoryModal', shouldPreventDefault: true, shouldStopPropagation: true };
   }
   if (args.showHistory) {
     return { action: 'toggleHistory', shouldPreventDefault: true, shouldStopPropagation: true };
+  }
+  if (args.isRequestRunning) {
+    return { action: 'cancelRequest', shouldPreventDefault: true, shouldStopPropagation: true };
   }
 
   return { action: 'none', shouldPreventDefault: false, shouldStopPropagation: false };

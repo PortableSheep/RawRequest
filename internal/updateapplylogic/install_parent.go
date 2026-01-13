@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-// InstallParentDir returns the directory that should be probed for write access
-// when installing to installPath.
-//
-// On macOS, installPath may be a .app bundle, in which case the parent directory
-// is probed (since writing alongside the .app is what matters).
 func InstallParentDir(installPath string) (string, error) {
 	parent := installPath
 	if strings.HasSuffix(strings.ToLower(strings.TrimSpace(installPath)), ".app") {

@@ -28,12 +28,10 @@ export type LoadRunUiState = {
   loadRpsSparklineTransformView: string;
   loadRpsSparklinePathDView: string;
 
-  // RPS sampler state
   lastRpsSampleAtMs: null;
   lastRpsTotalSent: null;
   lastRpsSmoothed: null;
 
-  // RPS numeric readout smoothing
   rpsRenderValue: null;
   rpsRenderTarget: null;
 };

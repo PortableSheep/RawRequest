@@ -31,10 +31,6 @@ func (a assertionFailure) Error() string {
 	return a.message
 }
 
-// Execute runs the provided script inside a goja VM.
-// It wires `context`, `setVar`, `getVar`, `setHeader`, `updateRequest`, `assert`, `delay`, and `console.*`.
-//
-// Script content is expected to be pre-cleaned by the caller (e.g. via cleanScriptContent).
 func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps Dependencies) {
 	if strings.TrimSpace(cleanScript) == "" {
 		return

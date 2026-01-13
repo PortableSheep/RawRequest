@@ -211,6 +211,7 @@ export class AppComponent implements OnInit, OnDestroy {
     startedAt: number;
   } | null = null;
   isCancellingActiveRequest = false;
+  downloadProgress: { downloaded: number; total: number } | null = null;
   // History is cached in HistoryStoreService
   // executeRequestTrigger = signal<number | null>(null);
 
@@ -264,6 +265,15 @@ export class AppComponent implements OnInit, OnDestroy {
       .onMissingSecret()
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {});
+
+    // Subscribe to download progress events
+    this.httpService.downloadProgress$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(progress => {
+        if (this.activeRequestInfo?.id === progress.requestId) {
+          this.downloadProgress = { downloaded: progress.downloaded, total: progress.total };
+        }
+      });
   }
 
   @HostListener('window:resize')
@@ -502,6 +512,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.isRequestRunning = true;
     this.pendingRequestIndex = requestIndex;
+    this.downloadProgress = null; // Reset download progress for new request
     const request = activeFile.requests[requestIndex];
     const now = Date.now();
     this.activeRequestInfo = buildActiveRequestInfo(activeFile.id, requestIndex, request, now);
@@ -622,7 +633,8 @@ export class AppComponent implements OnInit, OnDestroy {
       ctrlKey: event.ctrlKey,
       shiftKey: event.shiftKey,
       showHistoryModal: this.showHistoryModal,
-      showHistory: this.showHistory
+      showHistory: this.showHistory,
+      isRequestRunning: this.isRequestRunning
     });
 
     if (decision.shouldPreventDefault) {
@@ -644,6 +656,9 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       case 'toggleHistory':
         this.toggleHistory();
+        return;
+      case 'cancelRequest':
+        void this.cancelActiveRequest();
         return;
       case 'none':
       default:

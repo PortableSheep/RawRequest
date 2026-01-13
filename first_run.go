@@ -6,7 +6,6 @@ import (
 	"runtime"
 )
 
-// IsFirstRun checks if this is the first time the app has been run.
 func (a *App) IsFirstRun() bool {
 	appDir := a.getAppDir()
 	flagFile := filepath.Join(appDir, ".first-run-completed")
@@ -14,7 +13,6 @@ func (a *App) IsFirstRun() bool {
 	return os.IsNotExist(err)
 }
 
-// MarkFirstRunComplete marks the first run as completed.
 func (a *App) MarkFirstRunComplete() error {
 	appDir := a.getAppDir()
 	if err := os.MkdirAll(appDir, 0o755); err != nil {

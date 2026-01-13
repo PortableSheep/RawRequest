@@ -127,11 +127,8 @@ func main() {
 			die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 		}
 	} else {
-		// Fallback: artifact may be a local temp file without an extension.
 		if err := extractZip(artifactPath, stagingDir); err == nil {
-			// ok
 		} else if err := extractTarGz(artifactPath, stagingDir); err == nil {
-			// ok
 		} else {
 			die("unsupported artifact type (expected .tar.gz/.tgz or .zip)")
 		}
@@ -154,7 +151,6 @@ func main() {
 		dief("apply update failed: %v", err)
 	}
 
-	// Best-effort: clear persisted "restart to install" state after a successful apply.
 	clearPreparedUpdateStateBestEffort()
 
 	fmt.Printf("Update applied successfully.\n")
@@ -176,11 +172,9 @@ func dief(format string, args ...any) {
 }
 
 func installParentDir(installPath string) string {
-	// macOS: /path/RawRequest.app → parent directory
 	if strings.HasSuffix(strings.ToLower(installPath), ".app") {
 		return filepath.Dir(installPath)
 	}
-	// Windows / others: treat installPath as install directory
 	return installPath
 }
 
@@ -299,7 +293,6 @@ func extractTarGz(src, dest string) error {
 		}
 
 		rel := filepath.Clean(hdr.Name)
-		// Prevent path traversal
 		if strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
 			continue
 		}
@@ -324,7 +317,6 @@ func extractTarGz(src, dest string) error {
 			}
 			out.Close()
 		case tar.TypeSymlink:
-			// Skip symlinks in MVP (keeps extraction simple and safer)
 			continue
 		default:
 			continue

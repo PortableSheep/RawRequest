@@ -42,7 +42,6 @@ export function pointsToSmoothPathD(points: SparklinePoint[], bounds: SparklineB
     const p2 = points[i + 1];
     const p3 = points[i + 2] ?? p2;
 
-    // Catmull-Rom to cubic Bezier conversion.
     let cp1 = {
       x: p1.x + ((p2.x - p0.x) * t) / 6,
       y: p1.y + ((p2.y - p0.y) * t) / 6

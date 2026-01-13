@@ -99,6 +99,7 @@
                         [request]="lastExecutedRequestIndex !== null ? currentFile.requests[lastExecutedRequestIndex] : null"
                         [isLoading]="isRequestRunning"
                         [isCancelling]="isCancellingActiveRequest"
+                        [downloadProgress]="downloadProgress"
                         (replayRequest)="onReplayRequest($event)">
                     </app-response-panel>
                 </div>

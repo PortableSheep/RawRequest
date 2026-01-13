@@ -14,8 +14,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// RevealInFinder opens the file's parent directory in Finder (macOS) or Explorer (Windows)
-// and selects the file. On Linux, it opens the parent directory in the default file manager.
 func (a *App) RevealInFinder(filePath string) error {
 	if filePath == "" {
 		return errors.New("no file path provided")

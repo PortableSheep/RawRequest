@@ -7,15 +7,6 @@ import (
 	"strings"
 )
 
-// Resolve replaces {{...}} placeholders in input using:
-// - requestN.response.body[.json.path]
-// - requestN.response.status
-// - requestN.response.headers.Header-Name
-// - variables.key
-// - env.key
-// - bare variable keys (e.g. {{token}})
-//
-// Unknown placeholders are left unchanged.
 func Resolve(input string, variables map[string]string, envVars map[string]string, responseStore map[string]map[string]interface{}) string {
 	if input == "" {
 		return input

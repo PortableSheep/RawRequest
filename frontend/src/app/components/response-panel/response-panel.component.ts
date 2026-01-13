@@ -12,6 +12,11 @@ import {
 
 type EntryTab = 'response' | 'request';
 
+export interface DownloadProgress {
+  downloaded: number;
+  total: number;
+}
+
 @Component({
   selector: 'app-response-panel',
   standalone: true,
@@ -24,6 +29,7 @@ export class ResponsePanelComponent implements OnDestroy {
   request = input<Request | null>(null);
   isLoading = input<boolean>(false);
   isCancelling = input<boolean>(false);
+  downloadProgress = input<DownloadProgress | null>(null);
 
   replayRequest = output<ChainEntryPreview>();
 
@@ -268,6 +274,10 @@ export class ResponsePanelComponent implements OnDestroy {
       this.copyTimers.delete(entryId);
     }, 1500);
     this.copyTimers.set(entryId, timer);
+  }
+
+  formatBytes(bytes: number): string {
+    return formatBytesForResponsePanel(bytes);
   }
 
 }

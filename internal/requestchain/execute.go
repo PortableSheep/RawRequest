@@ -15,7 +15,7 @@ type Dependencies struct {
 	VariablesSnapshot func() map[string]string
 
 	Resolve           func(input string, responseStore map[string]map[string]interface{}) string
-	PerformRequest    func(ctx context.Context, method, url, headersJSON, body string, timeoutMs int) string
+	PerformRequest    func(ctx context.Context, requestID, method, url, headersJSON, body string, timeoutMs int) string
 	ParseResponse     func(response string) map[string]interface{}
 	ApplyVarsFromBody func(responseBody string)
 	ExecuteScript     func(rawScript string, ctx *sr.ExecutionContext, stage string)
@@ -157,7 +157,7 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 		timeoutMs := readTimeoutMs(req)
 
 		headersJSON, _ := json.Marshal(headers)
-		resultRaw := deps.PerformRequest(ctx, method, url, string(headersJSON), body, timeoutMs)
+		resultRaw := deps.PerformRequest(ctx, "", method, url, string(headersJSON), body, timeoutMs)
 		if resultRaw == deps.CancelledResponse {
 			return deps.CancelledResponse
 		}

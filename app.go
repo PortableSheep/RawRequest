@@ -83,36 +83,27 @@ func NewApp() *App {
 	}
 }
 
-// startup is called when the app starts. The context is saved
-// so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-// onDomReady is called when the frontend DOM is ready
 func (a *App) onDomReady(ctx context.Context) {
-	// Restore window state after DOM is ready (ensures window functions work)
 	a.RestoreWindowState()
 
-	// Check if this is the first run - the frontend will handle opening examples
 	if a.IsFirstRun() {
 		fmt.Println("First run detected")
 	}
 }
 
-// onBeforeClose is called when the window is about to close
 func (a *App) onBeforeClose(ctx context.Context) bool {
-	// Save window state before closing
 	_ = a.SaveWindowState()
-	return false // Allow close
+	return false
 }
 
-// ExecuteRequests executes multiple requests with chaining
 func (a *App) ExecuteRequests(requests []map[string]interface{}) string {
 	return a.executeRequestsWithContext(context.Background(), requests)
 }
 
-// ExecuteRequestsWithID executes chained requests that can be cancelled via requestID
 func (a *App) ExecuteRequestsWithID(requestID string, requests []map[string]interface{}) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -141,7 +132,6 @@ func (a *App) parseResponse(response string) map[string]interface{} {
 	return rp.Parse(response)
 }
 
-// executeScript executes JavaScript code for chained requests
 func (a *App) executeScript(rawScript string, ctx *sr.ExecutionContext, stage string) {
 	cleanScript := cleanScriptContent(rawScript)
 	if strings.TrimSpace(cleanScript) == "" {

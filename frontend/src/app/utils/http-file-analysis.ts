@@ -56,7 +56,6 @@ export function extractDependsTarget(line: string): { target: string; start: num
     return null;
   }
 
-  // Preserve original spacing for accurate ranges
   const dependsIndexInTrimmed = trimmed.toLowerCase().indexOf('@depends');
   const afterDepends = trimmed.slice(dependsIndexInTrimmed + '@depends'.length);
   const leadingSpaces = afterDepends.match(/^\s*/)?.[0].length ?? 0;
@@ -74,7 +73,6 @@ export function extractSetVarKeys(script: string): Set<string> {
   const keys = new Set<string>();
   if (!script) return keys;
 
-  // Only literal first arg: setVar('name', ...) or setVar("name", ...)
   const rx = /\bsetVar\s*\(\s*(['"])([^'"\\]+)\1/g;
   let match: RegExpExecArray | null;
   while ((match = rx.exec(script)) !== null) {

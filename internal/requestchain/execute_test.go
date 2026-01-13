@@ -30,7 +30,7 @@ func TestExecute_CallsPreBeforeResolve(t *testing.T) {
 			}
 			return input
 		},
-		PerformRequest: func(_ context.Context, _ string, url string, _ string, _ string, _ int) string {
+		PerformRequest: func(_ context.Context, _, _, url, _, _ string, _ int) string {
 			gotURL = url
 			return "resp"
 		},
@@ -59,7 +59,7 @@ func TestExecute_CallsPreBeforeResolve(t *testing.T) {
 func TestExecute_ResponseStoreAvailableForLaterRequests(t *testing.T) {
 	deps := Dependencies{
 		CancelledResponse: "__CANCELLED__",
-		PerformRequest: func(_ context.Context, _ string, url string, _ string, _ string, _ int) string {
+		PerformRequest: func(_ context.Context, _, _, url, _, _ string, _ int) string {
 			return "resp:" + url
 		},
 		ParseResponse: func(resp string) map[string]interface{} {
@@ -105,7 +105,7 @@ func TestExecute_ReadsTimeoutFromOptions(t *testing.T) {
 	var gotTimeout int
 	deps := Dependencies{
 		CancelledResponse: "__CANCELLED__",
-		PerformRequest: func(_ context.Context, _ string, _ string, _ string, _ string, timeoutMs int) string {
+		PerformRequest: func(_ context.Context, _, _, _, _, _ string, timeoutMs int) string {
 			gotTimeout = timeoutMs
 			return "Status: 200 OK\nHeaders: {}\nBody: {}"
 		},
@@ -132,7 +132,7 @@ func TestExecute_ErrorStopsChain(t *testing.T) {
 	called := 0
 	deps := Dependencies{
 		CancelledResponse: "__CANCELLED__",
-		PerformRequest: func(_ context.Context, _ string, url string, _ string, _ string, _ int) string {
+		PerformRequest: func(_ context.Context, _, _, url, _, _ string, _ int) string {
 			called++
 			if url == "first" {
 				return "Error: Request timeout after 1ms"

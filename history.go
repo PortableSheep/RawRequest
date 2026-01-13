@@ -43,8 +43,6 @@ func (a *App) LoadFileHistory(fileID string) string {
 	return "[]"
 }
 
-// LoadFileHistoryFromDir retrieves stored history JSON for a file from a specific directory.
-// dir should be the base directory where a "history" subfolder exists.
 func (a *App) LoadFileHistoryFromDir(fileID string, dir string) string {
 	if fileID == "" {
 		return "[]"
@@ -60,8 +58,6 @@ func (a *App) LoadFileHistoryFromDir(fileID string, dir string) string {
 	return "[]"
 }
 
-// LoadFileHistoryFromRunLocation retrieves stored history JSON for a file from the current
-// working directory's "history" folder.
 func (a *App) LoadFileHistoryFromRunLocation(fileID string) string {
 	wd, err := os.Getwd()
 	if err != nil {
