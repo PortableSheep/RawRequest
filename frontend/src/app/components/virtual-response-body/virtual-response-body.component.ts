@@ -1,4 +1,4 @@
-import { Component, input, computed, ViewChild, effect, untracked, signal, OnDestroy, ChangeDetectionStrategy, inject, NgZone } from '@angular/core';
+import { Component, input, computed, ViewChild, effect, untracked, signal, OnDestroy, ChangeDetectionStrategy, inject, ChangeDetectorRef, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { CdkVirtualScrollViewport, ScrollingModule } from '@angular/cdk/scrolling';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
@@ -22,9 +22,10 @@ interface HighlightedLine {
   styleUrls: ['./virtual-response-body.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class VirtualResponseBodyComponent implements OnDestroy {
+export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
   private highlightService = inject(SyntaxHighlightWorkerService);
   private sanitizer = inject(DomSanitizer);
+  private cdr = inject(ChangeDetectorRef);
   
   body = input<string>('');
   
@@ -37,6 +38,7 @@ export class VirtualResponseBodyComponent implements OnDestroy {
   private highlightSub?: Subscription;
   private cachedBodyHash = '';
   private cachedLines: HighlightedLine[] = [];
+  private viewportReady = false;
   
   private lineCount = computed(() => {
     const bodyText = this.body();
@@ -92,10 +94,13 @@ export class VirtualResponseBodyComponent implements OnDestroy {
         
         if (!bodyText) {
           this.isProcessing.set(false);
+          this.refreshViewport();
           return;
         }
       
         this.isProcessing.set(true);
+        // Trigger immediate refresh for plain text display
+        this.refreshViewport();
         
         this.highlightSub = this.highlightService.highlight(bodyText).subscribe({
           next: (result) => {
@@ -103,13 +108,22 @@ export class VirtualResponseBodyComponent implements OnDestroy {
               this.highlightResult.set(result);
             }
             this.isProcessing.set(false);
+            // Refresh viewport after highlighting completes
+            this.refreshViewport();
           },
           error: () => {
             this.isProcessing.set(false);
+            this.refreshViewport();
           }
         });
       });
     });
+  }
+  
+  ngAfterViewInit(): void {
+    this.viewportReady = true;
+    // Initial viewport check after view is ready
+    setTimeout(() => this.refreshViewport(), 0);
   }
   
   ngOnDestroy(): void {
@@ -155,5 +169,17 @@ export class VirtualResponseBodyComponent implements OnDestroy {
   
   trackByLineNumber(index: number, line: HighlightedLine): number {
     return line.lineNumber;
+  }
+  
+  private refreshViewport(): void {
+    // Mark component for check to ensure change detection runs
+    this.cdr.markForCheck();
+    
+    // Schedule viewport size check for next tick (after DOM updates)
+    if (this.viewportReady && this.viewport) {
+      setTimeout(() => {
+        this.viewport?.checkViewportSize();
+      }, 0);
+    }
   }
 }
