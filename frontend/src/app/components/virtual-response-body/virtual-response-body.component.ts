@@ -10,10 +10,6 @@ interface HighlightedLine {
   content: string | SafeHtml;
 }
 
-/**
- * Virtual scrolling response body component.
- * Always uses virtual scrolling to handle responses of any size efficiently.
- */
 @Component({
   selector: 'app-virtual-response-body',
   standalone: true,
@@ -43,7 +39,7 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
   private lineCount = computed(() => {
     const bodyText = this.body();
     if (!bodyText) return 0;
-    return (bodyText.match(/\n/g) || []).length + 1;
+    return this.splitTextIntoLines(bodyText).length;
   });
   
   lines = computed<HighlightedLine[]>(() => {
@@ -58,14 +54,13 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
     const result = this.highlightResult();
     
     if (result?.html) {
-      const lines = this.splitIntoLines(result.html, this.lineCount());
+      const lines = this.splitHighlightedIntoLines(result.html, result.lineCount);
       this.cachedBodyHash = bodyHash;
       this.cachedLines = lines;
       return lines;
     }
     
-    // No highlighting yet - show plain text
-    const bodyLines = bodyText.split('\n');
+    const bodyLines = this.splitTextIntoLines(bodyText);
     const lines = bodyLines.map((line, index) => ({
       lineNumber: index + 1,
       content: this.escapeHtml(line)
@@ -99,7 +94,6 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
         }
       
         this.isProcessing.set(true);
-        // Trigger immediate refresh for plain text display
         this.refreshViewport();
         
         this.highlightSub = this.highlightService.highlight(bodyText).subscribe({
@@ -108,7 +102,6 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
               this.highlightResult.set(result);
             }
             this.isProcessing.set(false);
-            // Refresh viewport after highlighting completes
             this.refreshViewport();
           },
           error: () => {
@@ -122,7 +115,6 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
   
   ngAfterViewInit(): void {
     this.viewportReady = true;
-    // Initial viewport check after view is ready
     setTimeout(() => this.refreshViewport(), 0);
   }
   
@@ -132,29 +124,24 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
     }
   }
   
-  private splitIntoLines(highlightedHtml: string, expectedLineCount: number): HighlightedLine[] {
-    const htmlLines = highlightedHtml.split('\n');
-    
-    if (Math.abs(htmlLines.length - expectedLineCount) <= 1) {
-      return htmlLines.slice(0, expectedLineCount).map((line, index) => ({
-        lineNumber: index + 1,
-        content: this.sanitizer.bypassSecurityTrustHtml(line)
-      }));
-    }
-    
-    const tempDiv = typeof document !== 'undefined' ? document.createElement('div') : null;
-    if (tempDiv) {
-      tempDiv.innerHTML = highlightedHtml;
-      const textContent = tempDiv.textContent || tempDiv.innerText || '';
-      const textLines = textContent.split('\n');
-      
-      return textLines.slice(0, expectedLineCount).map((line, index) => ({
-        lineNumber: index + 1,
-        content: this.escapeHtml(line)
-      }));
-    }
-    
-    return htmlLines.slice(0, expectedLineCount).map((line, index) => ({
+  private splitTextIntoLines(text: string): string[] {
+    return text.split(/\r\n|\n|\r/);
+  }
+
+  private splitHighlightedIntoLines(highlightedHtml: string, workerLineCount?: number): HighlightedLine[] {
+    const htmlLines = this.splitTextIntoLines(highlightedHtml);
+
+    const count =
+      typeof workerLineCount === 'number' && workerLineCount > 0
+        ? workerLineCount
+        : htmlLines.length;
+
+    const effectiveLines =
+      Math.abs(htmlLines.length - count) <= 1
+        ? htmlLines
+        : htmlLines;
+
+    return effectiveLines.map((line, index) => ({
       lineNumber: index + 1,
       content: this.sanitizer.bypassSecurityTrustHtml(line)
     }));
@@ -172,10 +159,8 @@ export class VirtualResponseBodyComponent implements OnDestroy, AfterViewInit {
   }
   
   private refreshViewport(): void {
-    // Mark component for check to ensure change detection runs
     this.cdr.markForCheck();
     
-    // Schedule viewport size check for next tick (after DOM updates)
     if (this.viewportReady && this.viewport) {
       setTimeout(() => {
         this.viewport?.checkViewportSize();
