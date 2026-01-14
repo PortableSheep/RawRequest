@@ -133,10 +133,32 @@ export class AppComponent implements OnInit, OnDestroy {
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
   @ViewChild('editorComponent') editorComponent!: EditorComponent;
 
-  // State management - convert to signals
   filesSignal = signal<FileTab[]>([]);
   currentFileIndexSignal = signal<number>(0);
   currentEnvSignal = signal<string>('');
+
+  isRequestRunningSignal = signal<boolean>(false);
+  pendingRequestIndexSignal = signal<number | null>(null);
+  lastExecutedRequestIndexSignal = signal<number | null>(null);
+  downloadProgressSignal = signal<{ downloaded: number; total: number } | null>(null);
+
+  private readonly emptyFile: FileTab = {
+    id: 'empty',
+    name: '',
+    content: '',
+    requests: [],
+    environments: {},
+    variables: {},
+    responseData: {},
+    groups: [],
+    selectedEnv: ''
+  };
+
+  currentFileView = computed<FileTab>(() => {
+    const files = this.filesSignal();
+    const index = this.currentFileIndexSignal();
+    return files[index] || this.emptyFile;
+  });
 
   // Computed values
   currentFileEnvironments = computed(() => {
@@ -162,10 +184,8 @@ export class AppComponent implements OnInit, OnDestroy {
     return [];
   });
 
-  // Legacy properties for compatibility
   files: FileTab[] = [];
   currentFileIndex = 0;
-  // currentEnv = '';
   history: HistoryItem[] = [];
   lastExecutedRequestIndex: number | null = null;
   isRequestRunning = false;
@@ -212,9 +232,7 @@ export class AppComponent implements OnInit, OnDestroy {
   } | null = null;
   isCancellingActiveRequest = false;
   downloadProgress: { downloaded: number; total: number } | null = null;
-  // History is cached in HistoryStoreService
-  // executeRequestTrigger = signal<number | null>(null);
-
+  
   // UI state
   showHistory = false;
   showHistoryModal = false;
@@ -251,14 +269,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.loadFiles();
     this.refreshSecrets(true);
-
-    // Wire update events + fetch app version (non-blocking)
     this.updateService.init();
-
-    // Check for updates (non-blocking)
     this.checkForUpdates();
-
-    // Check if this is first run and open examples
     this.checkFirstRun();
 
     this.secretService
@@ -266,12 +278,12 @@ export class AppComponent implements OnInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {});
 
-    // Subscribe to download progress events
     this.httpService.downloadProgress$
       .pipe(takeUntil(this.destroy$))
       .subscribe(progress => {
         if (this.activeRequestInfo?.id === progress.requestId) {
           this.downloadProgress = { downloaded: progress.downloaded, total: progress.total };
+          this.downloadProgressSignal.set(this.downloadProgress);
         }
       });
   }
@@ -509,10 +521,14 @@ export class AppComponent implements OnInit, OnDestroy {
     // Clear the response panel immediately so stale results don't linger while the
     // new request is running. The response panel will show its loading state.
     this.lastExecutedRequestIndex = null;
+    this.lastExecutedRequestIndexSignal.set(null);
 
     this.isRequestRunning = true;
+    this.isRequestRunningSignal.set(true);
     this.pendingRequestIndex = requestIndex;
+    this.pendingRequestIndexSignal.set(requestIndex);
     this.downloadProgress = null; // Reset download progress for new request
+    this.downloadProgressSignal.set(null);
     const request = activeFile.requests[requestIndex];
     const now = Date.now();
     this.activeRequestInfo = buildActiveRequestInfo(activeFile.id, requestIndex, request, now);
@@ -579,6 +595,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   onRequestExecuted(result: { requestIndex: number; response: ResponseData }) {
     this.lastExecutedRequestIndex = result.requestIndex;
+    this.lastExecutedRequestIndexSignal.set(result.requestIndex);
     this.resetPendingRequestState();
 
     // Check if this is a load test result
@@ -908,6 +925,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.lastRpsTotalSent = patch.lastRpsTotalSent;
     this.activeRequestInfo = patch.activeRequestInfo;
     this.isCancellingActiveRequest = patch.isCancellingActiveRequest;
+
+    this.isRequestRunningSignal.set(this.isRequestRunning);
+    this.pendingRequestIndexSignal.set(this.pendingRequestIndex);
+    // Keep lastExecutedRequestIndexSignal as-is here; it is set explicitly on start/finish.
+    if (!this.isRequestRunning) {
+      // Request lifecycle ended; clear download progress.
+      this.downloadProgressSignal.set(null);
+    }
 
     const q = consumeQueuedRequest({
       isRequestRunning: this.isRequestRunning,

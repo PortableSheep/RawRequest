@@ -64,7 +64,7 @@ export class BackendClientService {
 		if (typeof fn !== 'function') {
 			return Promise.reject(new Error('Wails binding missing: StartLoadTest'));
 		}
-		return fn(requestId, method, url, headersJson, body, loadConfigJson);
+    return fn(requestId, method, url, headersJson, body, loadConfigJson);
   }
 
   setVariable(key: string, value: string): Promise<void> {

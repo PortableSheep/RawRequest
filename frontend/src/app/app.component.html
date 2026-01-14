@@ -2,8 +2,8 @@
 <div class="min-h-screen flex flex-col bg-black text-zinc-100 selection:bg-blue-500/30">
     <!-- Header Component -->
     <app-header
-            [files]="files"
-            [currentFileIndex]="currentFileIndex"
+            [files]="filesSignal()"
+            [currentFileIndex]="currentFileIndexSignal()"
             [environments]="getEnvironments()"
             [selectedEnv]="currentEnv()"
             [appVersion]="updateService.appVersion()"
@@ -28,8 +28,8 @@
         <div class="mx-auto w-full px-4 py-4 h-full flex flex-col">
             <!-- Request Manager (logic only, no layout impact) -->
             <app-request-manager
-                    [files]="files"
-                    [currentFileIndex]="currentFileIndex"
+                    [files]="filesSignal()"
+                    [currentFileIndex]="currentFileIndexSignal()"
                     [currentEnv]="currentEnv()"
                     (filesChange)="onFilesChange($event)"
                     (currentFileIndexChange)="onCurrentFileIndexChange($event)"
@@ -62,15 +62,15 @@
                     <app-editor
                         #editorComponent
                         class="flex-1 overflow-hidden"
-                        [content]="currentFile.content"
-                        [requests]="currentFile.requests"
-                        [variables]="currentFile.variables"
-                        [environments]="currentFile.environments"
+                        [content]="currentFileView().content"
+                        [requests]="currentFileView().requests"
+                        [variables]="currentFileView().variables"
+                        [environments]="currentFileView().environments"
                         [currentEnv]="currentEnv()"
                         [secrets]="allSecrets"
                         [requestNames]="currentFileRequestNames()"
-                        [executingRequestIndex]="pendingRequestIndex"
-                        [isBusy]="isRequestRunning"
+                        [executingRequestIndex]="pendingRequestIndexSignal()"
+                        [isBusy]="isRequestRunningSignal()"
                         (contentChange)="onEditorContentChange($event)"
                         (requestExecute)="onRequestExecute($event)">
                     </app-editor>
@@ -95,11 +95,11 @@
                 <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-emerald-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col lg:pl-2">
                     <app-response-panel
                         class="flex-1 overflow-hidden"
-                        [responseData]="lastExecutedRequestIndex !== null ? currentFile.responseData[lastExecutedRequestIndex] : null"
-                        [request]="lastExecutedRequestIndex !== null ? currentFile.requests[lastExecutedRequestIndex] : null"
-                        [isLoading]="isRequestRunning"
+                        [responseData]="lastExecutedRequestIndexSignal() !== null ? currentFileView().responseData[lastExecutedRequestIndexSignal()!] : null"
+                        [request]="lastExecutedRequestIndexSignal() !== null ? currentFileView().requests[lastExecutedRequestIndexSignal()!] : null"
+                        [isLoading]="isRequestRunningSignal()"
                         [isCancelling]="isCancellingActiveRequest"
-                        [downloadProgress]="downloadProgress"
+                        [downloadProgress]="downloadProgressSignal()"
                         (replayRequest)="onReplayRequest($event)">
                     </app-response-panel>
                 </div>
