@@ -3,13 +3,25 @@
   height: 100%;
 }
 
-// Variable hover tooltip styles
+.editor {
+  position: relative;
+  height: 100%;
+}
+
+.editor__surface {
+  height: 100%;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.55;
+  background: var(--rr-surface-1);
+}
+
 ::ng-deep .cm-tooltip {
   &.cm-tooltip-hover {
-    border: 1px solid #404040;
-    background: #1e1e1e;
+    border: 1px solid var(--rr-border-color);
+    background: color-mix(in srgb, var(--rr-surface-2), transparent 0%);
     border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
     overflow: hidden;
   }
 }
@@ -23,14 +35,14 @@
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    color: #888;
+    color: var(--rr-text-tertiary);
     margin-bottom: 4px;
   }
   
   .tooltip-name {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 13px;
-    color: #dcdcaa;
+    color: color-mix(in srgb, var(--rr-primary), white 22%);
     font-weight: 500;
     margin-bottom: 4px;
   }
@@ -38,8 +50,8 @@
   .tooltip-value {
     font-family: 'JetBrains Mono', 'Fira Code', monospace;
     font-size: 11px;
-    color: #ce9178;
-    background: #0d0d0d;
+    color: var(--rr-text);
+    background: color-mix(in srgb, var(--rr-surface-3), transparent 0%);
     padding: 6px 8px;
     border-radius: 4px;
     white-space: pre-wrap;
@@ -50,23 +62,21 @@
   
   .tooltip-hint {
     font-size: 11px;
-    color: #666;
+    color: var(--rr-text-tertiary);
     font-style: italic;
     margin-top: 4px;
   }
   
   &.cm-variable-undefined {
     .tooltip-header {
-      color: #f0a020;
+      color: var(--rr-warning);
     }
     
     .tooltip-name {
-      color: #f0a020;
+      color: var(--rr-warning);
     }
   }
 }
-
-// Lint diagnostics
 ::ng-deep .cm-lintRange {
   text-decoration-thickness: 1.5px;
   text-underline-offset: 2px;
@@ -81,17 +91,15 @@
 }
 
 ::ng-deep .cm-diagnostic {
-  border: 1px solid rgba(63, 63, 70, 0.9);
-  background: rgba(9, 9, 11, 0.95);
+  border: 1px solid var(--rr-border-color);
+  background: color-mix(in srgb, var(--rr-surface-2), transparent 0%);
   border-radius: 8px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
-
-// Folding gutter styling to match existing gutters
 ::ng-deep .cm-foldGutter {
-  background-color: var(--color-zinc-900);
-  color: var(--color-zinc-600);
-  border-right: 1px solid var(--color-zinc-800);
+  background-color: var(--rr-surface-1);
+  color: var(--rr-text-tertiary);
+  border-right: 1px solid var(--rr-border-color);
 }
 
 ::ng-deep .cm-foldGutter .cm-gutterElement {
@@ -107,4 +115,158 @@
   text-decoration: underline;
   text-underline-offset: 2px;
   cursor: pointer;
+}
+
+// We use a custom find/replace UI. Hide CodeMirror's built-in panel.
+::ng-deep .cm-panel.cm-search {
+  display: none !important;
+}
+
+.editor-search {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 50;
+
+  width: min(640px, calc(100% - 20px));
+  background: color-mix(in srgb, var(--rr-surface-2), transparent 0%);
+  border: 1px solid var(--rr-border-color);
+  border-radius: 10px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.editor-search__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+}
+
+.editor-search__row + .editor-search__row {
+  border-top: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-1);
+}
+
+.editor-search__input {
+  flex: 1;
+  min-width: 0;
+  background: var(--rr-surface-1);
+  border: 1px solid var(--rr-border-color);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--rr-text);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  outline: none;
+
+  &:focus {
+    border-color: var(--rr-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--rr-primary), transparent 75%);
+  }
+}
+
+.editor-search__btn {
+  background: var(--rr-surface-3);
+  border: 1px solid var(--rr-border-color);
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--rr-text);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--rr-surface-hover);
+    border-color: var(--rr-border-hover);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: default;
+  }
+}
+
+.editor-search__toggles {
+  display: inline-flex;
+  gap: 6px;
+  padding: 0 2px;
+}
+
+.editor-search__meta {
+  margin-left: auto;
+  padding: 0 6px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 11px;
+  color: var(--rr-text-tertiary);
+  white-space: nowrap;
+}
+
+.editor-search__toggle {
+  background: transparent;
+  border: 1px solid var(--rr-border-color);
+  border-radius: 8px;
+  padding: 6px 8px;
+  color: var(--rr-text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+  &:hover {
+    background: var(--rr-surface-hover);
+    border-color: var(--rr-border-hover);
+  }
+
+  &.is-active {
+    color: var(--rr-text);
+    border-color: color-mix(in srgb, var(--rr-primary), var(--rr-border-color) 40%);
+    background: color-mix(in srgb, var(--rr-primary), transparent 85%);
+  }
+}
+
+.editor-search__close {
+  background: transparent;
+  border: none;
+  padding: 6px 8px;
+  color: var(--rr-text-secondary);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0.75;
+
+  &:hover {
+    opacity: 1;
+  }
+}
+
+::ng-deep .cm-searchMatch {
+  background: color-mix(in srgb, var(--rr-primary), transparent 70%);
+  border-radius: 2px;
+}
+
+::ng-deep .cm-searchMatch-selected {
+  background: color-mix(in srgb, var(--rr-primary), transparent 12%);
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  outline: 2px solid color-mix(in srgb, var(--rr-primary), white 22%);
+  outline-offset: 1px;
+  border-radius: 3px;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--rr-primary), transparent 70%);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+  padding: 0 1px;
+}
+
+@keyframes rrSearchFlash {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--rr-primary), transparent 30%);
+  }
+  100% {
+    box-shadow: 0 0 0 10px color-mix(in srgb, var(--rr-primary), transparent 100%);
+  }
+}
+
+::ng-deep .rr-search-flash .cm-searchMatch-selected {
+  animation: rrSearchFlash 0.65s ease-out;
 }

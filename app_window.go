@@ -161,9 +161,14 @@ func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string
 	dir := filepath.Dir(httpFilePath)
 	base := filepath.Base(httpFilePath)
 	name := strings.TrimSuffix(base, filepath.Ext(base))
+	// Save to {httpFileName}.responses/ subfolder
+	responsesDir := filepath.Join(dir, name+".responses")
+	if err := os.MkdirAll(responsesDir, 0755); err != nil {
+		return "", err
+	}
 	timestamp := time.Now().Format("20060102-150405")
-	outName := fmt.Sprintf("%s-response-%s.json", name, timestamp)
-	outPath := filepath.Join(dir, outName)
+	outName := fmt.Sprintf("response-%s.json", timestamp)
+	outPath := filepath.Join(responsesDir, outName)
 	if err := os.WriteFile(outPath, []byte(responseJson), 0644); err != nil {
 		return "", err
 	}
@@ -178,14 +183,15 @@ func (a *App) SaveResponseFileToRunLocation(fileID string, responseJson string) 
 	if err != nil {
 		return "", err
 	}
-	outDir := filepath.Join(wd, "responses")
-	if err := os.MkdirAll(outDir, 0755); err != nil {
+	safe := a.sanitizeFileID(fileID)
+	// Save to {fileId}.responses/ in working directory (same pattern as saved files)
+	responsesDir := filepath.Join(wd, safe+".responses")
+	if err := os.MkdirAll(responsesDir, 0755); err != nil {
 		return "", err
 	}
 	timestamp := time.Now().Format("20060102-150405")
-	safe := a.sanitizeFileID(fileID)
-	outName := fmt.Sprintf("%s-response-%s.json", safe, timestamp)
-	outPath := filepath.Join(outDir, outName)
+	outName := fmt.Sprintf("response-%s.json", timestamp)
+	outPath := filepath.Join(responsesDir, outName)
 	if err := os.WriteFile(outPath, []byte(responseJson), 0644); err != nil {
 		return "", err
 	}

@@ -94,6 +94,10 @@ export function LoadFileHistoryFromDir(arg1, arg2) {
   return window['go']['main']['App']['LoadFileHistoryFromDir'](arg1, arg2);
 }
 
+export function LoadFileHistoryFromHttpFile(arg1) {
+  return window['go']['main']['App']['LoadFileHistoryFromHttpFile'](arg1);
+}
+
 export function LoadFileHistoryFromRunLocation(arg1) {
   return window['go']['main']['App']['LoadFileHistoryFromRunLocation'](arg1);
 }
@@ -148,18 +152,6 @@ export function RevealInFinder(arg1) {
 
 export function SaveFileContents(arg1, arg2) {
   return window['go']['main']['App']['SaveFileContents'](arg1, arg2);
-}
-
-export function SaveFileHistory(arg1, arg2) {
-  return window['go']['main']['App']['SaveFileHistory'](arg1, arg2);
-}
-
-export function SaveFileHistoryToDir(arg1, arg2, arg3) {
-  return window['go']['main']['App']['SaveFileHistoryToDir'](arg1, arg2, arg3);
-}
-
-export function SaveFileHistoryToRunLocation(arg1, arg2) {
-  return window['go']['main']['App']['SaveFileHistoryToRunLocation'](arg1, arg2);
 }
 
 export function SaveResponseFile(arg1, arg2) {

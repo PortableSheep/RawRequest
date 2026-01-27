@@ -1,33 +1,38 @@
-<!-- language: html -->
-<div class="flex flex-col h-full bg-transparent overflow-hidden">
+<div class="response-panel">
     @let chainItems = getChainItems();
 
-    <!-- Fixed header -->
-    <div class="flex items-center px-4 py-3 bg-zinc-900 border-b border-zinc-800 text-[13px] font-medium text-emerald-100">
-        <span>Response chain</span>
+    <div class="response-panel__header">
+        <div class="response-panel__header-left">
+            <span class="response-panel__dot" aria-hidden="true"></span>
+            <span class="response-panel__title">Response</span>
+            @if (chainItems.length) {
+                <span class="response-panel__count" aria-label="Chain item count">
+                    {{ chainItems.length }}
+                </span>
+            }
+        </div>
         @if (chainItems.length) {
-            <span class="ml-2 text-xs text-zinc-400">
-                {{ chainItems.length }} request{{ chainItems.length === 1 ? '' : 's' }}
+            <span class="response-panel__header-right">
+                {{ chainItems.length }} request{{ chainItems.length === 1 ? '' : 's' }} in chain
             </span>
         }
     </div>
 
-    <!-- Scrollable content area -->
-    <div class="flex-1 overflow-y-auto p-4">
+    <div class="response-panel__body rr-no-scrollbar">
         @if (isLoading() && !chainItems.length) {
             @let progress = downloadProgress();
-            <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-400">
-                <div class="spinner text-emerald-400"></div>
+            <div class="response-panel__state">
+                <div class="spinner rr-color-accent"></div>
                 @if (progress && progress.downloaded > 0) {
                     <p>Downloading response…</p>
-                    <div class="w-48 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                        <div 
-                            class="h-full bg-emerald-500 transition-all duration-150"
+                    <div class="response-panel__progress">
+                        <div
+                            class="response-panel__progress-fill"
                             [style.width.%]="progress.total > 0 ? (progress.downloaded / progress.total * 100) : 50"
-                            [class.animate-pulse]="progress.total <= 0"
+                            [class.response-panel__progress-fill--pulse]="progress.total <= 0"
                         ></div>
                     </div>
-                    <p class="text-[11px] text-zinc-500">
+                    <p class="response-panel__state-subtle">
                         @if (progress.total > 0) {
                             {{ formatBytes(progress.downloaded) }} / {{ formatBytes(progress.total) }}
                         } @else {
@@ -39,110 +44,86 @@
                 }
             </div>
         } @else if (!chainItems.length && !isLoading()) {
-            <div class="flex flex-col h-full items-center justify-center gap-3 text-[13px] text-zinc-500">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-zinc-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+            <div class="response-panel__state response-panel__state--idle">
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--lg response-panel__empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.636 5.636l2.121 2.121m8.486 8.486l2.121 2.121M5.636 18.364l2.121-2.121m8.486-8.486l2.121-2.121"/>
                 </svg>
-                <p>Waiting for a request to be ran.</p>
+                <p>Waiting for a request to run.</p>
             </div>
         } @else if (chainItems.length) {
-            <div class="space-y-3">
+            <div class="response-panel__list">
                 @for (entry of chainItems; track entry.id; let idx = $index) {
-                    <article class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden transition-colors hover:border-zinc-700 shadow-sm">
-                        <!-- Row header -->
-                        <div
-                            class="flex items-center justify-between p-3 bg-zinc-900 cursor-pointer select-none hover:bg-zinc-800 transition-colors"
-                            (click)="toggleEntry(entry.id)"
-                        >
-                            <div class="flex items-center gap-3 min-w-0">
-                                <span class="text-[13px] font-semibold text-zinc-500 font-mono">
-                                    {{ (idx + 1) | number:'2.0' }}
-                                </span>
-                                <div class="min-w-0">
-                                    <div class="text-[13px] font-medium text-zinc-100 truncate" [title]="entry.request.name || entry.label">
+                    <article class="response-entry" [class.response-entry--open]="expandedEntryId() === entry.id">
+                        <div class="response-entry__header" (click)="toggleEntry(entry.id)">
+                            <div class="response-entry__left">
+                                <span class="response-entry__index rr-mono">{{ (idx + 1) | number:'2.0' }}</span>
+                                <div class="response-entry__meta">
+                                    <div class="response-entry__name" [title]="entry.request.name || entry.label">
                                         {{ entry.request.name || entry.label }}
                                     </div>
-                                    <div class="flex items-center gap-2 mt-1 text-[11px]">
-                                        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold font-mono text-white shadow-sm"
-                                              [class.bg-emerald-500]="entry.request.method === 'GET'"
-                                              [class.bg-amber-500]="entry.request.method === 'POST'"
-                                              [class.bg-blue-500]="entry.request.method === 'PUT'"
-                                              [class.bg-red-500]="entry.request.method === 'DELETE'"
-                                              [class.bg-violet-500]="entry.request.method === 'PATCH'"
-                                              [class.bg-zinc-500]="!['GET','POST','PUT','DELETE','PATCH'].includes(entry.request.method)">
+                                    <div class="response-entry__sub">
+                                        <span class="response-entry__method rr-mono" [attr.data-method]="entry.request.method">
                                             {{ entry.request.method }}
                                         </span>
-                                        <span class="text-zinc-400 truncate" [title]="entry.request.url">
+                                        <span class="response-entry__url" [title]="entry.request.url">
                                             {{ entry.request.url }}
                                         </span>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="flex items-center gap-2 text-xs">
+                            <div class="response-entry__right">
                                 @if (entry.response) {
                                     <button
                                         type="button"
-                                        class="px-2 py-0.5 rounded border border-zinc-700 bg-zinc-800 text-[11px] font-semibold text-zinc-200 hover:bg-zinc-700 hover:border-zinc-600 transition-colors"
+                                        class="rr-btn rr-btn--ghost response-entry__replay"
                                         title="Replay this request"
                                         (click)="onReplay(entry, $event)"
                                     >
                                         Replay
                                     </button>
                                 }
-                                <span
-                                    class="px-2 py-0.5 rounded-full text-[11px] font-semibold shadow-sm"
-                                    [ngClass]="getStatusClass(entry)"
-                                >
-                                    {{ getStatusLabel(entry) }}
-                                </span>
+
+                                <span [ngClass]="getStatusClass(entry)">{{ getStatusLabel(entry) }}</span>
 
                                 @if (entry.response) {
-                                    <span class="text-zinc-400 font-mono text-[11px]" [title]="'Total: ' + entry.response!.responseTime + 'ms'">
+                                    <span class="response-entry__time rr-mono" [title]="'Total: ' + entry.response!.responseTime + 'ms'">
                                         {{ entry.response!.responseTime }}ms
                                     </span>
                                     @if (entry.response!.size !== undefined) {
-                                        <span class="text-zinc-500 font-mono text-[11px]">
-                                            {{ formatSize(entry.response!.size) }}
-                                        </span>
+                                        <span class="response-entry__size rr-mono">{{ formatSize(entry.response!.size) }}</span>
                                     }
                                 }
 
-                                <span class="text-zinc-500">
+                                <span class="response-entry__chev" aria-hidden="true">
                                     @if (expandedEntryId() === entry.id) {
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 15.75 7.5-7.5 7.5 7.5" /></svg>
                                     } @else {
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                                     }
                                 </span>
                             </div>
                         </div>
 
-                        <!-- Expanded details -->
                         @if (expandedEntryId() === entry.id) {
-                            <div class="p-3 bg-zinc-950 border-t border-zinc-800 border-l-2 border-l-blue-500 text-xs">
-                                <!-- Collapsible Request Section -->
-                                <div class="mb-3">
-                                    <button
-                                        type="button"
-                                        class="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 hover:text-zinc-300 transition-colors"
-                                        (click)="toggleRequestSection(entry.id)"
-                                    >
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform" [class.rotate-90]="!isRequestCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                            <div class="response-entry__details">
+                                <div class="response-entry__section">
+                                    <button type="button" class="response-entry__section-toggle" (click)="toggleRequestSection(entry.id)">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm response-entry__section-chev" [class.response-entry__section-chev--open]="!isRequestCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                                         Request Details
                                     </button>
-                                    
+
                                     @if (!isRequestCollapsed(entry.id)) {
-                                        <div class="mt-3 space-y-3 pl-5 border-l-2 border-zinc-800">
+                                        <div class="response-entry__section-body">
                                             @let reqHeaders = entry.request.headers | keyvalue;
                                             @if (reqHeaders.length) {
-                                                <div>
-                                                    <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Headers</span>
-                                                    <ul class="mt-1 rounded-md border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
+                                                <div class="response-entry__block">
+                                                    <span class="response-entry__block-title">Headers</span>
+                                                    <ul class="response-entry__kv">
                                                         @for (kv of reqHeaders; track kv.key) {
-                                                            <li class="flex justify-between gap-4 px-3 py-1.5">
-                                                                <span class="font-mono text-[11px] text-sky-400">{{ kv.key }}</span>
-                                                                <span class="truncate text-[11px] text-zinc-300">{{ kv.value }}</span>
+                                                            <li class="response-entry__kv-row">
+                                                                <span class="response-entry__kv-key rr-mono">{{ kv.key }}</span>
+                                                                <span class="response-entry__kv-val">{{ kv.value }}</span>
                                                             </li>
                                                         }
                                                     </ul>
@@ -150,61 +131,44 @@
                                             }
 
                                             @if (entry.request.body) {
-                                                <div>
-                                                    <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-400">Body</span>
-                                                    <app-virtual-response-body
-                                                        [body]="entry.request.body"
-                                                    ></app-virtual-response-body>
+                                                <div class="response-entry__block">
+                                                    <span class="response-entry__block-title">Body</span>
+                                                    <app-virtual-response-body [body]="entry.request.body"></app-virtual-response-body>
                                                 </div>
                                             }
                                         </div>
                                     }
                                 </div>
 
-                                <!-- Response section -->
-                                <div class="mt-4 pt-3 border-t border-zinc-800">
+                                <div class="response-entry__section response-entry__section--response">
                                     @if (entry.response) {
                                         @if (entry.response!.assertions?.length) {
-                                            <div class="mb-4">
-                                                <button
-                                                    type="button"
-                                                    class="mb-2 w-full flex items-center justify-between text-[11px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 transition-colors"
-                                                    (click)="toggleAssertionsSection(entry.id)"
-                                                >
-                                                    <span class="inline-flex items-center gap-2">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 transition-transform" [class.rotate-90]="!isAssertionsCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                                            <div class="response-entry__block">
+                                                <button type="button" class="response-entry__section-toggle response-entry__section-toggle--full" (click)="toggleAssertionsSection(entry.id)">
+                                                    <span class="response-entry__section-toggle-left">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm response-entry__section-chev" [class.response-entry__section-chev--open]="!isAssertionsCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                                                         Assertions
                                                     </span>
 
                                                     @let passedCount = countAssertionsPassed(entry.response!.assertions);
                                                     @let failedCount = countAssertionsFailed(entry.response!.assertions);
 
-                                                    <span
-                                                        class="px-2 py-0.5 rounded-full border text-[11px] font-mono"
-                                                        [class.border-red-700]="failedCount > 0"
-                                                        [class.bg-red-900/30]="failedCount > 0"
-                                                        [class.text-red-300]="failedCount > 0"
-                                                        [class.border-emerald-700]="failedCount === 0"
-                                                        [class.bg-emerald-900/30]="failedCount === 0"
-                                                        [class.text-emerald-300]="failedCount === 0"
-                                                    >
+                                                    <span class="response-entry__assertions-summary rr-mono" [attr.data-failed]="failedCount > 0 ? 'true' : 'false'">
                                                         {{ passedCount }} passed · {{ failedCount }} failed
                                                     </span>
                                                 </button>
 
                                                 @if (!isAssertionsCollapsed(entry.id)) {
-                                                    <ul class="rounded-md border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
+                                                    <ul class="response-entry__assertions">
                                                         @for (a of entry.response!.assertions; track $index) {
-                                                            <li class="flex items-start gap-3 px-3 py-2">
-                                                                @if (a.passed) {
-                                                                    <span class="mt-0.5 px-1.5 py-0.5 rounded bg-emerald-900/40 text-emerald-300 text-[10px] font-bold font-mono">PASS</span>
-                                                                } @else {
-                                                                    <span class="mt-0.5 px-1.5 py-0.5 rounded bg-red-900/40 text-red-300 text-[10px] font-bold font-mono">FAIL</span>
-                                                                }
-                                                                <div class="min-w-0">
-                                                                    <div class="text-[11px] text-zinc-200 wrap-break-word">{{ a.message }}</div>
+                                                            <li class="response-entry__assertion">
+                                                                <span class="response-entry__assertion-tag rr-mono" [class.response-entry__assertion-tag--pass]="a.passed" [class.response-entry__assertion-tag--fail]="!a.passed">
+                                                                    {{ a.passed ? 'PASS' : 'FAIL' }}
+                                                                </span>
+                                                                <div class="response-entry__assertion-text">
+                                                                    <div class="response-entry__assertion-msg">{{ a.message }}</div>
                                                                     @if (a.stage) {
-                                                                        <div class="mt-1 text-[10px] text-zinc-500 font-mono">{{ a.stage }}</div>
+                                                                        <div class="response-entry__assertion-stage rr-mono">{{ a.stage }}</div>
                                                                     }
                                                                 </div>
                                                             </li>
@@ -214,124 +178,111 @@
                                             </div>
                                         }
 
-                                        <!-- Timing breakdown -->
                                         @if (entry.response!.timing) {
-                                            <div class="mb-4">
-                                                <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Timing Breakdown</span>
-                                                <div class="flex flex-wrap gap-3 text-xs">
+                                            <div class="response-entry__block">
+                                                <span class="response-entry__block-title">Timing Breakdown</span>
+                                                <div class="response-entry__timing">
                                                     @if (entry.response!.timing!.dnsLookup > 0) {
-                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="DNS Lookup - Time to resolve the domain name to an IP address">
-                                                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
-                                                            <span class="text-zinc-400">DNS</span>
-                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.dnsLookup }}ms</span>
+                                                        <div class="timing-chip" data-tooltip="DNS Lookup - Time to resolve the domain name to an IP address">
+                                                            <span class="timing-chip__dot timing-chip__dot--purple"></span>
+                                                            <span class="timing-chip__label">DNS</span>
+                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.dnsLookup }}ms</span>
                                                         </div>
                                                     }
                                                     @if (entry.response!.timing!.tcpConnect > 0) {
-                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="TCP Connection - Time to establish a TCP connection with the server">
-                                                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                                            <span class="text-zinc-400">TCP</span>
-                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.tcpConnect }}ms</span>
+                                                        <div class="timing-chip" data-tooltip="TCP Connection - Time to establish a TCP connection with the server">
+                                                            <span class="timing-chip__dot timing-chip__dot--blue"></span>
+                                                            <span class="timing-chip__label">TCP</span>
+                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.tcpConnect }}ms</span>
                                                         </div>
                                                     }
                                                     @if (entry.response!.timing!.tlsHandshake > 0) {
-                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="TLS Handshake - Time to complete the secure connection negotiation">
-                                                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                                            <span class="text-zinc-400">TLS</span>
-                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.tlsHandshake }}ms</span>
+                                                        <div class="timing-chip" data-tooltip="TLS Handshake - Time to complete the secure connection negotiation">
+                                                            <span class="timing-chip__dot timing-chip__dot--emerald"></span>
+                                                            <span class="timing-chip__label">TLS</span>
+                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.tlsHandshake }}ms</span>
                                                         </div>
                                                     }
                                                     @if (entry.response!.timing!.timeToFirstByte > 0) {
-                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="Time to First Byte - Time from request sent until first byte received from server">
-                                                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                                            <span class="text-zinc-400">TTFB</span>
-                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.timeToFirstByte }}ms</span>
+                                                        <div class="timing-chip" data-tooltip="Time to First Byte - Time from request sent until first byte received from server">
+                                                            <span class="timing-chip__dot timing-chip__dot--amber"></span>
+                                                            <span class="timing-chip__label">TTFB</span>
+                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.timeToFirstByte }}ms</span>
                                                         </div>
                                                     }
                                                     @if (entry.response!.timing!.contentTransfer > 0) {
-                                                        <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800/50 border border-zinc-700" data-tooltip="Content Transfer - Time to download the complete response body">
-                                                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                                            <span class="text-zinc-400">Download</span>
-                                                            <span class="font-mono text-zinc-200">{{ entry.response!.timing!.contentTransfer }}ms</span>
+                                                        <div class="timing-chip" data-tooltip="Content Transfer - Time to download the complete response body">
+                                                            <span class="timing-chip__dot timing-chip__dot--rose"></span>
+                                                            <span class="timing-chip__label">Download</span>
+                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.contentTransfer }}ms</span>
                                                         </div>
                                                     }
-                                                    <div class="timing-chip flex items-center gap-1.5 px-2 py-1 rounded bg-zinc-800 border border-zinc-600" data-tooltip="Total Request Time - Complete round-trip duration">
-                                                        <span class="text-zinc-300 font-medium">Total</span>
-                                                        <span class="font-mono text-zinc-100 font-semibold">{{ entry.response!.timing!.total }}ms</span>
+                                                    <div class="timing-chip timing-chip--total" data-tooltip="Total Request Time - Complete round-trip duration">
+                                                        <span class="timing-chip__label">Total</span>
+                                                        <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.total }}ms</span>
                                                     </div>
                                                 </div>
                                             </div>
                                         }
 
-                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                                        <div class="response-entry__grid">
                                             @if (entry.response!.headers['content-type']) {
-                                                <div>
-                                                    <span class="block mb-1 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Content-Type</span>
-                                                    <p class="text-xs text-zinc-200 break-all">
-                                                        {{ entry.response!.headers['content-type'] }}
-                                                    </p>
+                                                <div class="response-entry__grid-item">
+                                                    <span class="response-entry__block-title">Content-Type</span>
+                                                    <p class="response-entry__text">{{ entry.response!.headers['content-type'] }}</p>
                                                 </div>
                                             }
                                         </div>
 
-                                        <div class="mt-3">
-                                            <span class="block mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Headers</span>
+                                        <div class="response-entry__block">
+                                            <span class="response-entry__block-title">Headers</span>
                                             @let resHeaders = entry.response!.headers | keyvalue;
                                             @if (resHeaders.length) {
-                                                <ul class="mt-1 rounded-md border border-zinc-800 bg-zinc-900/50 divide-y divide-zinc-800">
+                                                <ul class="response-entry__kv">
                                                     @for (kv of resHeaders; track kv.key) {
-                                                        <li class="flex justify-between gap-4 px-3 py-1.5">
-                                                            <span class="font-mono text-[11px] text-sky-400">{{ kv.key }}</span>
-                                                            <span class="truncate text-[11px] text-zinc-300">{{ kv.value }}</span>
+                                                        <li class="response-entry__kv-row">
+                                                            <span class="response-entry__kv-key rr-mono">{{ kv.key }}</span>
+                                                            <span class="response-entry__kv-val">{{ kv.value }}</span>
                                                         </li>
                                                     }
                                                 </ul>
                                             } @else {
-                                                <p class="mt-1 text-xs text-zinc-500">No response headers</p>
+                                                <p class="response-entry__muted">No response headers</p>
                                             }
                                         </div>
 
-                                        <div class="mt-3">
-                                            <div class="mb-1 flex items-center justify-between">
-                                                <span class="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">Body</span>
+                                        <div class="response-entry__block">
+                                            <div class="response-entry__block-head">
+                                                <span class="response-entry__block-title">Body</span>
                                                 <button
                                                     type="button"
-                                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded border text-[11px] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                                    [class.border-zinc-700]="getCopyState(entry.id) === 'idle'"
-                                                    [class.bg-zinc-900]="getCopyState(entry.id) === 'idle'"
-                                                    [class.text-zinc-300]="getCopyState(entry.id) === 'idle'"
-                                                    [class.hover:bg-zinc-800]="getCopyState(entry.id) === 'idle'"
-                                                    [class.border-emerald-600]="getCopyState(entry.id) === 'copied'"
-                                                    [class.bg-emerald-900/30]="getCopyState(entry.id) === 'copied'"
-                                                    [class.text-emerald-400]="getCopyState(entry.id) === 'copied'"
-                                                    [class.border-red-600]="getCopyState(entry.id) === 'error'"
-                                                    [class.bg-red-900/30]="getCopyState(entry.id) === 'error'"
-                                                    [class.text-red-400]="getCopyState(entry.id) === 'error'"
+                                                    class="rr-btn rr-btn--ghost response-entry__copy"
+                                                    [attr.data-state]="getCopyState(entry.id)"
                                                     (click)="copyResponseBody(entry.id, entry.response!.body)"
                                                     [disabled]="!entry.response!.body"
                                                     aria-label="Copy response body"
                                                 >
                                                     @switch (getCopyState(entry.id)) {
                                                         @case ('copied') {
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm rr-icon--success" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
                                                             <span>Copied</span>
                                                         }
                                                         @case ('error') {
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm rr-icon--danger" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
                                                             <span>Failed</span>
                                                         }
                                                         @default {
-                                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm rr-icon--primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                                                             <span>Copy</span>
                                                         }
                                                     }
                                                 </button>
                                             </div>
-                                            <app-virtual-response-body
-                                                [body]="entry.response!.body || ''"
-                                            ></app-virtual-response-body>
+
+                                            <app-virtual-response-body [body]="entry.response!.body || ''"></app-virtual-response-body>
                                         </div>
                                     } @else {
-                                        <p class="text-xs text-zinc-500">Awaiting response...</p>
+                                        <p class="response-entry__muted">Awaiting response...</p>
                                     }
                                 </div>
                             </div>

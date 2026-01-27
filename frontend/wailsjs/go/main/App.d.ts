@@ -48,6 +48,8 @@ export function LoadFileHistory(arg1:string):Promise<string>;
 
 export function LoadFileHistoryFromDir(arg1:string,arg2:string):Promise<string>;
 
+export function LoadFileHistoryFromHttpFile(arg1:string):Promise<string>;
+
 export function LoadFileHistoryFromRunLocation(arg1:string):Promise<string>;
 
 export function LoadWindowState():Promise<main.WindowState>;
@@ -75,12 +77,6 @@ export function RestoreWindowState():Promise<void>;
 export function RevealInFinder(arg1:string):Promise<void>;
 
 export function SaveFileContents(arg1:string,arg2:string):Promise<string>;
-
-export function SaveFileHistory(arg1:string,arg2:string):Promise<void>;
-
-export function SaveFileHistoryToDir(arg1:string,arg2:string,arg3:string):Promise<void>;
-
-export function SaveFileHistoryToRunLocation(arg1:string,arg2:string):Promise<void>;
 
 export function SaveResponseFile(arg1:string,arg2:string):Promise<string>;
 

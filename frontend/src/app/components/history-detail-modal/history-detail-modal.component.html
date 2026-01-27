@@ -1,352 +1,309 @@
 @if (item()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-    <div class="modal-animated relative w-full max-w-6xl h-[90vh] flex flex-col transform overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl transition-all" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
-      
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900 shrink-0">
-        <div class="flex items-center gap-3 overflow-hidden">
-          <span class="px-2 py-1 rounded text-xs font-bold font-mono shrink-0"
-                [class.text-emerald-400]="item()!.method === 'GET'"
-                [class.bg-emerald-400-10]="item()!.method === 'GET'"
-                [class.text-amber-400]="item()!.method === 'POST'"
-                [class.bg-amber-400-10]="item()!.method === 'POST'"
-                [class.text-blue-400]="item()!.method === 'PUT' || item()!.method === 'PATCH'"
-                [class.bg-blue-400-10]="item()!.method === 'PUT' || item()!.method === 'PATCH'"
-                [class.text-red-400]="item()!.method === 'DELETE'"
-                [class.bg-red-400-10]="item()!.method === 'DELETE'">
-            {{item()!.method}}
-          </span>
-          <h5 class="text-sm font-mono text-zinc-100 truncate" [title]="item()!.url">{{item()!.url}}</h5>
+  <div class="rr-modal-shell">
+    <div class="rr-modal history-detail-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+      <div class="rr-modal__header">
+        <div class="history-detail-modal__headline">
+          <span class="history-detail-modal__method rr-mono" [attr.data-method]="item()!.method">{{ item()!.method }}</span>
+          <h5 id="history-modal-title" class="history-detail-modal__url rr-mono" [title]="item()!.url">{{ item()!.url }}</h5>
         </div>
-        <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors ml-4 shrink-0" (click)="onClose.emit()" aria-label="Close modal">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" class="rr-icon-btn rr-modal__close" (click)="onClose.emit()" aria-label="Close modal">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6L6 18M6 6l12 12"></path>
           </svg>
         </button>
       </div>
 
-      <!-- Body -->
-      <div class="flex-1 overflow-hidden flex flex-col bg-zinc-950">
-        <!-- Status and Meta Info -->
-        <div class="p-6 border-b border-zinc-800 bg-zinc-900 shrink-0">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="history-detail-modal__meta">
+        <div class="history-detail-modal__meta-grid">
+          <div class="history-detail-modal__meta-item">
+            <div class="history-detail-modal__meta-label">Status</div>
             <div>
-              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Status</label>
-              <div>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-                      [class.text-emerald-400]="item()!.status >= 200 && item()!.status < 300"
-                      [class.bg-emerald-400-10]="item()!.status >= 200 && item()!.status < 300"
-                      [class.text-amber-400]="item()!.status >= 300 && item()!.status < 400"
-                      [class.bg-amber-400-10]="item()!.status >= 300 && item()!.status < 400"
-                      [class.text-red-400]="item()!.status >= 400 || item()!.status === 0"
-                      [class.bg-red-400-10]="item()!.status >= 400 || item()!.status === 0">
-                  {{item()!.status || 'ERR'}} {{item()!.statusText}}
-                </span>
-              </div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Response Time</label>
-              <div class="text-sm font-mono text-zinc-200">{{item()!.responseTime}}ms</div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Size</label>
-              <div class="text-sm font-mono text-zinc-200">{{item()!.responseData.body.length}} bytes</div>
-            </div>
-            <div>
-              <label class="block text-xs font-medium text-zinc-500 mb-1 uppercase tracking-wider">Time</label>
-              <div class="text-sm font-mono text-zinc-200">{{formatTime(item()!.timestamp)}}</div>
+              <span
+                class="rr-status"
+                [class.rr-status--success]="item()!.status >= 200 && item()!.status < 300"
+                [class.rr-status--warning]="item()!.status >= 300 && item()!.status < 400"
+                [class.rr-status--error]="item()!.status >= 400 || item()!.status === 0"
+                [class.rr-status--neutral]="item()!.status < 200 && item()!.status !== 0"
+              >
+                {{ item()!.status || 'ERR' }} {{ item()!.statusText }}
+              </span>
             </div>
           </div>
+          <div class="history-detail-modal__meta-item">
+            <div class="history-detail-modal__meta-label">Response Time</div>
+            <div class="history-detail-modal__meta-value rr-mono">{{ item()!.responseTime }}ms</div>
+          </div>
+          <div class="history-detail-modal__meta-item">
+            <div class="history-detail-modal__meta-label">Size</div>
+            <div class="history-detail-modal__meta-value rr-mono">{{ item()!.responseData.body.length }} bytes</div>
+          </div>
+          <div class="history-detail-modal__meta-item">
+            <div class="history-detail-modal__meta-label">Time</div>
+            <div class="history-detail-modal__meta-value rr-mono">{{ formatTime(item()!.timestamp) }}</div>
+          </div>
         </div>
+      </div>
 
-        <!-- Tabs -->
-        <div class="border-b border-zinc-800 bg-zinc-900/30 px-6 shrink-0">
-          <nav class="-mb-px flex space-x-6" role="tablist" aria-label="Response details">
-            @if (isLoadTest()) {
-              <button
-                (click)="activeTab='summary'"
-                [class.border-blue-500]="activeTab==='summary'"
-                [class.text-blue-400]="activeTab==='summary'"
-                [class.border-transparent]="activeTab!=='summary'"
-                [class.text-zinc-400]="activeTab!=='summary'"
-                class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
-                role="tab"
-                [attr.aria-selected]="activeTab==='summary'"
-                aria-controls="tabpanel-summary"
-                id="tab-summary">
-                Summary
-              </button>
-              <button
-                (click)="activeTab='raw'"
-                [class.border-blue-500]="activeTab==='raw'"
-                [class.text-blue-400]="activeTab==='raw'"
-                [class.border-transparent]="activeTab!=='raw'"
-                [class.text-zinc-400]="activeTab!=='raw'"
-                class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
-                role="tab"
-                [attr.aria-selected]="activeTab==='raw'"
-                aria-controls="tabpanel-raw"
-                id="tab-raw">
-                Raw JSON
-              </button>
-            } @else {
-              <button
-                (click)="activeTab='body'"
-                [class.border-blue-500]="activeTab==='body'"
-                [class.text-blue-400]="activeTab==='body'"
-                [class.border-transparent]="activeTab!=='body'"
-                [class.text-zinc-400]="activeTab!=='body'"
-                class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
-                role="tab"
-                [attr.aria-selected]="activeTab==='body'"
-                aria-controls="tabpanel-body"
-                id="tab-body">
-                Response Body
-              </button>
-            }
+      <div class="history-detail-modal__tabs" role="tablist" aria-label="Response details">
+        @if (isLoadTest()) {
+          <button
+            class="history-detail-modal__tab"
+            [class.history-detail-modal__tab--active]="activeTab==='summary'"
+            (click)="activeTab='summary'"
+            role="tab"
+            [attr.aria-selected]="activeTab==='summary'"
+            aria-controls="tabpanel-summary"
+            id="tab-summary"
+          >
+            Summary
+          </button>
+          <button
+            class="history-detail-modal__tab"
+            [class.history-detail-modal__tab--active]="activeTab==='raw'"
+            (click)="activeTab='raw'"
+            role="tab"
+            [attr.aria-selected]="activeTab==='raw'"
+            aria-controls="tabpanel-raw"
+            id="tab-raw"
+          >
+            Raw JSON
+          </button>
+        } @else {
+          <button
+            class="history-detail-modal__tab"
+            [class.history-detail-modal__tab--active]="activeTab==='body'"
+            (click)="activeTab='body'"
+            role="tab"
+            [attr.aria-selected]="activeTab==='body'"
+            aria-controls="tabpanel-body"
+            id="tab-body"
+          >
+            Response Body
+          </button>
+        }
 
-            <button
-              (click)="activeTab='headers'"
-              [class.border-blue-500]="activeTab==='headers'"
-              [class.text-blue-400]="activeTab==='headers'"
-              [class.border-transparent]="activeTab!=='headers'"
-              [class.text-zinc-400]="activeTab!=='headers'"
-              class="whitespace-nowrap border-b-2 py-3 px-1 text-xs font-medium hover:text-zinc-200 transition-colors"
-              role="tab"
-              [attr.aria-selected]="activeTab==='headers'"
-              aria-controls="tabpanel-headers"
-              id="tab-headers">
-              Headers
-            </button>
-          </nav>
-        </div>
+        <button
+          class="history-detail-modal__tab"
+          [class.history-detail-modal__tab--active]="activeTab==='headers'"
+          (click)="activeTab='headers'"
+          role="tab"
+          [attr.aria-selected]="activeTab==='headers'"
+          aria-controls="tabpanel-headers"
+          id="tab-headers"
+        >
+          Headers
+        </button>
+      </div>
 
-        <!-- Content -->
-        <div class="flex-1 overflow-auto p-0 relative">
-          @if (isLoadTest() && activeTab === 'summary') {
-            <div id="tabpanel-summary" role="tabpanel" aria-labelledby="tab-summary" class="absolute inset-0 overflow-auto p-6 bg-zinc-950">
-              @if (getLoadTestMetrics(); as m) {
-                @if (m.cancelled || m.aborted) {
-                  <div class="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                    <div class="text-sm font-semibold text-zinc-100">
-                      {{ m.cancelled ? 'Cancelled' : 'Aborted early' }}
-                    </div>
-                    @if (m.abortReason) {
-                      <div class="mt-1 text-xs text-zinc-400">{{ m.abortReason }}</div>
+      <div class="history-detail-modal__content">
+        @if (isLoadTest() && activeTab === 'summary') {
+          <div id="tabpanel-summary" role="tabpanel" aria-labelledby="tab-summary" class="history-detail-modal__panel">
+            @if (getLoadTestMetrics(); as m) {
+              @if (m.cancelled || m.aborted) {
+                <div class="rr-card history-detail-modal__notice">
+                  <div class="history-detail-modal__notice-title">
+                    {{ m.cancelled ? 'Cancelled' : 'Aborted early' }}
+                  </div>
+                  @if (m.abortReason) {
+                    <div class="history-detail-modal__notice-sub">{{ m.abortReason }}</div>
+                  }
+                </div>
+              }
+
+              <div class="history-detail-modal__cards">
+                <div class="rr-card">
+                  <div class="rr-card__kicker">Total Requests</div>
+                  <div class="rr-card__value">{{ m.totalRequests }}</div>
+                </div>
+                <div class="rr-card">
+                  <div class="rr-card__kicker">Success Rate</div>
+                  <div class="rr-card__value rr-card__value--success">{{ (100 - m.errorRate).toFixed(1) }}%</div>
+                </div>
+                <div class="rr-card">
+                  <div class="rr-card__kicker">Req/sec</div>
+                  <div class="rr-card__value">{{ m.requestsPerSecond.toFixed(2) }}</div>
+                </div>
+                <div class="rr-card">
+                  <div class="rr-card__kicker">Duration</div>
+                  <div class="rr-card__value">{{ m.duration.toFixed(2) }}s</div>
+                </div>
+              </div>
+
+              @if (m.adaptive; as a) {
+              @if (a.enabled) {
+                <div class="rr-card history-detail-modal__section">
+                  <div class="history-detail-modal__section-head">
+                    <div class="history-detail-modal__section-title">Adaptive backoff</div>
+                    @if (a.phase) {
+                      <div class="history-detail-modal__section-sub">Phase: {{ a.phase }}</div>
                     }
                   </div>
-                }
 
-                <!-- Summary Cards (copied from load-test-results-modal) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                    <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Total Requests</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{m.totalRequests}}</div>
-                  </div>
-                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                    <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Success Rate</div>
-                    <div class="text-2xl font-bold text-emerald-400">{{(100 - m.errorRate).toFixed(1)}}%</div>
-                  </div>
-                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                    <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Req/sec</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{m.requestsPerSecond.toFixed(2)}}</div>
-                  </div>
-                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                    <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Duration</div>
-                    <div class="text-2xl font-bold text-zinc-100">{{m.duration.toFixed(2)}}s</div>
-                  </div>
-                </div>
-
-                @if (m.adaptive; as a) {
-                @if (a.enabled) {
-                  <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
-                    <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">
-                      <h6 class="text-sm font-semibold text-zinc-100">Adaptive backoff</h6>
-                      @if (a.phase) {
-                        <div class="mt-1 text-xs text-zinc-400">Phase: {{a.phase}}</div>
-                      }
-                    </div>
-                    <div class="p-4">
-                      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
-                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Peak (first unstable)</div>
-                          <div class="grid grid-cols-2 gap-2 text-sm">
-                            <div class="text-zinc-400">Users</div>
-                            <div class="text-zinc-200 font-mono">{{a.peakUsers ?? '—'}}</div>
-                            <div class="text-zinc-400">Window fail rate</div>
-                            <div class="text-zinc-200 font-mono">{{a.peakWindowFailureRate != null ? (a.peakWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
-                            <div class="text-zinc-400">Window RPS</div>
-                            <div class="text-zinc-200 font-mono">{{a.peakWindowRps != null ? a.peakWindowRps.toFixed(2) : '—'}}</div>
-                            <div class="text-zinc-400">Time to first failure</div>
-                            <div class="text-zinc-200 font-mono">{{a.timeToFirstFailureMs != null ? (a.timeToFirstFailureMs / 1000).toFixed(2) + 's' : '—'}}</div>
-                          </div>
-                        </div>
-                        <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
-                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Stabilized</div>
-                          <div class="grid grid-cols-2 gap-2 text-sm">
-                            <div class="text-zinc-400">Stable</div>
-                            <div class="text-zinc-200 font-mono">{{a.stabilized ? 'yes' : 'no'}}</div>
-                            <div class="text-zinc-400">Users</div>
-                            <div class="text-zinc-200 font-mono">{{a.stableUsers ?? '—'}}</div>
-                            <div class="text-zinc-400">Window fail rate</div>
-                            <div class="text-zinc-200 font-mono">{{a.stableWindowFailureRate != null ? (a.stableWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
-                            <div class="text-zinc-400">Window RPS</div>
-                            <div class="text-zinc-200 font-mono">{{a.stableWindowRps != null ? a.stableWindowRps.toFixed(2) : '—'}}</div>
-                            <div class="text-zinc-400">Backoff steps</div>
-                            <div class="text-zinc-200 font-mono">{{a.backoffSteps ?? '—'}}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                }
-                }
-
-                <!-- Response Time Statistics -->
-                <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
-                  <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">
-                    <h6 class="text-sm font-semibold text-zinc-100">Response Time Statistics</h6>
-                  </div>
-                  <div class="p-0">
-                    <table class="min-w-full divide-y divide-zinc-800">
-                      <thead class="bg-zinc-900">
-                        <tr>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Metric</th>
-                          <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody class="divide-y divide-zinc-800 bg-transparent">
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">Average</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.averageResponseTime.toFixed(2)}}ms</td>
-                        </tr>
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">50th Percentile (Median)</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p50.toFixed(2)}}ms</td>
-                        </tr>
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">95th Percentile</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p95.toFixed(2)}}ms</td>
-                        </tr>
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">99th Percentile</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.p99.toFixed(2)}}ms</td>
-                        </tr>
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">Min</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.minResponseTime.toFixed(2)}}ms</td>
-                        </tr>
-                        <tr class="hover:bg-zinc-800/50 transition-colors">
-                          <td class="px-6 py-3 text-sm text-zinc-300">Max</td>
-                          <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{m.maxResponseTime.toFixed(2)}}ms</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                <!-- Request Status -->
-                <div class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
-                  <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900/50">
-                    <h6 class="text-sm font-semibold text-zinc-100">Request Status</h6>
-                  </div>
-                  <div class="p-4">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                        <span class="text-sm text-zinc-400">Successful</span>
-                        <span class="text-sm font-mono font-bold text-emerald-400">{{m.successfulRequests}}</span>
-                      </div>
-                      <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                        <span class="text-sm text-zinc-400">Failed</span>
-                        <span class="text-sm font-mono font-bold text-red-400">{{m.failedRequests}}</span>
-                      </div>
-                      <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                        <span class="text-sm text-zinc-400">Total</span>
-                        <span class="text-sm font-mono font-bold text-zinc-200">{{m.totalRequests}}</span>
+                  <div class="history-detail-modal__adaptive">
+                    <div class="rr-card rr-card--soft history-detail-modal__adaptive-card">
+                      <div class="rr-card__kicker">Peak (first unstable)</div>
+                      <div class="history-detail-modal__kv">
+                        <div class="history-detail-modal__kv-k">Users</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.peakUsers ?? '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Window fail rate</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.peakWindowFailureRate != null ? (a.peakWindowFailureRate * 100).toFixed(2) + '%' : '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Window RPS</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.peakWindowRps != null ? a.peakWindowRps.toFixed(2) : '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Time to first failure</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.timeToFirstFailureMs != null ? (a.timeToFirstFailureMs / 1000).toFixed(2) + 's' : '—' }}</div>
                       </div>
                     </div>
 
-                    @if (m.failedRequests > 0 && m.failureStatusCounts && (m.failureStatusCounts | keyvalue).length > 0) {
-                      <div class="mt-4 rounded-lg border border-zinc-800 overflow-hidden">
-                        <div class="border-b border-zinc-800 px-4 py-2 bg-zinc-900/50">
-                          <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Failure breakdown (status)</div>
-                        </div>
-                        <table class="min-w-full divide-y divide-zinc-800">
-                          <thead class="bg-zinc-900">
-                            <tr>
-                              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
-                              <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Count</th>
-                            </tr>
-                          </thead>
-                          <tbody class="divide-y divide-zinc-800 bg-transparent">
-                            @for (kv of (m.failureStatusCounts | keyvalue); track kv.key) {
-                              <tr class="hover:bg-zinc-800/50 transition-colors">
-                                <td class="px-4 py-2 text-xs font-mono text-zinc-200">{{kv.key}}</td>
-                                <td class="px-4 py-2 text-xs font-mono text-zinc-300">{{kv.value}}</td>
-                              </tr>
-                            }
-                          </tbody>
-                        </table>
+                    <div class="rr-card rr-card--soft history-detail-modal__adaptive-card">
+                      <div class="rr-card__kicker">Stabilized</div>
+                      <div class="history-detail-modal__kv">
+                        <div class="history-detail-modal__kv-k">Stable</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.stabilized ? 'yes' : 'no' }}</div>
+                        <div class="history-detail-modal__kv-k">Users</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.stableUsers ?? '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Window fail rate</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.stableWindowFailureRate != null ? (a.stableWindowFailureRate * 100).toFixed(2) + '%' : '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Window RPS</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.stableWindowRps != null ? a.stableWindowRps.toFixed(2) : '—' }}</div>
+                        <div class="history-detail-modal__kv-k">Backoff steps</div>
+                        <div class="history-detail-modal__kv-v rr-mono">{{ a.backoffSteps ?? '—' }}</div>
                       </div>
-                    }
+                    </div>
                   </div>
                 </div>
               }
-            </div>
-          }
+              }
 
-          @if (isLoadTest() && activeTab === 'raw') {
-            <div id="tabpanel-raw" role="tabpanel" aria-labelledby="tab-raw" class="absolute inset-0 p-6 overflow-auto">
-              <app-virtual-response-body
-                [body]="getRawJson()"
-                class="history-modal-body"
-              ></app-virtual-response-body>
-            </div>
-          }
+              <div class="rr-card history-detail-modal__section">
+                <div class="history-detail-modal__section-head">
+                  <div class="history-detail-modal__section-title">Response Time Statistics</div>
+                </div>
+                <div class="history-detail-modal__table-wrap">
+                  <table class="rr-table">
+                    <thead>
+                      <tr>
+                        <th scope="col">Metric</th>
+                        <th scope="col">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Average</td>
+                        <td class="rr-mono">{{ m.averageResponseTime.toFixed(2) }}ms</td>
+                      </tr>
+                      <tr>
+                        <td>50th Percentile (Median)</td>
+                        <td class="rr-mono">{{ m.p50.toFixed(2) }}ms</td>
+                      </tr>
+                      <tr>
+                        <td>95th Percentile</td>
+                        <td class="rr-mono">{{ m.p95.toFixed(2) }}ms</td>
+                      </tr>
+                      <tr>
+                        <td>99th Percentile</td>
+                        <td class="rr-mono">{{ m.p99.toFixed(2) }}ms</td>
+                      </tr>
+                      <tr>
+                        <td>Min</td>
+                        <td class="rr-mono">{{ m.minResponseTime.toFixed(2) }}ms</td>
+                      </tr>
+                      <tr>
+                        <td>Max</td>
+                        <td class="rr-mono">{{ m.maxResponseTime.toFixed(2) }}ms</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          <!-- Body Tab (non-load-test) -->
-          @if (!isLoadTest() && activeTab === 'body') {
-            <div id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="absolute inset-0 p-6 overflow-auto">
-              <app-virtual-response-body
-                [body]="getFormattedResponse()"
-                class="history-modal-body"
-              ></app-virtual-response-body>
-            </div>
-          }
+              <div class="rr-card history-detail-modal__section">
+                <div class="history-detail-modal__section-head">
+                  <div class="history-detail-modal__section-title">Request Status</div>
+                </div>
 
-          <!-- Headers Tab -->
-          @if (activeTab === 'headers') {
-            <div id="tabpanel-headers" role="tabpanel" aria-labelledby="tab-headers" class="absolute inset-0 overflow-auto">
-              <table class="min-w-full divide-y divide-zinc-800">
-                <thead class="bg-zinc-900/50 sticky top-0">
+                <div class="history-detail-modal__status-grid">
+                  <div class="rr-card rr-card--soft history-detail-modal__status-item">
+                    <span>Successful</span>
+                    <span class="history-detail-modal__status-value history-detail-modal__status-value--success rr-mono">{{ m.successfulRequests }}</span>
+                  </div>
+                  <div class="rr-card rr-card--soft history-detail-modal__status-item">
+                    <span>Failed</span>
+                    <span class="history-detail-modal__status-value history-detail-modal__status-value--error rr-mono">{{ m.failedRequests }}</span>
+                  </div>
+                  <div class="rr-card rr-card--soft history-detail-modal__status-item">
+                    <span>Total</span>
+                    <span class="history-detail-modal__status-value rr-mono">{{ m.totalRequests }}</span>
+                  </div>
+                </div>
+
+                @if (m.failedRequests > 0 && m.failureStatusCounts && (m.failureStatusCounts | keyvalue).length > 0) {
+                  <div class="rr-card rr-card--soft history-detail-modal__failbreak">
+                    <div class="rr-card__kicker">Failure breakdown (status)</div>
+                    <div class="history-detail-modal__table-wrap">
+                      <table class="rr-table">
+                        <thead>
+                          <tr>
+                            <th scope="col">Status</th>
+                            <th scope="col">Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (kv of (m.failureStatusCounts | keyvalue); track kv.key) {
+                            <tr>
+                              <td class="rr-mono">{{ kv.key }}</td>
+                              <td class="rr-mono">{{ kv.value }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        }
+
+        @if (isLoadTest() && activeTab === 'raw') {
+          <div id="tabpanel-raw" role="tabpanel" aria-labelledby="tab-raw" class="history-detail-modal__panel">
+            <app-virtual-response-body [body]="getRawJson()" class="history-modal-body"></app-virtual-response-body>
+          </div>
+        }
+
+        @if (!isLoadTest() && activeTab === 'body') {
+          <div id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="history-detail-modal__panel">
+            <app-virtual-response-body [body]="getFormattedResponse()" class="history-modal-body"></app-virtual-response-body>
+          </div>
+        }
+
+        @if (activeTab === 'headers') {
+          <div id="tabpanel-headers" role="tabpanel" aria-labelledby="tab-headers" class="history-detail-modal__panel">
+            <div class="history-detail-modal__table-wrap">
+              <table class="rr-table">
+                <thead>
                   <tr>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider w-1/3">Header</th>
-                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Value</th>
+                    <th scope="col" class="history-detail-modal__th--w33">Header</th>
+                    <th scope="col">Value</th>
                   </tr>
                 </thead>
-                <tbody class="divide-y divide-zinc-800 bg-transparent">
+                <tbody>
                   @for (kv of (item()!.responseData.headers | keyvalue); track kv.key) {
-                    <tr class="hover:bg-zinc-900/30 transition-colors">
-                      <td class="px-6 py-2 whitespace-nowrap text-xs font-mono font-medium text-zinc-300">{{kv.key}}</td>
-                      <td class="px-6 py-2 text-xs font-mono text-zinc-400 break-all">{{kv.value}}</td>
+                    <tr>
+                      <td class="rr-mono history-detail-modal__header-key">{{ kv.key }}</td>
+                      <td class="rr-mono history-detail-modal__header-value">{{ kv.value }}</td>
                     </tr>
                   }
                 </tbody>
               </table>
             </div>
-          }
-        </div>
+          </div>
+        }
       </div>
 
-      <!-- Footer -->
-      <div class="border-t border-zinc-800 bg-zinc-900 px-6 py-4 flex justify-end shrink-0">
-        <button type="button" 
-                class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 shadow-sm hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-600" 
-                (click)="onClose.emit()">
-          Close
-        </button>
+      <div class="rr-modal__footer">
+        <button type="button" class="rr-btn" (click)="onClose.emit()">Close</button>
       </div>
     </div>
   </div>
-  <div class="modal-backdrop-animated fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+  <div class="rr-modal-backdrop modal-backdrop-animated" (click)="onClose.emit()"></div>
 }

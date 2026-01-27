@@ -17,6 +17,17 @@ describe('path utils', () => {
       expect(basename('C:\\a\\b\\c.http')).toBe('c.http');
       expect(basename('C:\\a\\b\\')).toBe('b');
     });
+
+    it('strips extension when provided', () => {
+      expect(basename('/a/b/test.http', '.http')).toBe('test');
+      expect(basename('/a/b/myfile.json', '.json')).toBe('myfile');
+      expect(basename('C:\\a\\b\\test.http', '.http')).toBe('test');
+    });
+
+    it('does not strip extension if it does not match', () => {
+      expect(basename('/a/b/test.http', '.json')).toBe('test.http');
+      expect(basename('/a/b/myfile', '.http')).toBe('myfile');
+    });
   });
 
   describe('dirname', () => {

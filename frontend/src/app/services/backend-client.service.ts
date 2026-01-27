@@ -4,8 +4,6 @@ import {
   ExecuteRequests,
   SetVariable,
   GetVariable,
-  SaveFileHistoryToRunLocation,
-  SaveFileHistoryToDir,
   LoadFileHistoryFromDir,
   LoadFileHistoryFromRunLocation,
   SendRequestWithID,
@@ -73,14 +71,6 @@ export class BackendClientService {
 
   getVariable(key: string): Promise<string> {
     return GetVariable(key);
-  }
-
-  saveFileHistoryToRunLocation(fileId: string, historyJson: string): Promise<void> {
-    return SaveFileHistoryToRunLocation(fileId, historyJson);
-  }
-
-  saveFileHistoryToDir(fileId: string, historyJson: string, dir: string): Promise<void> {
-    return SaveFileHistoryToDir(fileId, historyJson, dir);
   }
 
   loadFileHistoryFromDir(fileId: string, dir: string): Promise<string> {

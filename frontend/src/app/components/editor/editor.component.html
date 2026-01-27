@@ -1,33 +1,108 @@
 
-<div #wrapper class="relative h-full">
-	<div #editor class="h-full font-mono text-[13px] leading-relaxed bg-zinc-900 overflow-auto"></div>
+<div #wrapper class="editor">
+	@if (searchUi.open) {
+		<div class="editor-search" (mousedown)="$event.stopPropagation()">
+			<div class="editor-search__row">
+				<input
+					#findInput
+					type="text"
+					class="editor-search__input"
+					placeholder="Find"
+					[value]="searchUi.query"
+					(input)="onFindInput($event)"
+					(keydown)="onFindKeydown($event)"
+				/>
+				<button type="button" class="editor-search__btn" (click)="searchPrev()" title="Previous (Shift+Enter)">
+					Prev
+				</button>
+				<button type="button" class="editor-search__btn" (click)="searchNext()" title="Next (Enter)">
+					Next
+				</button>
+				<button type="button" class="editor-search__btn" (click)="selectAllMatches()" title="Select all matches">
+					All
+				</button>
+				<div class="editor-search__toggles">
+					<button
+						type="button"
+						class="editor-search__toggle"
+						[class.is-active]="searchUi.caseSensitive"
+						(click)="toggleCaseSensitive()"
+						title="Match case"
+					>
+						Aa
+					</button>
+					<button
+						type="button"
+						class="editor-search__toggle"
+						[class.is-active]="searchUi.regexp"
+						(click)="toggleRegexp()"
+						title="Use regular expression"
+					>
+						.*
+					</button>
+					<button
+						type="button"
+						class="editor-search__toggle"
+						[class.is-active]="searchUi.wholeWord"
+						(click)="toggleWholeWord()"
+						title="Match whole word"
+					>
+						W
+					</button>
+				</div>
+				@if (searchUiStatsText) {
+					<div class="editor-search__meta" [title]="searchUiStatsText">{{ searchUiStatsText }}</div>
+				}
+				<button type="button" class="editor-search__btn" (click)="toggleReplaceUi()" title="Toggle replace (Cmd/Ctrl+H)">
+					Replace
+				</button>
+				<button type="button" class="editor-search__close" (click)="closeSearchUi()" aria-label="Close">
+					×
+				</button>
+			</div>
+
+			@if (searchUi.showReplace) {
+				<div class="editor-search__row">
+					<input
+						#replaceInput
+						type="text"
+						class="editor-search__input"
+						placeholder="Replace"
+						[value]="searchUi.replace"
+						(input)="onReplaceInput($event)"
+						(keydown)="onReplaceKeydown($event)"
+					/>
+					<button type="button" class="editor-search__btn" (click)="replaceOne()" [disabled]="isBusy()">
+						Replace
+					</button>
+					<button type="button" class="editor-search__btn" (click)="replaceEverything()" [disabled]="isBusy()">
+						All
+					</button>
+				</div>
+			}
+		</div>
+	}
+
+	<div #editor class="editor__surface rr-mono"></div>
 
 	@if (editorContextMenu.show) {
-		<div class="fixed inset-0 z-100" (click)="closeEditorContextMenu()" (contextmenu)="$event.preventDefault(); closeEditorContextMenu()"></div>
+		<div class="rr-menu-backdrop" (click)="closeEditorContextMenu()" (contextmenu)="$event.preventDefault(); closeEditorContextMenu()"></div>
 		<div
-			class="absolute z-101 min-w-40 py-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl"
+			class="rr-menu"
 			[style.left.px]="editorContextMenu.x"
 			[style.top.px]="editorContextMenu.y"
 		>
-			<button type="button"
-							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-							(click)="cutSelection()">
+			<button type="button" class="rr-menu__item" (click)="cutSelection()">
 				<span>Cut</span>
 			</button>
-			<button type="button"
-							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-							(click)="copySelection()">
+			<button type="button" class="rr-menu__item" (click)="copySelection()">
 				<span>Copy</span>
 			</button>
-			<button type="button"
-							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-							(click)="pasteFromClipboard()">
+			<button type="button" class="rr-menu__item" (click)="pasteFromClipboard()">
 				<span>Paste</span>
 			</button>
-			<div class="border-t border-zinc-700 my-1"></div>
-			<button type="button"
-							class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
-							(click)="selectAll()">
+			<div class="rr-menu__sep"></div>
+			<button type="button" class="rr-menu__item" (click)="selectAll()">
 				<span>Select All</span>
 			</button>
 		</div>

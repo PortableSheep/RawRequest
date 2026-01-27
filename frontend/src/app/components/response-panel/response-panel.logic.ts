@@ -40,19 +40,19 @@ export function getChainItemsForResponsePanel(
 
 export function getStatusClassForEntry(entry: ChainEntryPreview): string {
   if (!entry.response) {
-    return 'pending';
+    return 'rr-status rr-status--pending';
   }
   const status = entry.response.status;
   if (status >= 200 && status < 300) {
-    return 'bg-green-500 text-black';
+    return 'rr-status rr-status--success';
   }
   if (status >= 400 || status === 0) {
-    return 'bg-red-500 text-white';
+    return 'rr-status rr-status--error';
   }
   if (status >= 300 && status < 400) {
-    return 'bg-yellow-500 text-black';
+    return 'rr-status rr-status--warning';
   }
-  return 'bg-gray-500 text-white';
+  return 'rr-status rr-status--neutral';
 }
 
 export function getStatusLabelForEntry(entry: ChainEntryPreview): string {

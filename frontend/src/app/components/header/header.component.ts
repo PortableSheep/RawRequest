@@ -1,7 +1,8 @@
-import { Component, input, output } from '@angular/core';
+import { Component, input, output, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { FileTab } from '../../models/http.models';
+import { ThemeService } from '../../services/theme.service';
 
 @Component({
   selector: 'app-header',
@@ -10,6 +11,8 @@ import { FileTab } from '../../models/http.models';
   styleUrls: ['./header.component.scss']
 })
 export class HeaderComponent {
+  private readonly theme = inject(ThemeService);
+
   // Signal inputs
   files = input<FileTab[]>([]);
   currentFileIndex = input<number>(0);
@@ -151,6 +154,14 @@ export class HeaderComponent {
 
   handleTabDragEnd() {
     this.resetDragState();
+  }
+
+  toggleTheme(): void {
+    this.theme.toggle();
+  }
+
+  isDarkTheme(): boolean {
+    return this.theme.resolvedTheme() === 'dark';
   }
 
   private resetDragState() {

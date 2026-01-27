@@ -1,6 +1,4 @@
-<!-- language: html -->
-<div class="min-h-screen flex flex-col bg-black text-zinc-100 selection:bg-blue-500/30">
-    <!-- Header Component -->
+<div class="rr-app">
     <app-header
             [files]="filesSignal()"
             [currentFileIndex]="currentFileIndexSignal()"
@@ -23,10 +21,8 @@
             (onCloseOtherTabs)="closeOtherTabs($event)">
     </app-header>
 
-    <!-- Main content flex: grows between header and footer -->
-    <main class="flex-1 relative">
-        <div class="mx-auto w-full px-4 py-4 h-full flex flex-col">
-            <!-- Request Manager (logic only, no layout impact) -->
+    <main class="rr-app__main">
+        <div class="rr-shell">
             <app-request-manager
                     [files]="filesSignal()"
                     [currentFileIndex]="currentFileIndexSignal()"
@@ -39,19 +35,17 @@
                     (historyUpdated)="onHistoryUpdated($event)">
             </app-request-manager>
 
-            <!-- Two-column main layout (resizable on large screens) -->
             <div
                 #mainSplit
-                class="grid grid-cols-1 gap-4 lg:gap-0 h-full"
+                class="rr-split"
                 [style.gridTemplateColumns]="splitGridTemplateColumns"
             >
-                <!-- Editor column -->
-                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-blue-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col lg:pr-2">
-                    <div class="flex items-center justify-between px-3 py-1 border-b border-zinc-800 bg-zinc-950/50">
-                        <span class="text-xs text-zinc-500">Editor</span>
+                <div class="glass-panel glass-panel--static rr-panel rr-panel--accent-blue rr-main-pane rr-main-pane--left">
+                    <div class="rr-panel__header">
+                        <span class="rr-panel__header-label">Editor</span>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition"
+                            class="rr-btn rr-btn--ghost"
                             (click)="openSnippetModal()"
                             title="Insert script snippet"
                         >
@@ -61,7 +55,7 @@
                     </div>
                     <app-editor
                         #editorComponent
-                        class="flex-1 overflow-hidden"
+                        class="rr-panel__body"
                         [content]="currentFileView().content"
                         [requests]="currentFileView().requests"
                         [variables]="currentFileView().variables"
@@ -78,7 +72,7 @@
 
                 @if (isSplitLayout) {
                     <div
-                        class="hidden lg:flex items-stretch justify-center"
+                        class="rr-split__separator"
                         (mousedown)="onSplitMouseDown($event)"
                         (dblclick)="resetSplit()"
                         title="Drag to resize (double-click to reset)"
@@ -86,15 +80,15 @@
                         aria-orientation="vertical"
                         [attr.aria-valuenow]="editorPaneWidthPx"
                     >
-                        <div class="w-2.5 cursor-col-resize flex items-stretch justify-center">
-                            <div class="w-px bg-zinc-800"></div>
+                        <div class="rr-split__separator-handle">
+                            <div class="rr-split__separator-line"></div>
                         </div>
                     </div>
                 }
 
-                <div class="glass-panel glass-panel--static overflow-hidden rounded-xl border border-zinc-800 border-t border-t-emerald-500 bg-zinc-900 shadow-sm max-h-[calc(100vh-50px-40px)] min-h-[calc(100vh-50px-40px)] flex flex-col lg:pl-2">
+                <div class="glass-panel glass-panel--static rr-panel rr-panel--accent-emerald rr-main-pane rr-main-pane--right">
                     <app-response-panel
-                        class="flex-1 overflow-hidden"
+                        class="rr-panel__body"
                         [responseData]="lastExecutedRequestIndexSignal() !== null ? currentFileView().responseData[lastExecutedRequestIndexSignal()!] : null"
                         [request]="lastExecutedRequestIndexSignal() !== null ? currentFileView().requests[lastExecutedRequestIndexSignal()!] : null"
                         [isLoading]="isRequestRunningSignal()"
@@ -108,23 +102,22 @@
 
         @if (activeRequestInfo; as active) {
             @let activeRequest = getActiveRequestDetails();
-            <div class="fixed left-0 right-0 z-30 flex justify-center px-3" style="bottom: calc(var(--rr-console-offset, 0px) + 5rem);">
-                <div class="glass-panel floating-overlay w-full max-w-4xl rounded-xl border border-blue-500 bg-zinc-900 shadow-lg shadow-blue-900/40 p-3 space-y-3">
-                    <div class="flex items-center justify-between gap-3">
-                        <div class="inline-flex items-center gap-2">
+            <div class="rr-active-overlay" style="bottom: calc(var(--rr-console-offset, 0px) + 5rem);">
+                <div class="glass-panel floating-overlay rr-active-card">
+                    <div class="rr-active-card__top">
+                        <div class="rr-active-card__title">
                             <span
-                                class="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse"
-                                [class.bg-amber-400]="isCancellingActiveRequest"
-                                [class.cancelling]="isCancellingActiveRequest"
+                                class="rr-active-dot"
+                                [class.rr-active-dot--cancelling]="isCancellingActiveRequest"
                             ></span>
                             <div>
-                                <p class="text-sm font-medium">{{ active?.label }}</p>
-                                <small class="text-xs text-zinc-400">{{ getActiveRequestMeta() }}</small>
+                                <p class="rr-active-card__label">{{ active?.label }}</p>
+                                <small class="rr-active-card__meta">{{ getActiveRequestMeta() }}</small>
                             </div>
                         </div>
                         <button
                             type="button"
-                            class="btn-ambient inline-flex items-center rounded-full border border-zinc-700 bg-zinc-800 px-3 py-1 text-xs font-medium text-zinc-100 hover:bg-red-600 hover:border-red-500 hover:text-white transition disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-zinc-800 disabled:hover:border-zinc-700"
+                            class="rr-btn rr-btn--pill rr-btn--danger btn-ambient"
                             (click)="cancelActiveRequest()"
                             [disabled]="!active.canCancel || isCancellingActiveRequest"
                         >
@@ -132,20 +125,20 @@
                         </button>
                     </div>
 
-                    <div class="rounded-lg border border-zinc-700 bg-zinc-950 text-xs">
-                        <div class="flex items-center justify-between border-b border-zinc-800 px-3 py-2">
-                            <span class="inline-flex items-center rounded-full bg-zinc-800 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-zinc-100">
+                    <div class="rr-active-card__details">
+                        <div class="rr-active-card__details-top">
+                            <span class="rr-pill rr-pill--method">
                                 {{ activeRequest?.method || '—' }}
                             </span>
-                            <span class="text-[11px] text-zinc-400">
+                            <span class="rr-active-card__status">
                                 {{ active.type === 'load' ? 'Load test running' : active.type === 'chain' ? 'Chained request running' : 'Request running' }}
                             </span>
                         </div>
 
-                                                @if (active.type === 'load') {
-                                                    <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
-                                                        <div class="text-[11px] text-zinc-400 whitespace-nowrap">Users</div>
-                                                        <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
+                        @if (active.type === 'load') {
+                            <div class="rr-active-row">
+                                <div class="rr-active-row__label">Users</div>
+                                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
                                                             <defs>
                                                                 <clipPath id="usersSparklineClip">
                                                                     <rect x="0" y="0" width="100" height="20"></rect>
@@ -159,18 +152,18 @@
                                                                     stroke-width="1.5"
                                                                     stroke-linecap="round"
                                                                     stroke-linejoin="round"
-                                                                    class="text-blue-400"
+                                                                    class="rr-color-primary"
                                                                 ></path>
                                                             </g>
                                                         </svg>
-                                                        <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
-                                                            {{ activeRunProgressView?.activeUsers ?? 0 }}/{{ activeRunProgressView?.maxUsers ?? '—' }}
-                                                        </div>
-                                                    </div>
+                                <div class="rr-active-row__value">
+                                    {{ activeRunProgressView?.activeUsers ?? 0 }}/{{ activeRunProgressView?.maxUsers ?? '—' }}
+                                </div>
+                            </div>
 
-                                                    <div class="flex items-center justify-between gap-3 px-3 py-2 border-b border-zinc-800">
-                                                        <div class="text-[11px] text-zinc-400 whitespace-nowrap">RPS</div>
-                                                        <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="h-5 w-full">
+                            <div class="rr-active-row">
+                                <div class="rr-active-row__label">RPS</div>
+                                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
                                                             <defs>
                                                                 <clipPath id="rpsSparklineClip">
                                                                     <rect x="0" y="0" width="100" height="20"></rect>
@@ -184,27 +177,26 @@
                                                                     stroke-width="1.5"
                                                                     stroke-linecap="round"
                                                                     stroke-linejoin="round"
-                                                                    class="text-emerald-400"
+                                                                    class="rr-color-accent"
                                                                 ></path>
                                                             </g>
                                                         </svg>
-                                                        <div class="text-[11px] font-mono text-zinc-300 whitespace-nowrap">
-                                                            {{ currentLoadRpsView | number:'1.0-0' }}
-                                                        </div>
-                                                    </div>
-                                                }
+                                <div class="rr-active-row__value">
+                                    {{ currentLoadRpsView | number:'1.0-0' }}
+                                </div>
+                            </div>
+                        }
 
-                        <div class="px-3 py-2 border-b border-zinc-800 text-[11px] text-zinc-300 truncate">
+                        <div class="rr-active-card__name">
                             {{ activeRequest?.name || 'Waiting for request selection' }}
                         </div>
-                        <pre class="max-h-64 overflow-auto px-3 py-2 text-[11px] leading-snug text-zinc-200"><code>{{ getActiveRequestPreview() }}</code></pre>
+                        <pre class="rr-active-card__preview"><code>{{ getActiveRequestPreview() }}</code></pre>
                     </div>
                 </div>
             </div>
         }
     </main>
 
-    <!-- Console Drawer Component -->
     <app-console-drawer
             [open]="consoleOpen()"
             [logs]="scriptLogs()"
@@ -213,8 +205,6 @@
             (onToggle)="toggleConsole()"
             (onClear)="clearConsole()">
     </app-console-drawer>
-
-   <!-- History Sidebar Component -->
    <app-history-sidebar
         [isOpen]="showHistory"
         [history]="history"
@@ -222,29 +212,21 @@
         (onClose)="toggleHistory()"
         (onItemClick)="viewHistory($event)">
    </app-history-sidebar>
-
-   <!-- History Detail Modal Component -->
    <app-history-detail-modal
         [isOpen]="showHistoryModal"
         [item]="selectedHistoryItem"
         (onClose)="closeHistoryModal()">
     </app-history-detail-modal>
-
-    <!-- Load Test Results Modal Component -->
     <app-load-test-results-modal
         [isOpen]="showLoadTestResults"
         [metrics]="loadTestMetrics"
         (onClose)="closeLoadTestResults()">
     </app-load-test-results-modal>
-
-    <!-- Donation Modal Component -->
     <app-donation-modal
         [isOpen]="showDonationModal"
         (onClose)="showDonationModal = false"
         (onDonate)="donate($event)">
     </app-donation-modal>
-
-    <!-- Secrets Modal Component -->
     <app-secrets-modal
         [isOpen]="showSecretsModal"
         [selectedEnv]="currentEnv()"

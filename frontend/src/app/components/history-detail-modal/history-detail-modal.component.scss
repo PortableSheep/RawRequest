@@ -1,13 +1,282 @@
-///* History detail modal component styles */
-//
-//.modal-response {
-//  max-height: 60vh;
-//  overflow-y: auto;
-//}
-
-// Override virtual response body height for modal context
 ::ng-deep .history-modal-body .virtual-scroll-viewport {
-  height: calc(100vh - 400px); // Account for modal header, tabs, footer, etc.
+  height: calc(100vh - 400px);
   max-height: none;
   min-height: 200px;
+}
+
+.history-detail-modal {
+  max-width: 1200px;
+  height: 90vh;
+}
+
+.history-detail-modal__headline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.history-detail-modal__method {
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--rr-border-color), white 10%);
+  background: color-mix(in srgb, var(--rr-surface-3), transparent 0%);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.history-detail-modal__method[data-method="GET"] {
+  border-color: color-mix(in srgb, var(--rr-success), transparent 35%);
+  background: color-mix(in srgb, var(--rr-success), transparent 88%);
+  color: color-mix(in srgb, var(--rr-success), white 12%);
+}
+
+.history-detail-modal__method[data-method="POST"] {
+  border-color: color-mix(in srgb, var(--rr-warning), transparent 35%);
+  background: color-mix(in srgb, var(--rr-warning), transparent 88%);
+  color: color-mix(in srgb, var(--rr-warning), white 12%);
+}
+
+.history-detail-modal__method[data-method="PUT"],
+.history-detail-modal__method[data-method="PATCH"] {
+  border-color: color-mix(in srgb, var(--rr-primary), transparent 35%);
+  background: color-mix(in srgb, var(--rr-primary), transparent 90%);
+  color: color-mix(in srgb, var(--rr-primary), white 20%);
+}
+
+.history-detail-modal__method[data-method="DELETE"] {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.12);
+  color: rgba(251, 113, 133, 0.95);
+}
+
+.history-detail-modal__url {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--rr-text);
+}
+
+.history-detail-modal__meta {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--rr-border-color);
+  background: color-mix(in srgb, var(--rr-surface-2), transparent 0%);
+}
+
+.history-detail-modal__meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (min-width: 768px) {
+  .history-detail-modal__meta-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.history-detail-modal__meta-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rr-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.history-detail-modal__meta-value {
+  font-size: 12.5px;
+  color: var(--rr-text);
+}
+
+.history-detail-modal__tabs {
+  display: flex;
+  gap: 10px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--rr-border-color);
+  background: color-mix(in srgb, var(--rr-surface-1), transparent 40%);
+}
+
+.history-detail-modal__tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 12px 2px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rr-text-tertiary);
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.history-detail-modal__tab:hover {
+  color: var(--rr-text);
+}
+
+.history-detail-modal__tab--active {
+  color: color-mix(in srgb, var(--rr-primary), white 20%);
+  border-bottom-color: color-mix(in srgb, var(--rr-primary), transparent 0%);
+}
+
+.history-detail-modal__content {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.history-detail-modal__panel {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  padding: 18px;
+  background: color-mix(in srgb, var(--rr-surface-1), transparent 35%);
+}
+
+.history-detail-modal__notice {
+  margin-bottom: 14px;
+}
+
+.history-detail-modal__notice-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--rr-text);
+}
+
+.history-detail-modal__notice-sub {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--rr-text-tertiary);
+}
+
+.history-detail-modal__cards {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 640px) {
+  .history-detail-modal__cards { grid-template-columns: 1fr 1fr; }
+}
+
+@media (min-width: 1024px) {
+  .history-detail-modal__cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.history-detail-modal__section {
+  margin-top: 14px;
+}
+
+.history-detail-modal__section-head {
+  margin-bottom: 10px;
+}
+
+.history-detail-modal__section-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--rr-text);
+}
+
+.history-detail-modal__section-sub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--rr-text-tertiary);
+}
+
+.history-detail-modal__adaptive {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .history-detail-modal__adaptive {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.history-detail-modal__adaptive-card {
+  padding: 12px;
+}
+
+.history-detail-modal__kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 10px;
+  font-size: 12px;
+}
+
+.history-detail-modal__kv-k {
+  color: var(--rr-text-tertiary);
+}
+
+.history-detail-modal__kv-v {
+  color: var(--rr-text);
+}
+
+.history-detail-modal__table-wrap {
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid var(--rr-border-color);
+}
+
+.history-detail-modal__status-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+@media (min-width: 768px) {
+  .history-detail-modal__status-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.history-detail-modal__status-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.history-detail-modal__status-value {
+  font-weight: 900;
+  color: var(--rr-text);
+}
+
+.history-detail-modal__status-value--success {
+  color: color-mix(in srgb, var(--rr-success), white 12%);
+}
+
+.history-detail-modal__status-value--error {
+  color: rgba(251, 113, 133, 0.95);
+}
+
+.history-detail-modal__failbreak {
+  margin-top: 12px;
+}
+
+.history-detail-modal__th--w33 {
+  width: 33%;
+}
+
+.history-detail-modal__header-key {
+  color: var(--rr-text);
+  font-weight: 700;
+}
+
+.history-detail-modal__header-value {
+  word-break: break-all;
+  color: var(--rr-text-tertiary);
 }

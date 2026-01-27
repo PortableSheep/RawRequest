@@ -2,14 +2,14 @@
   height: 320px;
   width: 100%;
   overflow: auto;
-  border-radius: 0.375rem;
-  border: 1px solid rgb(39 39 42);
-  background-color: rgb(0 0 0);
-  padding: 0.75rem;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  border-radius: 10px;
+  border: 1px solid var(--rr-border-color);
+  background-color: var(--rr-surface-1);
+  padding: 12px;
+  font-family: var(--rr-font-mono);
   font-size: 11px;
   line-height: 1.625;
-  color: rgb(212 212 216);
+  color: var(--rr-text);
 }
 
 .virtual-scroll-viewport ::ng-deep .cdk-virtual-scroll-content-wrapper {
@@ -27,7 +27,7 @@
   min-width: 48px;
   text-align: right;
   padding-right: 12px;
-  color: rgb(113 113 122);
+  color: var(--rr-text-tertiary);
   user-select: none;
   flex-shrink: 0;
 }
@@ -51,18 +51,19 @@
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
-  background: rgba(39, 39, 42, 0.9);
+  background: color-mix(in srgb, var(--rr-surface-2), transparent 10%);
+  border: 1px solid var(--rr-border-color);
   border-radius: 4px;
   font-size: 10px;
-  color: rgb(161 161 170);
+  color: var(--rr-text-tertiary);
   z-index: 10;
 }
 
 .processing-spinner {
   width: 10px;
   height: 10px;
-  border: 1.5px solid rgb(63 63 70);
-  border-top-color: rgb(161 161 170);
+  border: 1.5px solid var(--rr-border-color);
+  border-top-color: var(--rr-primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

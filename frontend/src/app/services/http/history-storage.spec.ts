@@ -1,23 +1,41 @@
-import { addToHistory, loadHistory, saveHistorySnapshot } from './history-storage';
+import { addToHistory, loadHistory } from './history-storage';
 
 describe('history-storage', () => {
   const makeDeps = () => {
     const store: { run?: string; dir?: string; savedResponse?: string } = {};
     const backend: any = {
-      loadFileHistoryFromDir: async (_id: string, _dir: string) => store.dir || '',
-      loadFileHistoryFromRunLocation: async (_id: string) => store.run || '',
-      saveFileHistoryToDir: async (_id: string, json: string, _dir: string) => {
-        store.dir = json;
-      },
-      saveFileHistoryToRunLocation: async (_id: string, json: string) => {
-        store.run = json;
-      },
+      loadFileHistoryFromDir: async (_id: string, _dir: string) => store.dir || '[]',
+      loadFileHistoryFromRunLocation: async (_id: string) => store.run || '[]',
       saveResponseFile: async (_filePath: string, json: string) => {
         store.savedResponse = json;
+        // Simulate backend adding to history after save
+        const resp = JSON.parse(json);
+        const historyItem = {
+          timestamp: new Date().toISOString(),
+          method: resp.requestPreview?.method || 'GET',
+          url: resp.requestPreview?.url || resp.processedUrl || '',
+          status: resp.status,
+          statusText: resp.statusText,
+          responseTime: resp.responseTime,
+          responseData: resp
+        };
+        store.dir = JSON.stringify([historyItem]);
         return 'saved-path';
       },
       saveResponseFileToRunLocation: async (_id: string, json: string) => {
         store.savedResponse = json;
+        // Simulate backend adding to history after save
+        const resp = JSON.parse(json);
+        const historyItem = {
+          timestamp: new Date().toISOString(),
+          method: resp.requestPreview?.method || 'GET',
+          url: resp.requestPreview?.url || resp.processedUrl || '',
+          status: resp.status,
+          statusText: resp.statusText,
+          responseTime: resp.responseTime,
+          responseData: resp
+        };
+        store.run = JSON.stringify([historyItem]);
         return 'saved-run';
       }
     };
@@ -25,6 +43,10 @@ describe('history-storage', () => {
     const deps = {
       backend,
       dirname: (_p: string) => '/dir',
+      basename: (p: string, ext?: string) => {
+        const base = p.split('/').pop() || '';
+        return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
+      },
       log: { error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
     };
 
@@ -39,33 +61,57 @@ describe('history-storage', () => {
     expect(items[0].timestamp instanceof Date).toBe(true);
   });
 
-  it('saves snapshots to run location when no filePath', async () => {
+  it('addToHistory saves response file and reloads history', async () => {
     const { deps, store } = makeDeps();
-    await saveHistorySnapshot('id', [], undefined, deps as any);
-    expect(store.run).toBe('[]');
-  });
-
-  it('adds to history and trims to maxItems', async () => {
-    const { deps, store } = makeDeps();
-    store.run = JSON.stringify([{ timestamp: '2020-01-01T00:00:00.000Z' }]);
+    store.run = JSON.stringify([]);
 
     const newItem = {
       timestamp: new Date('2020-01-02T00:00:00.000Z'),
-      responseData: { status: 200 }
+      responseData: {
+        status: 200,
+        statusText: 'OK',
+        responseTime: 100,
+        requestPreview: { method: 'POST', url: 'https://example.com' }
+      }
     } as any;
 
     const next = await addToHistory(
       'id',
       newItem,
       undefined,
-      1,
       deps as any
     );
 
+    // Should have saved response and reloaded history
     expect(next).toHaveLength(1);
-    const saved = JSON.parse(store.run || '[]');
-    expect(saved).toHaveLength(1);
-    expect(new Date(saved[0].timestamp).toISOString()).toBe((next[0] as any).timestamp.toISOString());
     expect(store.savedResponse).toContain('"status": 200');
+    expect(next[0].method).toBe('POST');
+  });
+
+  it('addToHistory with filePath saves response and uses dir-based history', async () => {
+    const { deps, store } = makeDeps();
+    store.dir = JSON.stringify([]);
+
+    const newItem = {
+      timestamp: new Date('2020-01-02T00:00:00.000Z'),
+      responseData: {
+        status: 201,
+        statusText: 'Created',
+        responseTime: 50,
+        requestPreview: { method: 'PUT', url: 'https://example.com/update' }
+      }
+    } as any;
+
+    const next = await addToHistory(
+      'test',
+      newItem,
+      '/path/to/test.http',
+      deps as any
+    );
+
+    // Should have saved response to file path location
+    expect(store.savedResponse).toContain('"status": 201');
+    expect(next).toHaveLength(1);
+    expect(next[0].method).toBe('PUT');
   });
 });

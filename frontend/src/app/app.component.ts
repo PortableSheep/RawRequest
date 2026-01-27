@@ -24,6 +24,7 @@ import { ScriptConsoleService } from './services/script-console.service';
 import { ToastService } from './services/toast.service';
 import { UpdateService } from './services/update.service';
 import { ScriptSnippet } from './services/script-snippet.service';
+import { ThemeService } from './services/theme.service';
 import { basename } from './utils/path';
 import { generateFileId, normalizeFileTab } from './utils/file-tab-utils';
 import { HistoryStoreService } from './services/history-store.service';
@@ -115,6 +116,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private scriptConsole = inject(ScriptConsoleService);
   private toast = inject(ToastService);
   protected updateService = inject(UpdateService);
+  private themeService = inject(ThemeService);
   private historyStore = inject(HistoryStoreService);
   private workspace = inject(WorkspaceFacadeService);
   private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
@@ -264,6 +266,7 @@ export class AppComponent implements OnInit, OnDestroy {
   constructor() {}
 
   ngOnInit() {
+    this.themeService.init();
     this.restoreSplitState();
     this.refreshSplitLayoutState();
 
@@ -341,7 +344,7 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private refreshSplitLayoutState(): void {
-    // Tailwind `lg` breakpoint is 1024px.
+    // "lg" breakpoint is 1024px.
     this.isSplitLayout = typeof window !== 'undefined' && window.innerWidth >= SPLIT_LAYOUT_BREAKPOINT_PX;
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
   }
@@ -568,6 +571,16 @@ export class AppComponent implements OnInit, OnDestroy {
   onReplayRequest(entry: ChainEntryPreview) {
     const activeFile = this.files[this.currentFileIndex];
     if (!activeFile) {
+      return;
+    }
+
+    // If the user clicks replay for the primary entry (the request currently shown in the
+    // response panel), replay by index. This avoids mismatches when the stored preview URL
+    // is a processed/expanded URL (e.g. variables resolved) while the editor contains the
+    // templated URL.
+    const lastIdx = this.lastExecutedRequestIndexSignal();
+    if (entry?.isPrimary && typeof lastIdx === 'number' && lastIdx >= 0 && lastIdx < activeFile.requests.length) {
+      this.onRequestExecute(lastIdx);
       return;
     }
 
@@ -954,7 +967,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
       if (file.filePath && file.filePath.length) {
         await SaveFileContents(file.filePath, file.content);
-        console.log('Saved file to', file.filePath);
       } else {
         const previousId = file.id;
         // Ask for a location
@@ -967,14 +979,10 @@ export class AppComponent implements OnInit, OnDestroy {
           const idx = this.currentFileIndex;
           this.replaceFileAtIndex(idx, updated);
           this.httpService.saveFiles(this.files);
-          console.log('Saved new file to', path);
 
-          // Migrate any existing (unsaved) history into the file directory
+          // Migrate history state for the renamed file
           try {
             const priorHistory = await this.httpService.loadHistory(previousId);
-            if (priorHistory?.length) {
-              await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
-            }
 
             const decision = decideFirstSaveHistoryMigration({
               previousId,
@@ -1021,13 +1029,9 @@ export class AppComponent implements OnInit, OnDestroy {
       const idx = this.currentFileIndex;
       this.replaceFileAtIndex(idx, updated);
       this.httpService.saveFiles(this.files);
-      console.log('Saved file as', path);
 
       try {
         const priorHistory = await this.httpService.loadHistory(previousId, previousPath);
-        if (priorHistory?.length) {
-          await this.httpService.saveHistorySnapshot(updated.id, priorHistory, updated.filePath);
-        }
         const decision = decideSaveAsHistoryMigration({
           previousId,
           newId: updated.id,
@@ -1113,7 +1117,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   confirmDeleteSecret(env: string, key: string) {
-    console.log('Confirming delete:', env, key);
     this.secretToDelete = { env, key };
     this.showDeleteConfirmModal = true;
   }
@@ -1122,7 +1125,6 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!this.secretToDelete) {
       return;
     }
-    console.log('Deleting secret');
     try {
       const snapshot = await this.secretService.remove(this.secretToDelete.env, this.secretToDelete.key);
       this.allSecrets = snapshot;
@@ -1137,7 +1139,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   cancelDeleteSecret() {
-    console.log('Canceling delete');
     this.showDeleteConfirmModal = false;
     this.secretToDelete = null;
   }

@@ -12,7 +12,7 @@ import {
   ActiveRunProgress
 } from '../models/http.models';
 import { cleanScriptContent } from '../utils/script-cleaner.generated';
-import { dirname } from '../utils/path';
+import { dirname, basename } from '../utils/path';
 import { BackendClientService } from './backend-client.service';
 import { ScriptConsoleService } from './script-console.service';
 import { SecretService } from './secret.service';
@@ -37,8 +37,7 @@ import { syncInitialVariablesToBackend } from './http/backend-variable-sync';
 import { loadFileTabsFromStorage, saveFileTabsToStorage } from './http/file-tabs-storage';
 import {
   addToHistory as addToHistoryHelper,
-  loadHistory as loadHistoryHelper,
-  saveHistorySnapshot as saveHistorySnapshotHelper
+  loadHistory as loadHistoryHelper
 } from './http/history-storage';
 import { sendRequest as sendRequestHelper } from './http/send-request';
 import { executeChain as executeChainHelper } from './http/execute-chain';
@@ -154,22 +153,16 @@ export class HttpService {
     return await loadHistoryHelper(fileId, filePath, {
       backend: this.backend,
       dirname,
+      basename,
       log: { error: console.error }
     } as any);
   }
 
-  async saveHistorySnapshot(fileId: string, history: HistoryItem[], filePath?: string): Promise<void> {
-    return await saveHistorySnapshotHelper(fileId, history, filePath, {
+  async addToHistory(fileId: string, item: HistoryItem, filePath?: string): Promise<HistoryItem[]> {
+    return await addToHistoryHelper(fileId, item, filePath, {
       backend: this.backend,
       dirname,
-      log: { error: console.error }
-    } as any);
-  }
-
-  async addToHistory(fileId: string, item: HistoryItem, filePath?: string, maxItems: number = 100): Promise<HistoryItem[]> {
-    return await addToHistoryHelper(fileId, item, filePath, maxItems, {
-      backend: this.backend,
-      dirname,
+      basename,
       log: { error: console.error, warn: console.warn, debug: console.debug }
     } as any);
   }

@@ -34,7 +34,7 @@ type UpdateInfo struct {
 }
 
 const (
-	githubOwner = "portablesheep" // TODO: Update this to your GitHub username
+	githubOwner = "portablesheep"
 	githubRepo  = "RawRequest"
 )
 

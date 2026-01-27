@@ -1,95 +1,90 @@
 @if (isOpen() && metrics()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6">
-    <div class="modal-animated relative w-full max-w-6xl max-h-[90vh] flex flex-col transform overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900 shadow-2xl transition-all" role="dialog" aria-modal="true" aria-labelledby="loadtest-modal-title">
-      
-      <!-- Header -->
-      <div class="flex items-center justify-between border-b border-zinc-800 px-6 py-4 bg-zinc-900 shrink-0">
-        <h5 id="loadtest-modal-title" class="text-lg font-semibold text-zinc-100 flex items-center gap-2">
-          <span class="text-amber-400" aria-hidden="true">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+  <div class="rr-modal-shell">
+    <div class="rr-modal loadtest-results-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="loadtest-modal-title">
+      <div class="rr-modal__header">
+        <h5 id="loadtest-modal-title" class="rr-modal__title">
+          <span class="loadtest-results-modal__title-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" class="rr-icon rr-icon--md" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
               <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
             </svg>
           </span>
           Load Test Results
         </h5>
-        <button type="button" class="text-zinc-400 hover:text-zinc-100 transition-colors" (click)="onClose.emit()" aria-label="Close modal">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button type="button" class="rr-icon-btn rr-modal__close" (click)="onClose.emit()" aria-label="Close modal">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6L6 18M6 6l12 12"></path>
           </svg>
         </button>
       </div>
 
-      <!-- Body -->
-      <div class="flex-1 overflow-y-auto p-6 bg-zinc-950">
+      <div class="rr-modal__body loadtest-results-modal__body">
         @if (metrics()!.cancelled || metrics()!.aborted) {
-          <div class="mb-6 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div class="text-sm font-semibold text-zinc-100">
+          <div class="rr-card loadtest-results-modal__notice">
+            <div class="loadtest-results-modal__notice-title">
               {{ metrics()!.cancelled ? 'Cancelled' : 'Aborted early' }}
             </div>
             @if (metrics()!.abortReason) {
-              <div class="mt-1 text-xs text-zinc-400">{{ metrics()!.abortReason }}</div>
+              <div class="loadtest-results-modal__notice-sub">{{ metrics()!.abortReason }}</div>
             }
           </div>
         }
 
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Total Requests</div>
-            <div class="text-2xl font-bold text-zinc-100">{{metrics()!.totalRequests}}</div>
+        <div class="loadtest-results-modal__cards">
+          <div class="rr-card">
+            <div class="rr-card__kicker">Total Requests</div>
+            <div class="rr-card__value">{{ metrics()!.totalRequests }}</div>
           </div>
-          <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Success Rate</div>
-            <div class="text-2xl font-bold text-emerald-400">{{(100 - metrics()!.errorRate).toFixed(1)}}%</div>
+          <div class="rr-card">
+            <div class="rr-card__kicker">Success Rate</div>
+            <div class="rr-card__value rr-card__value--success">{{ (100 - metrics()!.errorRate).toFixed(1) }}%</div>
           </div>
-          <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Req/sec</div>
-            <div class="text-2xl font-bold text-zinc-100">{{metrics()!.requestsPerSecond.toFixed(2)}}</div>
+          <div class="rr-card">
+            <div class="rr-card__kicker">Req/sec</div>
+            <div class="rr-card__value">{{ metrics()!.requestsPerSecond.toFixed(2) }}</div>
           </div>
-          <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-1">Duration</div>
-            <div class="text-2xl font-bold text-zinc-100">{{metrics()!.duration.toFixed(2)}}s</div>
+          <div class="rr-card">
+            <div class="rr-card__kicker">Duration</div>
+            <div class="rr-card__value">{{ metrics()!.duration.toFixed(2) }}s</div>
           </div>
         </div>
 
         @if (metrics()!.adaptive; as a) {
         @if (a.enabled) {
-          <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
-            <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">
-              <h6 class="text-sm font-semibold text-zinc-100">Adaptive backoff</h6>
+          <div class="rr-card loadtest-results-modal__section">
+            <div class="loadtest-results-modal__section-head">
+              <div class="loadtest-results-modal__section-title">Adaptive backoff</div>
               @if (a.phase) {
-                <div class="mt-1 text-xs text-zinc-400">Phase: {{a.phase}}</div>
+                <div class="loadtest-results-modal__section-sub">Phase: {{ a.phase }}</div>
               }
             </div>
-            <div class="p-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
-                  <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Peak (first unstable)</div>
-                  <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div class="text-zinc-400">Users</div>
-                    <div class="text-zinc-200 font-mono">{{a.peakUsers ?? '—'}}</div>
-                    <div class="text-zinc-400">Window fail rate</div>
-                    <div class="text-zinc-200 font-mono">{{a.peakWindowFailureRate != null ? (a.peakWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
-                    <div class="text-zinc-400">Window RPS</div>
-                    <div class="text-zinc-200 font-mono">{{a.peakWindowRps != null ? a.peakWindowRps.toFixed(2) : '—'}}</div>
-                    <div class="text-zinc-400">Time to first failure</div>
-                    <div class="text-zinc-200 font-mono">{{a.timeToFirstFailureMs != null ? (a.timeToFirstFailureMs / 1000).toFixed(2) + 's' : '—'}}</div>
-                  </div>
+            <div class="loadtest-results-modal__adaptive">
+              <div class="rr-card rr-card--soft loadtest-results-modal__adaptive-card">
+                <div class="rr-card__kicker">Peak (first unstable)</div>
+                <div class="loadtest-results-modal__kv">
+                  <div class="loadtest-results-modal__kv-k">Users</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.peakUsers ?? '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Window fail rate</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.peakWindowFailureRate != null ? (a.peakWindowFailureRate * 100).toFixed(2) + '%' : '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Window RPS</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.peakWindowRps != null ? a.peakWindowRps.toFixed(2) : '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Time to first failure</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.timeToFirstFailureMs != null ? (a.timeToFirstFailureMs / 1000).toFixed(2) + 's' : '—' }}</div>
                 </div>
-                <div class="rounded border border-zinc-800 bg-zinc-950/50 p-3">
-                  <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2">Stabilized</div>
-                  <div class="grid grid-cols-2 gap-2 text-sm">
-                    <div class="text-zinc-400">Stable</div>
-                    <div class="text-zinc-200 font-mono">{{a.stabilized ? 'yes' : 'no'}}</div>
-                    <div class="text-zinc-400">Users</div>
-                    <div class="text-zinc-200 font-mono">{{a.stableUsers ?? '—'}}</div>
-                    <div class="text-zinc-400">Window fail rate</div>
-                    <div class="text-zinc-200 font-mono">{{a.stableWindowFailureRate != null ? (a.stableWindowFailureRate * 100).toFixed(2) + '%' : '—'}}</div>
-                    <div class="text-zinc-400">Window RPS</div>
-                    <div class="text-zinc-200 font-mono">{{a.stableWindowRps != null ? a.stableWindowRps.toFixed(2) : '—'}}</div>
-                    <div class="text-zinc-400">Backoff steps</div>
-                    <div class="text-zinc-200 font-mono">{{a.backoffSteps ?? '—'}}</div>
-                  </div>
+              </div>
+
+              <div class="rr-card rr-card--soft loadtest-results-modal__adaptive-card">
+                <div class="rr-card__kicker">Stabilized</div>
+                <div class="loadtest-results-modal__kv">
+                  <div class="loadtest-results-modal__kv-k">Stable</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.stabilized ? 'yes' : 'no' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Users</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.stableUsers ?? '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Window fail rate</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.stableWindowFailureRate != null ? (a.stableWindowFailureRate * 100).toFixed(2) + '%' : '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Window RPS</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.stableWindowRps != null ? a.stableWindowRps.toFixed(2) : '—' }}</div>
+                  <div class="loadtest-results-modal__kv-k">Backoff steps</div>
+                  <div class="loadtest-results-modal__kv-v rr-mono">{{ a.backoffSteps ?? '—' }}</div>
                 </div>
               </div>
             </div>
@@ -97,106 +92,98 @@
         }
         }
 
-        <!-- Response Time Statistics -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 mb-6 overflow-hidden">
-          <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900">
-            <h6 class="text-sm font-semibold text-zinc-100">Response Time Statistics</h6>
+        <div class="rr-card loadtest-results-modal__section">
+          <div class="loadtest-results-modal__section-head">
+            <div class="loadtest-results-modal__section-title">Response Time Statistics</div>
           </div>
-          <div class="p-0">
-            <table class="min-w-full divide-y divide-zinc-800">
-              <thead class="bg-zinc-900">
+          <div class="loadtest-results-modal__table-wrap">
+            <table class="rr-table">
+              <thead>
                 <tr>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Metric</th>
-                  <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Value</th>
+                  <th scope="col">Metric</th>
+                  <th scope="col">Value</th>
                 </tr>
               </thead>
-              <tbody class="divide-y divide-zinc-800 bg-transparent">
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">Average</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.averageResponseTime.toFixed(2)}}ms</td>
+              <tbody>
+                <tr>
+                  <td>Average</td>
+                  <td class="rr-mono">{{ metrics()!.averageResponseTime.toFixed(2) }}ms</td>
                 </tr>
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">50th Percentile (Median)</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.p50.toFixed(2)}}ms</td>
+                <tr>
+                  <td>50th Percentile (Median)</td>
+                  <td class="rr-mono">{{ metrics()!.p50.toFixed(2) }}ms</td>
                 </tr>
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">95th Percentile</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.p95.toFixed(2)}}ms</td>
+                <tr>
+                  <td>95th Percentile</td>
+                  <td class="rr-mono">{{ metrics()!.p95.toFixed(2) }}ms</td>
                 </tr>
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">99th Percentile</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.p99.toFixed(2)}}ms</td>
+                <tr>
+                  <td>99th Percentile</td>
+                  <td class="rr-mono">{{ metrics()!.p99.toFixed(2) }}ms</td>
                 </tr>
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">Min</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.minResponseTime.toFixed(2)}}ms</td>
+                <tr>
+                  <td>Min</td>
+                  <td class="rr-mono">{{ metrics()!.minResponseTime.toFixed(2) }}ms</td>
                 </tr>
-                <tr class="hover:bg-zinc-800/50 transition-colors">
-                  <td class="px-6 py-3 text-sm text-zinc-300">Max</td>
-                  <td class="px-6 py-3 text-sm font-mono text-zinc-200">{{metrics()!.maxResponseTime.toFixed(2)}}ms</td>
+                <tr>
+                  <td>Max</td>
+                  <td class="rr-mono">{{ metrics()!.maxResponseTime.toFixed(2) }}ms</td>
                 </tr>
               </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Request Status -->
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 overflow-hidden">
-          <div class="border-b border-zinc-800 px-4 py-3 bg-zinc-900/50">
-            <h6 class="text-sm font-semibold text-zinc-100">Request Status</h6>
+        <div class="rr-card loadtest-results-modal__section">
+          <div class="loadtest-results-modal__section-head">
+            <div class="loadtest-results-modal__section-title">Request Status</div>
           </div>
-          <div class="p-4">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                <span class="text-sm text-zinc-400">Successful</span>
-                <span class="text-sm font-mono font-bold text-emerald-400">{{metrics()!.successfulRequests}}</span>
-              </div>
-              <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                <span class="text-sm text-zinc-400">Failed</span>
-                <span class="text-sm font-mono font-bold text-red-400">{{metrics()!.failedRequests}}</span>
-              </div>
-              <div class="flex items-center justify-between p-3 rounded bg-zinc-950/50 border border-zinc-800">
-                <span class="text-sm text-zinc-400">Total</span>
-                <span class="text-sm font-mono font-bold text-zinc-200">{{metrics()!.totalRequests}}</span>
-              </div>
-            </div>
 
-            @if (metrics()!.failedRequests > 0 && failureStatusEntries().length > 0) {
-              <div class="mt-4 rounded-lg border border-zinc-800 overflow-hidden">
-                <div class="border-b border-zinc-800 px-4 py-2 bg-zinc-900/50">
-                  <div class="text-xs font-medium text-zinc-500 uppercase tracking-wider">Failure breakdown (status)</div>
-                </div>
-                <table class="min-w-full divide-y divide-zinc-800">
-                  <thead class="bg-zinc-900">
+          <div class="loadtest-results-modal__status-grid">
+            <div class="rr-card rr-card--soft loadtest-results-modal__status-item">
+              <span>Successful</span>
+              <span class="loadtest-results-modal__status-value loadtest-results-modal__status-value--success rr-mono">{{ metrics()!.successfulRequests }}</span>
+            </div>
+            <div class="rr-card rr-card--soft loadtest-results-modal__status-item">
+              <span>Failed</span>
+              <span class="loadtest-results-modal__status-value loadtest-results-modal__status-value--error rr-mono">{{ metrics()!.failedRequests }}</span>
+            </div>
+            <div class="rr-card rr-card--soft loadtest-results-modal__status-item">
+              <span>Total</span>
+              <span class="loadtest-results-modal__status-value rr-mono">{{ metrics()!.totalRequests }}</span>
+            </div>
+          </div>
+
+          @if (metrics()!.failedRequests > 0 && failureStatusEntries().length > 0) {
+            <div class="rr-card rr-card--soft loadtest-results-modal__failbreak">
+              <div class="rr-card__kicker">Failure breakdown (status)</div>
+              <div class="loadtest-results-modal__table-wrap">
+                <table class="rr-table">
+                  <thead>
                     <tr>
-                      <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Status</th>
-                      <th scope="col" class="px-4 py-2 text-left text-xs font-medium text-zinc-500 uppercase tracking-wider">Count</th>
+                      <th scope="col">Status</th>
+                      <th scope="col">Count</th>
                     </tr>
                   </thead>
-                  <tbody class="divide-y divide-zinc-800 bg-transparent">
+                  <tbody>
                     @for (row of failureStatusEntries(); track row.code) {
-                      <tr class="hover:bg-zinc-800/50 transition-colors">
-                        <td class="px-4 py-2 text-xs font-mono text-zinc-200">{{row.code}}</td>
-                        <td class="px-4 py-2 text-xs font-mono text-zinc-300">{{row.count}}</td>
+                      <tr>
+                        <td class="rr-mono">{{ row.code }}</td>
+                        <td class="rr-mono">{{ row.count }}</td>
                       </tr>
                     }
                   </tbody>
                 </table>
               </div>
-            }
-          </div>
+            </div>
+          }
         </div>
       </div>
 
-      <!-- Footer -->
-      <div class="border-t border-zinc-800 bg-zinc-900 px-6 py-4 flex justify-end shrink-0">
-        <button type="button" 
-                class="rounded-md border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-300 shadow-sm hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-zinc-600" 
-                (click)="onClose.emit()">
-          Close
-        </button>
+      <div class="rr-modal__footer">
+        <button type="button" class="rr-btn" (click)="onClose.emit()">Close</button>
       </div>
     </div>
   </div>
-  <div class="modal-backdrop-animated fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+  <div class="rr-modal-backdrop modal-backdrop-animated" (click)="onClose.emit()"></div>
 }

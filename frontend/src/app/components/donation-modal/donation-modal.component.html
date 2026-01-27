@@ -1,81 +1,78 @@
 @if (isOpen()) {
-  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
-    <div class="modal-animated relative w-full max-w-md transform overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl transition-all" role="dialog" aria-modal="true" aria-labelledby="donation-modal-title">
-      <!-- Close button -->
-      <button type="button" class="absolute right-4 top-4 z-10 rounded-full p-1.5 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors" (click)="onClose.emit()" aria-label="Close modal">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <div class="rr-modal-shell">
+    <div class="rr-modal donation-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="donation-modal-title">
+      <button
+        type="button"
+        class="rr-icon-btn rr-modal__close donation-modal__close"
+        (click)="onClose.emit()"
+        aria-label="Close modal"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M18 6L6 18M6 6l12 12"></path>
         </svg>
       </button>
       
-      <!-- Gradient header with illustration -->
-      <div class="relative bg-linear-to-br from-blue-600/20 via-purple-600/10 to-zinc-900 px-6 pt-10 pb-6">
-        <div class="flex justify-center mb-4">
-          <div class="relative">
-            <!-- Heart animation container -->
-            <div class="w-20 h-20 rounded-full bg-linear-to-br from-rose-500/20 to-pink-600/10 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-rose-400 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+      <div class="donation-modal__hero">
+        <div class="donation-modal__hero-top">
+          <div class="donation-modal__hero-graphic">
+            <div class="donation-modal__heart">
+              <svg xmlns="http://www.w3.org/2000/svg" class="donation-modal__heart-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
               </svg>
             </div>
-            <!-- Sparkle accents -->
-            <svg class="absolute -top-1 -right-1 h-4 w-4 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
+            <svg class="donation-modal__spark donation-modal__spark--one" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2L13.09 8.26L18 6L15.74 10.91L22 12L15.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L8.26 13.09L2 12L8.26 10.91L6 6L10.91 8.26L12 2Z" />
             </svg>
-            <svg class="absolute -bottom-1 -left-2 h-3 w-3 text-blue-400" viewBox="0 0 24 24" fill="currentColor">
+            <svg class="donation-modal__spark donation-modal__spark--two" viewBox="0 0 24 24" fill="currentColor">
               <path d="M12 2L13.09 8.26L18 6L15.74 10.91L22 12L15.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L8.26 13.09L2 12L8.26 10.91L6 6L10.91 8.26L12 2Z" />
             </svg>
           </div>
         </div>
-        <h5 id="donation-modal-title" class="text-xl font-bold text-zinc-100 text-center">Support RawRequest</h5>
-        <p class="text-sm text-zinc-400 text-center mt-1">Help keep development going</p>
+        <h5 id="donation-modal-title" class="donation-modal__title">Support RawRequest</h5>
+        <p class="donation-modal__subtitle">Help keep development going</p>
       </div>
       
-      <!-- Content -->
-      <div class="px-6 py-5 bg-zinc-950">
-        <p class="text-zinc-300 text-center text-sm leading-relaxed mb-5">
-          RawRequest is <span class="text-emerald-400 font-medium">100% free</span> and open source. 
+      <div class="rr-modal__body donation-modal__body">
+        <p class="donation-modal__lead">
+          RawRequest is <span class="donation-modal__highlight">100% free</span> and open source.
           Your donation helps fund continued development, new features, and server costs.
         </p>
 
-        <!-- Benefits list -->
-        <ul class="space-y-2 mb-6">
-          <li class="flex items-center gap-2 text-xs text-zinc-400">
-            <svg class="h-4 w-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+        <ul class="donation-modal__benefits">
+          <li class="donation-modal__benefit">
+            <svg class="donation-modal__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
             <span>New features & improvements</span>
           </li>
-          <li class="flex items-center gap-2 text-xs text-zinc-400">
-            <svg class="h-4 w-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+          <li class="donation-modal__benefit">
+            <svg class="donation-modal__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
             <span>Bug fixes & maintenance</span>
           </li>
-          <li class="flex items-center gap-2 text-xs text-zinc-400">
-            <svg class="h-4 w-4 text-emerald-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+          <li class="donation-modal__benefit">
+            <svg class="donation-modal__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
             <span>Keeping the tool free forever</span>
           </li>
         </ul>
 
-        <!-- Donate button -->
         <button
           type="button"
           (click)="openDonate()"
-          class="flex items-center justify-center gap-2 w-full bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-semibold px-5 py-3 rounded-lg shadow-lg shadow-blue-500/20 transition-all hover:shadow-blue-500/30 hover:-translate-y-0.5"
+          class="rr-btn donation-modal__donate"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="currentColor">
             <path d="M11.645 20.91l-.007-.003-.022-.012a15.247 15.247 0 01-.383-.218 25.18 25.18 0 01-4.244-3.17C4.688 15.36 2.25 12.174 2.25 8.25 2.25 5.322 4.714 3 7.688 3A5.5 5.5 0 0112 5.052 5.5 5.5 0 0116.313 3c2.973 0 5.437 2.322 5.437 5.25 0 3.925-2.438 7.111-4.739 9.256a25.175 25.175 0 01-4.244 3.17 15.247 15.247 0 01-.383.219l-.022.012-.007.004-.003.001a.752.752 0 01-.704 0l-.003-.001z" />
           </svg>
           Donate Now
         </button>
 
-        <!-- Footer -->
-        <div class="flex items-center justify-center gap-2 mt-5 pt-4 border-t border-zinc-800">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <div class="donation-modal__footer">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm donation-modal__footer-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="5" width="20" height="14" rx="2" />
             <line x1="2" y1="10" x2="22" y2="10" />
           </svg>
-          <span class="text-xs text-zinc-500">Secure payment via Stripe</span>
+          <span>Secure payment via Stripe</span>
         </div>
       </div>
     </div>
   </div>
-  <div class="modal-backdrop-animated fixed inset-0 bg-black/50 backdrop-blur-sm z-40 transition-opacity" (click)="onClose.emit()"></div>
+  <div class="rr-modal-backdrop modal-backdrop-animated" (click)="onClose.emit()"></div>
 }

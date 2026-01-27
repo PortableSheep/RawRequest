@@ -1,20 +1,16 @@
-<nav class="flex items-center justify-between w-full h-12 px-4 bg-black border-b border-zinc-800 sticky top-0 z-50">
-    <div class="flex-1 min-w-0 overflow-x-auto no-scrollbar self-end">
+<nav class="rr-topbar">
+    <div class="rr-tabs rr-no-scrollbar">
         <ul
-            class="flex gap-0.5"
+            class="rr-tabs__list"
             (dragover)="handleTabStripDragOver($event)"
             (drop)="handleTabStripDrop($event)"
         >
             @for (file of files(); track file.id; let i = $index) {
-                <li class="group flex items-center max-w-[200px] h-9 px-3.5 rounded-t-lg rounded-b-none border border-zinc-800 border-b-0 bg-zinc-900 text-zinc-400 text-[13px] cursor-pointer select-none transition-all hover:bg-zinc-800 hover:text-zinc-200 hover:border-zinc-700 hover:border-b-0 relative"
+                <li class="rr-tab"
                     draggable="true"
-                    [class.bg-blue-500-10]="currentFileIndex() === i"
-                    [class.border-blue-500-50]="currentFileIndex() === i"
-                    [class.text-blue-400]="currentFileIndex() === i"
-                    [class.shadow-sm]="currentFileIndex() === i"
-                    [class.opacity-50]="draggingIndex === i"
-                    [class.z-10]="currentFileIndex() === i"
-                    [class.ring-2]="dragOverIndex === i"
+                    [class.rr-tab--active]="currentFileIndex() === i"
+                    [class.rr-tab--dragging]="draggingIndex === i"
+                    [class.rr-tab--dragover]="dragOverIndex === i"
                     (dragstart)="handleTabDragStart($event, i)"
                     (dragover)="handleTabDragOver($event, i)"
                     (drop)="handleTabDrop($event, i)"
@@ -22,24 +18,24 @@
                     (contextmenu)="handleContextMenu($event, i)"
                 >
                     <a
-                        class="flex flex-1 items-center min-w-0 text-inherit no-underline"
+                        class="rr-tab__link"
                         aria-current="page"
                         href="#"
                         (click)="$event.preventDefault(); onFileSelect.emit(i)"
                     >
-                        <span class="flex-1 truncate font-medium tracking-tight" [title]="file.displayName || file.name">
+                        <span class="rr-tab__title" [title]="file.displayName || file.name">
                           {{file.displayName || file.name}}
                         </span>
 
                         <button
                             type="button"
-                            class="flex items-center justify-center w-5 h-5 ml-2 rounded-md text-zinc-500 hover:bg-zinc-800 hover:text-red-400 transition-all"
+                            class="rr-icon-btn rr-icon-btn--danger"
                             draggable="false"
                             (click)="$event.stopPropagation(); $event.preventDefault(); onCloseFile.emit(i)"
                             title="Close File"
                         >
-                            <span class="sr-only">Close file</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                            <span class="rr-sr-only">Close file</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
                         </button>
                     </a>
                 </li>
@@ -47,161 +43,179 @@
         </ul>
     </div>
 
-    <!-- Context Menu -->
     @if (contextMenu.show) {
-        <div class="fixed inset-0 z-[100]" (click)="closeContextMenu()" (contextmenu)="$event.preventDefault(); closeContextMenu()"></div>
-        <div class="fixed z-[101] min-w-[160px] py-1 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl"
+        <div class="rr-menu-backdrop" (click)="closeContextMenu()" (contextmenu)="$event.preventDefault(); closeContextMenu()"></div>
+        <div class="rr-menu"
              [style.left.px]="contextMenu.x"
              [style.top.px]="contextMenu.y">
             @if (contextMenu.filePath) {
                 <button type="button"
-                        class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        class="rr-menu__item"
                         (click)="revealInFinder()">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /></svg>
                     <span>Reveal in Finder</span>
                 </button>
             } @else {
-                <div class="px-3 py-2 text-sm text-zinc-500 italic">
+                <div class="rr-menu__note">
                     File not saved to disk
                 </div>
             }
-            <div class="border-t border-zinc-700 my-1"></div>
+            <div class="rr-menu__sep"></div>
             <button type="button"
-                    class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    class="rr-menu__item"
                     (click)="closeTab()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
                 <span>Close Tab</span>
             </button>
             <button type="button"
-                    class="flex items-center gap-2 w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                    class="rr-menu__item"
                     (click)="closeOtherTabs()">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-zinc-500" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M4 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M14 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M4 14m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v4a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /></svg>
                 <span>Close Other Tabs</span>
             </button>
         </div>
     }
 
-    <div class="flex items-center gap-2">
+    <div class="rr-topbar__right">
         @if (appVersion()) {
-            <span class="hidden sm:inline-flex items-center h-8 px-2.5 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 text-xs font-medium">
+            <span class="rr-badge">
                 v{{ appVersion() }}
             </span>
         }
-        <!-- Environment selector -->
-        <div class="relative flex items-center">
+        <div class="rr-select-wrap">
             @if(environments().length > 0) {
-                <select class="appearance-none h-8 pl-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium cursor-pointer outline-none hover:border-zinc-700 hover:bg-zinc-800 focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all min-w-[140px] shadow-sm"
+                <select class="rr-select"
                     [ngModel]="selectedEnv()"
                     (ngModelChange)="onEnvChange.emit($event)"
                 >
                     @for (env of environments(); track env) {
-                        <option [value]="env" class="bg-zinc-900">{{env}}</option>
+                        <option [value]="env">{{env}}</option>
                     }
                 </select>
-                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-zinc-500">
-                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                <div class="rr-select-wrap__chev">
+                    <svg class="rr-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                 </div>
             } @else {
-                <span class="inline-flex items-center h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-500 text-xs font-medium">
+                <span class="rr-badge">
                     No Environments
                 </span>
             }
         </div>
 
-        <!-- New -->
         <button
             type="button"
-            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+            class="rr-btn btn-ambient"
             (click)="onNewFile.emit()"
             title="New File"
             aria-label="Create new file"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
             <span>New</span>
         </button>
 
-        <!-- Open -->
         <button
                 type="button"
-                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+                class="rr-btn btn-ambient"
                 (click)="onOpenFile.emit()"
                 title="Open File"
                 aria-label="Open existing file"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /></svg>
             <span>Open</span>
         </button>
 
-        <!-- Examples -->
         <button
             type="button"
-            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-blue-500/50 hover:text-blue-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+            class="rr-btn btn-ambient"
             (click)="onOpenExamples.emit()"
             title="Open Examples"
             aria-label="Open examples file"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500 group-hover:text-blue-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9h1" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--accent" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9h1" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
             <span>Examples</span>
         </button>
 
-        <!-- Save -->
         <button
                 type="button"
-                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-green-500/50 hover:text-green-400 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 transition-all shadow-sm group"
+                class="rr-btn btn-ambient"
                 (click)="onSaveFile.emit()"
                 title="Save File"
                 aria-label="Save file"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 group-hover:text-green-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--success" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /></svg>
             <span>Save</span>
         </button>
 
-        <!-- Save As -->
         <button
             type="button"
-            class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-green-500/50 hover:text-green-400 focus:outline-none focus:border-green-500/50 focus:ring-1 focus:ring-green-500/20 transition-all shadow-sm group"
+            class="rr-btn btn-ambient"
             (click)="onSaveFileAs.emit()"
             title="Save As"
             aria-label="Save file as"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500 group-hover:text-green-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /><path d="M15 3v4" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--success" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /><path d="M15 3v4" /></svg>
             <span>Save As</span>
         </button>
 
-        <!-- Secrets -->
         <button
                 type="button"
-                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-amber-500/50 hover:text-amber-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm group"
+                class="rr-btn btn-ambient"
                 (click)="onSecretsClick.emit()"
                 title="Manage Secrets"
                 aria-label="Manage secrets"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-500 group-hover:text-amber-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z" /><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" /><path d="M8 11v-4a4 4 0 1 1 8 0v4" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--warning" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6z" /><path d="M11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0" /><path d="M8 11v-4a4 4 0 1 1 8 0v4" /></svg>
             <span>Secrets</span>
         </button>
 
-        <!-- Support -->
         <button
                 type="button"
-                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-pink-500/50 hover:text-pink-400 focus:outline-none focus:ring-1 focus:ring-amber-500/20 transition-all shadow-sm group"
+                class="rr-btn btn-ambient"
                 (click)="onDonateClick.emit()"
                 title="Support Development"
                 aria-label="Support Development"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-pink-500 group-hover:text-pink-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--danger" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
             <span>Support</span>
         </button>
 
-        <!-- History -->
         <button
                 type="button"
-                class="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 text-xs font-medium hover:bg-zinc-900 hover:border-purple-500/50 hover:text-purple-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/20 transition-all shadow-sm group"
+                class="rr-btn btn-ambient"
                 (click)="onHistoryClick.emit()"
                 title="History"
                 aria-label="View request history"
         >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-purple-500 group-hover:text-purple-400 transition-colors" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
             <span>History</span>
+        </button>
+
+        <button
+                type="button"
+                class="rr-btn btn-ambient"
+                (click)="toggleTheme()"
+                [title]="isDarkTheme() ? 'Switch to light theme' : 'Switch to dark theme'"
+                aria-label="Toggle theme"
+        >
+            @if (isDarkTheme()) {
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 3v1" />
+                    <path d="M12 20v1" />
+                    <path d="M3 12h1" />
+                    <path d="M20 12h1" />
+                    <path d="M18.364 5.636l-.707.707" />
+                    <path d="M6.343 17.657l-.707.707" />
+                    <path d="M5.636 5.636l.707.707" />
+                    <path d="M17.657 17.657l.707.707" />
+                    <circle cx="12" cy="12" r="4" />
+                </svg>
+                <span>Light</span>
+            } @else {
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                </svg>
+                <span>Dark</span>
+            }
         </button>
     </div>
 </nav>

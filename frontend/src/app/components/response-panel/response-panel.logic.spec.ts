@@ -101,7 +101,7 @@ describe('response-panel.logic', () => {
         response: null
       };
       expect(getStatusLabelForEntry(entry)).toBe('Pending');
-      expect(getStatusClassForEntry(entry)).toBe('pending');
+      expect(getStatusClassForEntry(entry)).toBe('rr-status rr-status--pending');
     });
 
     it('classifies status ranges correctly', () => {
@@ -118,10 +118,10 @@ describe('response-panel.logic', () => {
         }
       });
 
-      expect(getStatusClassForEntry(mk(204))).toBe('bg-green-500 text-black');
-      expect(getStatusClassForEntry(mk(301))).toBe('bg-yellow-500 text-black');
-      expect(getStatusClassForEntry(mk(404))).toBe('bg-red-500 text-white');
-      expect(getStatusClassForEntry(mk(0))).toBe('bg-red-500 text-white');
+      expect(getStatusClassForEntry(mk(204))).toBe('rr-status rr-status--success');
+      expect(getStatusClassForEntry(mk(301))).toBe('rr-status rr-status--warning');
+      expect(getStatusClassForEntry(mk(404))).toBe('rr-status rr-status--error');
+      expect(getStatusClassForEntry(mk(0))).toBe('rr-status rr-status--error');
     });
   });
 

@@ -1,4 +1,4 @@
-export function basename(filePath: string): string {
+export function basename(filePath: string, ext?: string): string {
   const normalized = String(filePath ?? '');
   if (!normalized) return '';
 
@@ -15,8 +15,14 @@ export function basename(filePath: string): string {
 
   const trimmed = normalized.slice(0, end);
   const idx = Math.max(trimmed.lastIndexOf('/'), trimmed.lastIndexOf('\\'));
-  if (idx < 0) return trimmed;
-  return trimmed.slice(idx + 1);
+  let result = idx < 0 ? trimmed : trimmed.slice(idx + 1);
+
+  // If an extension is provided, strip it from the result
+  if (ext && result.endsWith(ext)) {
+    result = result.slice(0, result.length - ext.length);
+  }
+
+  return result;
 }
 
 export function dirname(filePath: string): string {

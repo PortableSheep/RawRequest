@@ -4,6 +4,11 @@
 
 .console-drawer {
   pointer-events: none;
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
 }
 
 .console-bubble {
@@ -17,18 +22,84 @@
   position: fixed;
   inset: auto 0 0;
   pointer-events: auto;
+  padding: 0 1rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .console-panel {
   max-height: 70vh;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-1);
+}
+
+.console-panel__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--rr-border-color);
+}
+
+.console-panel__hide-btn {
+  height: 34px;
+}
+
+.console-panel__count,
+.console-bubble__count {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--rr-primary), transparent 55%);
+  background: color-mix(in srgb, var(--rr-primary), transparent 88%);
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.console-panel__content {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.console-panel__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: 11px;
+  color: var(--rr-text-subtle);
+}
+
+.console-panel__clear-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+
+.console-panel__viewport {
+  border-radius: 0.75rem;
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-1);
+  overflow: hidden;
+}
+
+.console-panel__scroll {
+  height: 100%;
+  overflow: auto;
 }
 
 .console-panel__logs {
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
-
-// Make scrollbars in the console log viewport easier to see.
-// Uses existing theme variables (no new hard-coded colors).
 .console-panel__viewport .overflow-auto {
   scrollbar-width: thin;
   scrollbar-color: var(--color-zinc-600) transparent;
@@ -55,9 +126,47 @@
   border: 0;
   background-clip: border-box;
 }
-
-// Log level coloring
 .log-entry {
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--rr-border-color);
+  font-size: 11px;
+  line-height: 1.35;
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  .log-message {
+    margin: 0.25rem 0 0;
+    white-space: pre-wrap;
+    color: var(--rr-text);
+  }
+
+  .log-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--rr-text-subtle);
+  }
+
+  .log-level {
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-size: 10px;
+    font-weight: 800;
+  }
+
+  .log-source,
+  .log-time {
+    font-size: 10px;
+    color: color-mix(in srgb, var(--rr-text-subtle), transparent 10%);
+  }
+
+  .log-time {
+    margin-left: auto;
+  }
+
   &--error {
     background-color: rgba(239, 68, 68, 0.08);
     border-left: 3px solid rgb(239, 68, 68);
@@ -106,7 +215,27 @@
   }
 }
 
-// Resize handle
+.console-empty {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0.75rem;
+  color: var(--rr-text-subtle);
+}
+
+.console-empty__icon {
+  width: 32px;
+  height: 32px;
+  color: color-mix(in srgb, var(--rr-text-subtle), transparent 20%);
+}
+
+.console-empty__text {
+  margin: 0;
+  font-size: 13px;
+}
 .resize-handle {
   touch-action: none;
   user-select: none;
@@ -120,4 +249,50 @@
   &:active {
     cursor: ns-resize;
   }
+}
+
+.resize-handle {
+  display: flex;
+  justify-content: center;
+  padding: 0.45rem 0;
+  margin-bottom: -0.25rem;
+}
+
+.resize-handle__bar {
+  width: 3rem;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--rr-text-subtle), transparent 35%);
+  transition: background 160ms ease;
+}
+
+.resize-handle:hover .resize-handle__bar {
+  background: color-mix(in srgb, var(--rr-text-subtle), transparent 15%);
+}
+
+.resize-handle:active .resize-handle__bar {
+  background: color-mix(in srgb, var(--rr-primary), transparent 10%);
+}
+
+.console-bubble__btn {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--rr-border-color);
+  background: color-mix(in srgb, var(--rr-surface-2), transparent 10%);
+  padding: 0.5rem 0.9rem;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--rr-text);
+  box-shadow:
+    0 22px 40px rgba(0, 0, 0, 0.35),
+    0 10px 22px rgba(0, 0, 0, 0.25);
+  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.console-bubble__btn:hover {
+  border-color: color-mix(in srgb, var(--rr-primary), transparent 40%);
+  color: color-mix(in srgb, var(--rr-primary), white 20%);
 }

@@ -32,7 +32,6 @@
               "src/assets"
             ],
             "styles": [
-              "src/tailwind.css",
               "src/styles.scss"
             ],
             "scripts": [],
@@ -48,8 +47,8 @@
                 },
                 {
                   "type": "anyComponentStyle",
-                  "maximumWarning": "4kb",
-                  "maximumError": "8kb"
+                  "maximumWarning": "10kb",
+                  "maximumError": "20kb"
                 }
               ],
               "outputHashing": "all"

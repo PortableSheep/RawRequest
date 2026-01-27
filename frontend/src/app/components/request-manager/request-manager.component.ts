@@ -114,14 +114,12 @@ export class RequestManagerComponent {
         response: responseWithChain
       });
 
-      console.log('[RequestManager] Adding to history:', historyItem);
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
       // Save a response file next to the http file (if present)
       try {
         const { SaveResponseFile } = await import('@wailsjs/go/main/App');
         if (currentFile.filePath) {
           const saved = await SaveResponseFile(currentFile.filePath, JSON.stringify(responseWithChain, null, 2));
-          console.log('Saved response file:', saved);
         }
       } catch (err) {
         console.warn('Failed to save response file:', err);
@@ -182,16 +180,12 @@ export class RequestManagerComponent {
     const variables = this.getCombinedVariables();
 
     try {
-      console.log('[RequestManager] Executing chained request:', requestIndex);
-
       // Find all requests in the chain
       const chain = this.buildRequestChain(requestIndex);
-      console.log('[RequestManager] Built chain with', chain.length, 'requests:', chain.map(r => r.name));
 
       // Execute the chain using Go backend
       const execution = await this.httpService.executeChain(chain, variables, requestId, envName);
       const responses = execution.responses;
-      console.log('[RequestManager] Chain execution completed with', responses.length, 'responses');
 
       const lastResponse = responses[responses.length - 1];
       const primaryIndex = Math.max(0, responses.length - 1);

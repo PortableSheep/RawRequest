@@ -17,24 +17,21 @@ import (
 	vj "rawrequest/internal/varsjson"
 )
 
-// TimingBreakdown contains detailed timing information for an HTTP request
 type TimingBreakdown struct {
-	DNSLookup       int64 `json:"dnsLookup"`       // DNS resolution time in ms
-	TCPConnect      int64 `json:"tcpConnect"`      // TCP connection time in ms
-	TLSHandshake    int64 `json:"tlsHandshake"`    // TLS handshake time in ms
-	TimeToFirstByte int64 `json:"timeToFirstByte"` // Time to first response byte in ms
-	ContentTransfer int64 `json:"contentTransfer"` // Content download time in ms
-	Total           int64 `json:"total"`           // Total request time in ms
+	DNSLookup       int64 `json:"dnsLookup"`
+	TCPConnect      int64 `json:"tcpConnect"`
+	TLSHandshake    int64 `json:"tlsHandshake"`
+	TimeToFirstByte int64 `json:"timeToFirstByte"`
+	ContentTransfer int64 `json:"contentTransfer"`
+	Total           int64 `json:"total"`
 }
 
-// ResponseMetadata contains additional response information
 type ResponseMetadata struct {
 	Timing  TimingBreakdown   `json:"timing"`
-	Size    int64             `json:"size"`    // Response body size in bytes
-	Headers map[string]string `json:"headers"` // Response headers
+	Size    int64             `json:"size"`
+	Headers map[string]string `json:"headers"`
 }
 
-// WindowState stores the window position and size
 type WindowState struct {
 	X         int  `json:"x"`
 	Y         int  `json:"y"`
@@ -43,7 +40,6 @@ type WindowState struct {
 	Maximized bool `json:"maximized"`
 }
 
-// App struct
 type App struct {
 	ctx             context.Context
 	variables       map[string]string
@@ -134,9 +130,11 @@ func (a *App) parseResponse(response string) map[string]interface{} {
 
 func (a *App) executeScript(rawScript string, ctx *sr.ExecutionContext, stage string) {
 	cleanScript := cleanScriptContent(rawScript)
+
 	if strings.TrimSpace(cleanScript) == "" {
 		return
 	}
+
 	se.Execute(cleanScript, ctx, stage, se.Dependencies{
 		VariablesSnapshot: a.variablesSnapshot,
 		GetVar:            a.getVariable,
