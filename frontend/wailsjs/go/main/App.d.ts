@@ -56,6 +56,8 @@ export function LoadWindowState():Promise<main.WindowState>;
 
 export function MarkFirstRunComplete():Promise<void>;
 
+export function MigrateResponsesFromRunLocationToHttpFile(arg1:string,arg2:string):Promise<string>;
+
 export function OpenFileDialog():Promise<Array<string>>;
 
 export function OpenReleaseURL(arg1:string):Promise<void>;

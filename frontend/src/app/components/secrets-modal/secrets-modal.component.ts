@@ -1,4 +1,4 @@
-import { Component, effect, input, output } from '@angular/core';
+import { Component, effect, HostListener, input, output } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { SecretIndex, VaultInfo } from '../../services/secret.service';
@@ -22,6 +22,10 @@ export class SecretsModalComponent {
   targetEnv = '';
   newKey = '';
   newValue = '';
+  showValue = false;
+  filterText = '';
+  filterEnv = 'all';
+  resetConfirmText = '';
 
   private wasOpen = false;
 
@@ -30,6 +34,7 @@ export class SecretsModalComponent {
       const open = this.isOpen();
       if (open && !this.wasOpen) {
         this.targetEnv = (this.selectedEnv() || '').trim();
+		this.resetConfirmText = '';
       }
       this.wasOpen = open;
     });
@@ -42,6 +47,37 @@ export class SecretsModalComponent {
   onResetVault = output<void>();
 
   Object = Object;
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.isOpen()) return;
+    this.onClose.emit();
+  }
+
+  handleShellClick(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.onClose.emit();
+    }
+  }
+
+  toggleShowValue(): void {
+    this.showValue = !this.showValue;
+  }
+
+  getFilteredSecrets(): Record<string, string[]> {
+    const all = this.allSecrets() || {};
+    const q = this.filterText.trim().toLowerCase();
+    const envFilter = (this.filterEnv || 'all').trim();
+
+    const result: Record<string, string[]> = {};
+    for (const env of Object.keys(all)) {
+      if (envFilter !== 'all' && env !== envFilter) continue;
+      const keys = all[env] || [];
+      const filtered = q ? keys.filter((k) => k.toLowerCase().includes(q)) : keys;
+      if (filtered.length) result[env] = filtered;
+    }
+    return result;
+  }
 
   handleSave() {
     if (!this.newKey || !this.newValue) {
@@ -62,7 +98,13 @@ export class SecretsModalComponent {
   }
 
   triggerReset() {
+  if (!this.isResetEnabled) return;
     this.onResetVault.emit();
+  this.resetConfirmText = '';
+  }
+
+  get isResetEnabled(): boolean {
+    return this.resetConfirmText.trim().toUpperCase() === 'RESET';
   }
 
   getTotalSecretCount(): number {

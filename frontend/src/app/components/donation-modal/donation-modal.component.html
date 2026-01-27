@@ -1,6 +1,6 @@
 @if (isOpen()) {
-  <div class="rr-modal-shell">
-    <div class="rr-modal donation-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="donation-modal-title">
+  <div class="rr-modal-shell" (click)="handleShellClick($event)">
+    <div class="rr-modal donation-modal modal-animated" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="donation-modal-title">
       <button
         type="button"
         class="rr-icon-btn rr-modal__close donation-modal__close"

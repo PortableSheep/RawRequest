@@ -1,3 +1,34 @@
 :host {
   display: block;
 }
+
+.rr-split-btn {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.rr-split-btn__main {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.rr-split-btn__toggle {
+  width: 34px;
+  padding: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+.rr-kebab {
+  width: 34px;
+  padding: 0;
+  margin-left: auto;
+}
+
+.rr-topbar__sep {
+  width: 1px;
+  height: 26px;
+  margin: 0 var(--rr-space-2);
+  background: color-mix(in srgb, var(--rr-border-color), white 8%);
+}

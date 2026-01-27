@@ -218,7 +218,10 @@
 .response-entry__right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 10px;
+  row-gap: 6px;
+  flex-wrap: wrap;
   flex-shrink: 0;
   font-size: 12px;
 }
@@ -250,10 +253,15 @@
   border-top: 1px solid var(--rr-border-color);
   background: color-mix(in srgb, var(--rr-surface-1), transparent 25%);
   font-size: 12px;
+  line-height: 1.55;
 }
 
 .response-entry__section {
   margin-bottom: 12px;
+}
+
+.response-entry__section:last-child {
+  margin-bottom: 0;
 }
 
 .response-entry__section--response {
@@ -313,6 +321,10 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.response-entry__block--body {
+  margin-top: 14px;
 }
 
 .response-entry__block-head {
@@ -504,6 +516,7 @@
   display: grid;
   grid-template-columns: 1fr;
   gap: 12px;
+  margin-top: 14px;
 }
 
 @media (min-width: 640px) {
@@ -529,6 +542,13 @@
   border-color: color-mix(in srgb, var(--rr-success), transparent 35%);
   background: color-mix(in srgb, var(--rr-success), transparent 88%);
   color: color-mix(in srgb, var(--rr-success), white 10%);
+}
+
+// Headers spacing
+// Ensure both Request Headers and Response Headers blocks have breathing room
+// when they appear after other content.
+.response-entry__block--headers:not(:first-child) {
+  margin-top: 14px;
 }
 
 .response-entry__copy[data-state='error'] {

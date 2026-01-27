@@ -45,7 +45,7 @@
 
     @if (contextMenu.show) {
         <div class="rr-menu-backdrop" (click)="closeContextMenu()" (contextmenu)="$event.preventDefault(); closeContextMenu()"></div>
-        <div class="rr-menu"
+        <div class="rr-menu rr-menu--context"
              [style.left.px]="contextMenu.x"
              [style.top.px]="contextMenu.y">
             @if (contextMenu.filePath) {
@@ -102,6 +102,8 @@
             }
         </div>
 
+        <div class="rr-topbar__sep" aria-hidden="true"></div>
+
         <button
             type="button"
             class="rr-btn btn-ambient"
@@ -124,38 +126,41 @@
             <span>Open</span>
         </button>
 
-        <button
-            type="button"
-            class="rr-btn btn-ambient"
-            (click)="onOpenExamples.emit()"
-            title="Open Examples"
-            aria-label="Open examples file"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--accent" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9h1" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
-            <span>Examples</span>
-        </button>
 
-        <button
-                type="button"
-                class="rr-btn btn-ambient"
-                (click)="onSaveFile.emit()"
-                title="Save File"
-                aria-label="Save file"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--success" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /></svg>
-            <span>Save</span>
-        </button>
+        <div class="rr-split-btn" role="group" aria-label="Save actions">
+            <button
+                    type="button"
+                    class="rr-btn btn-ambient rr-split-btn__main"
+                    (click)="onSaveFile.emit(); closeSaveMenu()"
+                    title="Save File"
+                    aria-label="Save file"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--success" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /></svg>
+                <span>Save</span>
+            </button>
 
-        <button
-            type="button"
-            class="rr-btn btn-ambient"
-            (click)="onSaveFileAs.emit()"
-            title="Save As"
-            aria-label="Save file as"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--success" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /><path d="M15 3v4" /></svg>
-            <span>Save As</span>
-        </button>
+            <button
+                    type="button"
+                    class="rr-btn btn-ambient rr-split-btn__toggle"
+                    (click)="toggleSaveMenu($event)"
+                    title="More save options"
+                    aria-label="More save options"
+                    aria-haspopup="menu"
+                    [attr.aria-expanded]="saveMenu.show"
+            >
+                <svg class="rr-btn__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </button>
+        </div>
+
+        @if (saveMenu.show) {
+            <div class="rr-menu-backdrop" (click)="closeSaveMenu()"></div>
+            <div class="rr-menu rr-menu--save" [style.left.px]="saveMenu.x" [style.top.px]="saveMenu.y" role="menu" aria-label="Save menu">
+                <button type="button" class="rr-menu__item" (click)="handleSaveAsClick()" role="menuitem">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19 21H5a2 2 0 0 1 -2 -2V7a2 2 0 0 1 2 -2h11l5 5v9a2 2 0 0 1 -2 2z" /><path d="M17 21v-8H7v8" /><path d="M7 3v4" /><path d="M15 3v4" /></svg>
+                    <span>Save As…</span>
+                </button>
+            </div>
+        }
 
         <button
                 type="button"
@@ -169,53 +174,82 @@
         </button>
 
         <button
-                type="button"
-                class="rr-btn btn-ambient"
-                (click)="onDonateClick.emit()"
-                title="Support Development"
-                aria-label="Support Development"
-        >
-            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--danger" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
-            <span>Support</span>
-        </button>
-
-        <button
-                type="button"
-                class="rr-btn btn-ambient"
-                (click)="onHistoryClick.emit()"
-                title="History"
-                aria-label="View request history"
+            type="button"
+            class="rr-btn btn-ambient"
+            (click)="onHistoryClick.emit()"
+            title="History"
+            aria-label="View request history"
         >
             <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
             <span>History</span>
         </button>
 
         <button
-                type="button"
-                class="rr-btn btn-ambient"
-                (click)="toggleTheme()"
-                [title]="isDarkTheme() ? 'Switch to light theme' : 'Switch to dark theme'"
-                aria-label="Toggle theme"
+            type="button"
+            class="rr-btn btn-ambient rr-kebab"
+            (click)="toggleMoreMenu($event)"
+            title="More actions"
+            aria-label="More actions"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="moreMenu.show"
         >
-            @if (isDarkTheme()) {
-                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 3v1" />
-                    <path d="M12 20v1" />
-                    <path d="M3 12h1" />
-                    <path d="M20 12h1" />
-                    <path d="M18.364 5.636l-.707.707" />
-                    <path d="M6.343 17.657l-.707.707" />
-                    <path d="M5.636 5.636l.707.707" />
-                    <path d="M17.657 17.657l.707.707" />
-                    <circle cx="12" cy="12" r="4" />
-                </svg>
-                <span>Light</span>
-            } @else {
-                <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
-                </svg>
-                <span>Dark</span>
-            }
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="5" r="1" />
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="12" cy="19" r="1" />
+            </svg>
         </button>
+
+        @if (moreMenu.show) {
+            <div class="rr-menu-backdrop" (click)="closeMoreMenu()"></div>
+            <div class="rr-menu rr-menu--more" [style.left.px]="moreMenu.x" [style.top.px]="moreMenu.y" role="menu" aria-label="More actions">
+                <button
+                        type="button"
+                        class="rr-menu__item"
+                        (click)="handleOpenExamplesClick()"
+                        role="menuitem"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 9h1" /><path d="M9 13h6" /><path d="M9 17h6" /></svg>
+                    <span>Open Examples</span>
+                </button>
+                <button
+                        type="button"
+                        class="rr-menu__item"
+                        (click)="handleDonateClick()"
+                        role="menuitem"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" /></svg>
+                    <span>Support Development</span>
+                </button>
+                    <div class="rr-menu__sep" aria-hidden="true"></div>
+                    <button
+                            type="button"
+                            class="rr-menu__item"
+                            (click)="handleToggleThemeClick()"
+                            role="menuitem"
+                    >
+                        @if (isDarkTheme()) {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3v1" />
+                                <path d="M12 20v1" />
+                                <path d="M3 12h1" />
+                                <path d="M20 12h1" />
+                                <path d="M18.364 5.636l-.707.707" />
+                                <path d="M6.343 17.657l-.707.707" />
+                                <path d="M5.636 5.636l.707.707" />
+                                <path d="M17.657 17.657l.707.707" />
+                                <circle cx="12" cy="12" r="4" />
+                            </svg>
+                            <span>Switch to Light Theme</span>
+                        } @else {
+                            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                            </svg>
+                            <span>Switch to Dark Theme</span>
+                        }
+                    </button>
+            </div>
+        }
+
     </div>
 </nav>

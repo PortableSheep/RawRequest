@@ -110,6 +110,10 @@ export function MarkFirstRunComplete() {
   return window['go']['main']['App']['MarkFirstRunComplete']();
 }
 
+export function MigrateResponsesFromRunLocationToHttpFile(arg1, arg2) {
+  return window['go']['main']['App']['MigrateResponsesFromRunLocationToHttpFile'](arg1, arg2);
+}
+
 export function OpenFileDialog() {
   return window['go']['main']['App']['OpenFileDialog']();
 }

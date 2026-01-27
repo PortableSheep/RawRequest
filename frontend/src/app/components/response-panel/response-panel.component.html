@@ -117,7 +117,7 @@
                                         <div class="response-entry__section-body">
                                             @let reqHeaders = entry.request.headers | keyvalue;
                                             @if (reqHeaders.length) {
-                                                <div class="response-entry__block">
+                                                <div class="response-entry__block response-entry__block--headers">
                                                     <span class="response-entry__block-title">Headers</span>
                                                     <ul class="response-entry__kv">
                                                         @for (kv of reqHeaders; track kv.key) {
@@ -234,7 +234,7 @@
                                             }
                                         </div>
 
-                                        <div class="response-entry__block">
+                                        <div class="response-entry__block response-entry__block--headers">
                                             <span class="response-entry__block-title">Headers</span>
                                             @let resHeaders = entry.response!.headers | keyvalue;
                                             @if (resHeaders.length) {
@@ -251,7 +251,7 @@
                                             }
                                         </div>
 
-                                        <div class="response-entry__block">
+                                        <div class="response-entry__block response-entry__block--body">
                                             <div class="response-entry__block-head">
                                                 <span class="response-entry__block-title">Body</span>
                                                 <button

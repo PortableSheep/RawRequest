@@ -1,4 +1,4 @@
-import { Component, input, output, inject } from '@angular/core';
+import { Component, HostListener, input, output, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { FileTab } from '../../models/http.models';
@@ -47,6 +47,126 @@ export class HeaderComponent {
     tabIndex: -1,
     filePath: ''
   };
+
+  // Save menu state (for the split Save button)
+  saveMenu = {
+    show: false,
+    x: 0,
+    y: 0
+  };
+
+  // Overflow menu state (kebab)
+  moreMenu = {
+    show: false,
+    x: 0,
+    y: 0
+  };
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    this.closeSaveMenu();
+    this.closeMoreMenu();
+    this.closeContextMenu();
+  }
+
+  @HostListener('document:mousedown', ['$event'])
+  handleDocumentMouseDown(event: MouseEvent): void {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+
+    if (this.moreMenu.show && !target.closest('.rr-menu--more') && !target.closest('.rr-kebab')) {
+      this.closeMoreMenu();
+    }
+
+    if (this.saveMenu.show && !target.closest('.rr-menu--save') && !target.closest('.rr-split-btn')) {
+      this.closeSaveMenu();
+    }
+
+    if (this.contextMenu.show && !target.closest('.rr-menu--context') && !target.closest('.rr-tab')) {
+      this.closeContextMenu();
+    }
+  }
+
+  toggleSaveMenu(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Don't allow multiple menus at once.
+    this.closeContextMenu();
+    this.closeMoreMenu();
+
+    if (this.saveMenu.show) {
+      this.closeSaveMenu();
+      return;
+    }
+
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const menuWidth = 180;
+    const padding = 10;
+    const x = Math.min(Math.max(rect.right - menuWidth, padding), window.innerWidth - menuWidth - padding);
+    const y = rect.bottom + 6;
+
+    this.saveMenu = { show: true, x, y };
+  }
+
+  closeSaveMenu(): void {
+    this.saveMenu.show = false;
+  }
+
+  handleSaveAsClick(): void {
+    this.onSaveFileAs.emit();
+    this.closeSaveMenu();
+  }
+
+  toggleMoreMenu(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.closeContextMenu();
+    this.closeSaveMenu();
+
+    if (this.moreMenu.show) {
+      this.closeMoreMenu();
+      return;
+    }
+
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return;
+    }
+
+    const rect = target.getBoundingClientRect();
+    const menuWidth = 220;
+    const padding = 10;
+    const x = Math.min(Math.max(rect.right - menuWidth, padding), window.innerWidth - menuWidth - padding);
+    const y = rect.bottom + 6;
+
+    this.moreMenu = { show: true, x, y };
+  }
+
+  closeMoreMenu(): void {
+    this.moreMenu.show = false;
+  }
+
+  handleOpenExamplesClick(): void {
+    this.onOpenExamples.emit();
+    this.closeMoreMenu();
+  }
+
+  handleDonateClick(): void {
+    this.onDonateClick.emit();
+    this.closeMoreMenu();
+  }
+
+  handleToggleThemeClick(): void {
+    this.toggleTheme();
+    this.closeMoreMenu();
+  }
 
   handleContextMenu(event: MouseEvent, index: number) {
     event.preventDefault();

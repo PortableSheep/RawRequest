@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, HostListener, input, output } from '@angular/core';
 
 import { BrowserOpenURL } from '../../../../wailsjs/runtime/runtime';
 
@@ -21,6 +21,19 @@ export class DonationModalComponent {
 
   onClose = output<void>();
   onDonate = output<number>();
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.isOpen()) return;
+    this.onClose.emit();
+  }
+
+  handleShellClick(event: MouseEvent): void {
+    // Only close if the user clicked outside the modal content.
+    if (event.target === event.currentTarget) {
+      this.onClose.emit();
+    }
+  }
 
   openDonate(): void {
     // Close immediately so the user sees feedback even if the external open is slow.

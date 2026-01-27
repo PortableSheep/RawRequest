@@ -31,9 +31,10 @@ export class HistoryStoreService {
 
   async ensureLoaded(fileId: string, filePath?: string): Promise<HistoryItem[]> {
     const cached = this.cache.get(fileId);
-    if (cached) {
+
+    if (cached !== undefined && cached.length > 0) {
       return cached;
     }
-    return this.load(fileId, filePath);
+    return await this.load(fileId, filePath);
   }
 }

@@ -941,7 +941,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.isRequestRunningSignal.set(this.isRequestRunning);
     this.pendingRequestIndexSignal.set(this.pendingRequestIndex);
-    // Keep lastExecutedRequestIndexSignal as-is here; it is set explicitly on start/finish.
+
     if (!this.isRequestRunning) {
       // Request lifecycle ended; clear download progress.
       this.downloadProgressSignal.set(null);
@@ -963,7 +963,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!file) return;
 
     try {
-      const { SaveFileContents, ShowSaveDialog } = await import('../../wailsjs/go/main/App');
+      const { SaveFileContents, ShowSaveDialog, MigrateResponsesFromRunLocationToHttpFile } = await import('../../wailsjs/go/main/App');
 
       if (file.filePath && file.filePath.length) {
         await SaveFileContents(file.filePath, file.content);
@@ -974,6 +974,22 @@ export class AppComponent implements OnInit, OnDestroy {
         const path = await ShowSaveDialog(defaultName);
         if (path && path.length) {
           await SaveFileContents(path, file.content);
+
+          // Capture history before migrating files on disk.
+          let priorHistory: HistoryItem[] = [];
+          try {
+            priorHistory = await this.httpService.loadHistory(previousId);
+          } catch (historyErr) {
+            console.warn('Failed to load prior history on first save:', historyErr);
+          }
+
+          // Move {unsavedId}.responses/ from run location into {fileName}.responses/ beside the saved file.
+          try {
+            await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
+          } catch (moveErr) {
+            console.warn('Failed to migrate response files on first save:', moveErr);
+          }
+
           // Update file metadata to point to saved path
           const updated = buildFileAfterSave(file, path);
           const idx = this.currentFileIndex;
@@ -982,8 +998,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
           // Migrate history state for the renamed file
           try {
-            const priorHistory = await this.httpService.loadHistory(previousId);
-
             const decision = decideFirstSaveHistoryMigration({
               previousId,
               newId: updated.id,
@@ -1013,7 +1027,7 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!file) return;
 
     try {
-      const { SaveFileContents, ShowSaveDialog } = await import('../../wailsjs/go/main/App');
+      const { SaveFileContents, ShowSaveDialog, MigrateResponsesFromRunLocationToHttpFile } = await import('../../wailsjs/go/main/App');
 
       const previousId = file.id;
       const previousPath = file.filePath;
@@ -1032,6 +1046,15 @@ export class AppComponent implements OnInit, OnDestroy {
 
       try {
         const priorHistory = await this.httpService.loadHistory(previousId, previousPath);
+
+        if (!previousPath || !previousPath.length) {
+          try {
+            await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
+          } catch (moveErr) {
+            console.warn('Failed to migrate response files on Save As:', moveErr);
+          }
+        }
+
         const decision = decideSaveAsHistoryMigration({
           previousId,
           newId: updated.id,
@@ -1426,7 +1449,6 @@ export class AppComponent implements OnInit, OnDestroy {
     const code = type === 'pre' ? snippet.preScript : snippet.postScript;
     if (!code) return;
 
-    // Determine if we should wrap in pre/post script block
     const scriptBlock = type === 'pre' 
       ? `\n< {\n${code}\n}\n` 
       : `\n> {\n${code}\n}\n`;

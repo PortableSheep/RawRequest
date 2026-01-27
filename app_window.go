@@ -14,6 +14,91 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+func (a *App) MigrateResponsesFromRunLocationToHttpFile(fileID string, httpFilePath string) (string, error) {
+	if fileID == "" {
+		return "", errors.New("no file id provided")
+	}
+	if httpFilePath == "" {
+		return "", errors.New("no http file path provided")
+	}
+
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	safe := a.sanitizeFileID(fileID)
+	srcDir := filepath.Join(wd, safe+".responses")
+	if _, err := os.Stat(srcDir); err != nil {
+		// Nothing to migrate.
+		if os.IsNotExist(err) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	dir := filepath.Dir(httpFilePath)
+	base := filepath.Base(httpFilePath)
+	name := strings.TrimSuffix(base, filepath.Ext(base))
+	destDir := filepath.Join(dir, name+".responses")
+	if err := os.MkdirAll(destDir, 0755); err != nil {
+		return "", err
+	}
+
+	entries, err := os.ReadDir(srcDir)
+	if err != nil {
+		return "", err
+	}
+
+	uniqueDestPath := func(fileName string) string {
+		candidate := filepath.Join(destDir, fileName)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+		ext := filepath.Ext(fileName)
+		baseName := strings.TrimSuffix(fileName, ext)
+		for i := 2; i < 10000; i++ {
+			p := filepath.Join(destDir, fmt.Sprintf("%s-%d%s", baseName, i, ext))
+			if _, err := os.Stat(p); os.IsNotExist(err) {
+				return p
+			}
+		}
+		// Fallback: timestamp-based.
+		return filepath.Join(destDir, fmt.Sprintf("%s-%d%s", baseName, time.Now().UnixNano(), ext))
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		srcPath := filepath.Join(srcDir, entry.Name())
+		destPath := uniqueDestPath(entry.Name())
+
+		if err := os.Rename(srcPath, destPath); err == nil {
+			continue
+		}
+
+		// Cross-device move or rename failure; fall back to copy + delete.
+		data, err := os.ReadFile(srcPath)
+		if err != nil {
+			continue
+		}
+		if err := os.WriteFile(destPath, data, 0644); err != nil {
+			continue
+		}
+		_ = os.Remove(srcPath)
+	}
+
+	// Best-effort cleanup of now-empty source dir.
+	_ = os.Remove(srcDir)
+	_ = os.RemoveAll(srcDir)
+
+	return destDir, nil
+}
+
 func (a *App) RevealInFinder(filePath string) error {
 	if filePath == "" {
 		return errors.New("no file path provided")
