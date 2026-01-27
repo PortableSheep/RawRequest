@@ -1,6 +1,10 @@
 # RawRequest
 
-A modern, lightweight HTTP client for developers. Built with [Wails](https://wails.io/) and Angular.
+RawRequest is a code-first desktop HTTP client.
+
+Write requests in `.http` files, run them with environment variables and secrets, add small JavaScript scripts where needed, and keep history/results alongside your work.
+
+Built with [Wails](https://wails.io/) and Angular.
 
 ## Screenshots
 
@@ -12,12 +16,12 @@ A modern, lightweight HTTP client for developers. Built with [Wails](https://wai
 
 ## Features
 
-- 📝 **HTTP File Format** - Use `.http` files with syntax highlighting
-- 🔗 **Request Chaining** - Chain requests with `@depends`
-- ⚡ **Load Testing** - Built-in load testing with `@load`
-- 🔐 **Secrets Management** - Encrypted vault for sensitive data
-- 🌍 **Environments** - Switch between dev, staging, prod
-- 📜 **Pre/Post Scripts** - JavaScript pre/post blocks for dynamic requests
+- **HTTP file format**: run requests from `.http` files
+- **Request chaining**: chain requests with `@depends`
+- **Load testing**: built-in load testing with `@load`
+- **Secrets**: encrypted vault + `{{secret:key}}` placeholders
+- **Environments**: switch between dev/staging/prod via `@env.*`
+- **Scripts**: JavaScript pre/post blocks for dynamic requests and assertions
 
 ## Installation
 
@@ -59,7 +63,7 @@ Create a file called `requests.http`:
 ```http
 # Environment variables
 @env.dev.baseUrl = http://localhost:3000
-@env.prod.baseUrl https://api.example.com
+@env.prod.baseUrl = https://api.example.com
 
 # Optional globals (useful for defaults + autocomplete)
 @contentType = application/json
@@ -73,8 +77,8 @@ POST {{baseUrl}}/users
 Content-Type: application/json
 
 {
-  "name": "John Doe",
-  "email": "john@example.com"
+  "name": "Example User",
+  "email": "example@company.test"
 }
 
 ### Request with pre/post scripts
@@ -107,7 +111,8 @@ Notes:
 
 ## Documentation
 
-See the [examples.http](./examples/examples.http) file to see how features can be used.
+- The landing page lives in [docs/index.html](./docs/index.html).
+- See [examples/http](./examples/examples.http) for a bigger request file.
 
 ## Development
 

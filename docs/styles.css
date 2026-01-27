@@ -227,6 +227,38 @@ h1, h2, h3 {
   margin-top: 70px;
 }
 
+.screenshots {
+  margin-top: 70px;
+}
+
+.shot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+}
+
+.shot-card {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.shot-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.shot-card figcaption {
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 15px;
+}
+
 .section-title h2 {
   margin: 0;
   font-size: 30px;
@@ -272,6 +304,10 @@ h1, h2, h3 {
 }
 
 .workflow {
+  margin-top: 70px;
+}
+
+.install {
   margin-top: 70px;
 }
 

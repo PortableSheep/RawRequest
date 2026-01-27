@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="RawRequest — a fast, scriptable desktop HTTP client for builders." />
-  <title>RawRequest — Simple HTTP client for builders</title>
+  <meta name="description" content="RawRequest — a code-first desktop HTTP client. Run .http files with envs, secrets, scripts, and built-in load testing." />
+  <title>RawRequest — Code-first desktop HTTP client</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -15,8 +15,10 @@
     <header class="nav">
       <div class="logo">RawRequest</div>
       <nav class="nav-links">
+        <a href="#screenshots">Screenshots</a>
         <a href="#features">Features</a>
         <a href="#workflow">Workflow</a>
+        <a href="#install">Install</a>
         <a href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">GitHub</a>
       </nav>
       <div class="nav-actions">
@@ -28,8 +30,8 @@
       <section class="hero">
         <div class="hero-text">
           <p class="eyebrow">Desktop HTTP client</p>
-          <h1>Simple HTTP client for builders.</h1>
-          <p class="subhead">RawRequest is an HTTP client with folding, linting, scripts, secrets, and portable history.</p>
+          <h1>Code-first requests, on desktop.</h1>
+          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. History stays next to your file.</p>
           <div class="hero-actions">
             <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
             <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
@@ -42,7 +44,7 @@
           <div class="card-header">requests.http</div>
           <pre class="code"><code># Environments
 @env.dev.baseUrl = http://localhost:3000
-@env.prod.baseUrl https://api.example.com
+@env.prod.baseUrl = https://api.example.com
 
 # Globals (optional)
 @contentType = application/json
@@ -70,15 +72,41 @@ Accept: application/json
         </div>
       </section>
 
+      <section id="screenshots" class="screenshots">
+        <div class="section-title">
+          <h2>Screenshots</h2>
+          <p>A quick look at the editor, load testing, and results.</p>
+        </div>
+
+        <div class="shot-grid">
+          <figure class="shot-card">
+            <img src="MainWindow.png" alt="RawRequest main window" loading="lazy" />
+            <figcaption>Request editor + response viewer</figcaption>
+          </figure>
+          <figure class="shot-card">
+            <img src="LoadTestInProgress.png" alt="Load test running" loading="lazy" />
+            <figcaption>Load test in progress</figcaption>
+          </figure>
+          <figure class="shot-card">
+            <img src="LoadTestResult.png" alt="Load test results" loading="lazy" />
+            <figcaption>Load test results</figcaption>
+          </figure>
+        </div>
+      </section>
+
       <section id="features" class="features">
         <div class="section-title">
-          <h2>Built for builders</h2>
-          <p>Focused features for day-to-day API work.</p>
+          <h2>Features</h2>
+          <p>Practical tooling for day-to-day API work.</p>
         </div>
         <div class="grid">
           <div class="card">
             <h3>Code-first editor</h3>
             <p>CodeMirror 6 with search, folding, linting, and variable diagnostics that match your current file + env.</p>
+          </div>
+          <div class="card">
+            <h3>Built-in load testing</h3>
+            <p>Turn a request into a load test with <code>@load</code>, then watch progress and results without switching tools.</p>
           </div>
           <div class="card">
             <h3>Secrets & envs</h3>
@@ -97,38 +125,66 @@ Accept: application/json
 
       <section id="workflow" class="workflow">
         <div class="section-title">
-          <h2>A workflow that sticks</h2>
-          <p>Keep requests and scripts in text, keep outputs nearby, and ship changes with confidence.</p>
+          <h2>Workflow</h2>
+          <p>Keep requests in text, keep outputs nearby, and make changes you can review.</p>
         </div>
         <div class="steps">
           <div class="step">
             <div class="step-num">1</div>
             <div>
               <h3>Author .http files</h3>
-              <p>Organize requests with <code>###</code> separators, env placeholders, and scripts. Run any request instantly.</p>
+              <p>Use <code>###</code> separators, env placeholders, and scripts. Run any request instantly.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">2</div>
             <div>
               <h3>Wire secrets + envs</h3>
-              <p>Use the vault + per-environment vars; lint catches missing placeholders before you hit “send”.</p>
+              <p>Use the vault + per-environment vars; lint catches missing placeholders before you hit send.</p>
             </div>
           </div>
           <div class="step">
             <div class="step-num">3</div>
             <div>
               <h3>Keep history nearby</h3>
-              <p>Responses and history sit beside your file (or your run location for unsaved work).</p>
+              <p>Responses and history sit beside your file (or your run location for unsaved work) so it’s easy to inspect and share.</p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="install">
+        <div class="section-title">
+          <h2>Install</h2>
+          <p>Grab a release, or use the macOS installer script/Homebrew.</p>
+        </div>
+
+        <div class="grid">
+          <div class="card">
+            <h3>macOS</h3>
+            <p>Quick install:</p>
+            <pre class="code"><code>curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.sh | bash</code></pre>
+            <p>Or Homebrew cask:</p>
+            <pre class="code"><code>brew tap portablesheep/rawrequest https://github.com/portablesheep/homebrew-rawrequest
+brew install --cask rawrequest</code></pre>
+          </div>
+          <div class="card">
+            <h3>Windows</h3>
+            <p>Download <code>RawRequest-*-windows-portable.zip</code>, extract it, and run <code>RawRequest.exe</code>.</p>
+            <p>If SmartScreen warns you, choose “More info” → “Run anyway”.</p>
+          </div>
+          <div class="card">
+            <h3>License</h3>
+            <p>RawRequest is licensed under the PolyForm Noncommercial License 1.0.0.</p>
+            <p><a href="https://github.com/portablesheep/RawRequest/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the license</a></p>
           </div>
         </div>
       </section>
 
       <section class="cta">
         <div>
-          <h2>Ready to send better requests?</h2>
-          <p>Grab the latest release and stay in flow. macOS & Windows supported.</p>
+          <h2>Try RawRequest</h2>
+          <p>Download a release for macOS or Windows, then start from a <code>.http</code> file.</p>
         </div>
         <div class="cta-actions">
           <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>

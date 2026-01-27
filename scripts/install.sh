@@ -2,10 +2,10 @@
 # RawRequest Homebrew Installation Script
 # 
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/yourusername/RawRequest/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.sh | bash
 #
 # Or with a specific version:
-#   curl -fsSL https://raw.githubusercontent.com/yourusername/RawRequest/main/scripts/install.sh | bash -s -- v1.0.0
+#   curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.sh | bash -s -- v1.0.0
 
 set -e
 
