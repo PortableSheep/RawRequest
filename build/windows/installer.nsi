@@ -19,8 +19,18 @@
   !define VERSION "1.0.0"
 !endif
 
+; Paths can be overridden via command line: makensis -DSTAGING_DIR=path\to\staging
+; Default paths are relative to repo root (where makensis is invoked from)
+!ifndef STAGING_DIR
+  !define STAGING_DIR "dist\releases\installer-staging"
+!endif
+
+!ifndef OUT_DIR
+  !define OUT_DIR "dist\releases"
+!endif
+
 Name "${PRODUCT_NAME} ${VERSION}"
-OutFile "..\..\..\dist\releases\${PRODUCT_NAME}-${VERSION}-windows-setup.exe"
+OutFile "${OUT_DIR}\${PRODUCT_NAME}-${VERSION}-windows-setup.exe"
 InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_UNINST_KEY}" "InstallLocation"
 ShowInstDetails show
@@ -32,8 +42,9 @@ RequestExecutionLevel admin
 ; --------------------------------
 
 !define MUI_ABORTWARNING
-!define MUI_ICON "..\..\build\windows\icon.ico"
-!define MUI_UNICON "..\..\build\windows\icon.ico"
+; Icon paths are relative to the .nsi file location
+!define MUI_ICON "icon.ico"
+!define MUI_UNICON "icon.ico"
 
 ; Welcome page
 !insertmacro MUI_PAGE_WELCOME
@@ -68,10 +79,10 @@ Section "MainSection" SEC01
   SetOverwrite on
   
   ; Main application
-  File "..\..\..\dist\releases\installer-staging\${PRODUCT_NAME}.exe"
+  File "${STAGING_DIR}\${PRODUCT_NAME}.exe"
   
   ; Updater helper (required for auto-updates)
-  File "..\..\..\dist\releases\installer-staging\rawrequest-updater.exe"
+  File "${STAGING_DIR}\rawrequest-updater.exe"
   
   ; Create shortcuts
   CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"

@@ -145,12 +145,12 @@ jobs:
         shell: powershell
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path "dist/releases"
-          New-Item -ItemType Directory -Force -Path "dist/portable"
-          Copy-Item "build/bin/RawRequest.exe" "dist/portable/"
-          Copy-Item "build/bin/rawrequest-updater.exe" "dist/portable/"
-          Set-Content -Path "dist/portable/README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed.`n`nFor auto-updates to work, keep rawrequest-updater.exe in the same folder."
-          Compress-Archive -Path "dist/portable/*" -DestinationPath "dist/releases/RawRequest-$VERSION-windows-portable.zip"
+          New-Item -ItemType Directory -Force -Path "dist\releases"
+          New-Item -ItemType Directory -Force -Path "dist\portable"
+          Copy-Item "build\bin\RawRequest.exe" "dist\portable\"
+          Copy-Item "build\bin\rawrequest-updater.exe" "dist\portable\"
+          Set-Content -Path "dist\portable\README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed.`n`nFor auto-updates to work, keep rawrequest-updater.exe in the same folder."
+          Compress-Archive -Path "dist\portable\*" -DestinationPath "dist\releases\RawRequest-$VERSION-windows-portable.zip"
 
       - name: Install NSIS
         shell: powershell
@@ -161,10 +161,15 @@ jobs:
         shell: powershell
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path "dist/releases/installer-staging"
-          Copy-Item "build/bin/RawRequest.exe" "dist/releases/installer-staging/"
-          Copy-Item "build/bin/rawrequest-updater.exe" "dist/releases/installer-staging/"
-          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION "build/windows/installer.nsi"
+          New-Item -ItemType Directory -Force -Path "dist\releases\installer-staging"
+          Copy-Item "build\bin\RawRequest.exe" "dist\releases\installer-staging\"
+          Copy-Item "build\bin\rawrequest-updater.exe" "dist\releases\installer-staging\"
+          
+          # Debug: list staging directory contents
+          Write-Host "Staging directory contents:"
+          Get-ChildItem "dist\releases\installer-staging"
+          
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION "build\windows\installer.nsi"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
