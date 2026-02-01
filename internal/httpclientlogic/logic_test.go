@@ -58,3 +58,31 @@ func TestShouldSetDefaultContentType(t *testing.T) {
 		t.Fatalf("expected false")
 	}
 }
+
+func TestIsLocalhostURL(t *testing.T) {
+	cases := []struct {
+		url  string
+		want bool
+	}{
+		{"http://localhost:3000/api", true},
+		{"https://localhost/secure", true},
+		{"http://127.0.0.1:8080/", true},
+		{"https://127.0.0.1/test", true},
+		{"http://[::1]:8080/api", true},
+		{"https://[::1]/test", true},
+		{"http://api.localhost:3000/", true},
+		{"http://dev.localhost/test", true},
+		{"http://example.com/api", false},
+		{"https://google.com", false},
+		{"http://192.168.1.1:8080/", false},
+		{"http://myserver.local:3000/", false},
+		{"not a url", false},
+		{"", false},
+	}
+	for _, c := range cases {
+		got := IsLocalhostURL(c.url)
+		if got != c.want {
+			t.Errorf("IsLocalhostURL(%q) = %v, want %v", c.url, got, c.want)
+		}
+	}
+}

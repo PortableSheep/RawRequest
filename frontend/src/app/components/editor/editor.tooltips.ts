@@ -56,7 +56,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             const value = vars[varName];
             const displayValue = value.length > 100 ? value.slice(0, 100) + '...' : value;
             dom.innerHTML = `
-              <div class="tooltip-header">📦 Variable</div>
+              <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--var"></span>Variable</div>
               <div class="tooltip-name">${escapeHtml(varName)}</div>
               <div class="tooltip-value">${escapeHtml(displayValue)}</div>
               ${chainOrigin ? `<div class="tooltip-hint">${escapeHtml(chainOrigin)}</div>` : ''}
@@ -78,7 +78,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             const dom = document.createElement('div');
             dom.className = 'cm-variable-tooltip';
             dom.innerHTML = `
-              <div class="tooltip-header">🌍 Environment Variable</div>
+              <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--env"></span>Environment Variable</div>
               <div class="tooltip-name">${escapeHtml(currentEnvName)} → ${escapeHtml(varName)}</div>
               <div class="tooltip-value">${escapeHtml(displayValue)}</div>
             `;
@@ -102,7 +102,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
               const value = envs[envName][key];
               const displayValue = value.length > 100 ? value.slice(0, 100) + '...' : value;
               dom.innerHTML = `
-                <div class="tooltip-header">🌍 Environment Variable</div>
+                <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--env"></span>Environment Variable</div>
                 <div class="tooltip-name">${escapeHtml(envName)} → ${escapeHtml(key)}</div>
                 <div class="tooltip-value">${escapeHtml(displayValue)}</div>
               `;
@@ -127,7 +127,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             const dom = document.createElement('div');
             dom.className = 'cm-variable-tooltip' + (exists ? '' : ' cm-variable-undefined');
             dom.innerHTML = `
-              <div class="tooltip-header">🔐 Secret</div>
+              <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--secret"></span>Secret</div>
               <div class="tooltip-name">${escapeHtml(secretKey)}</div>
               <div class="tooltip-hint">${exists ? 'Resolved at runtime from vault' : 'Missing secret in current environment'}</div>
             `;
@@ -147,7 +147,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             const dom = document.createElement('div');
             dom.className = 'cm-variable-tooltip';
             dom.innerHTML = `
-              <div class="tooltip-header">🔗 Request Reference</div>
+              <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--link"></span>Request Reference</div>
               <div class="tooltip-name">${escapeHtml(reqMatch[1])}.${escapeHtml(reqMatch[2])}</div>
               <div class="tooltip-hint">Value resolved at runtime from previous request</div>
             `;
@@ -166,7 +166,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             const dom = document.createElement('div');
             dom.className = 'cm-variable-tooltip';
             dom.innerHTML = `
-              <div class="tooltip-header">🔗 Chain Variable</div>
+              <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--link"></span>Chain Variable</div>
               <div class="tooltip-name">${escapeHtml(varName)}</div>
               <div class="tooltip-hint">${escapeHtml(chainOrigin)}</div>
             `;
@@ -184,7 +184,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
           const dom = document.createElement('div');
           dom.className = 'cm-variable-tooltip cm-variable-undefined';
           dom.innerHTML = `
-            <div class="tooltip-header">⚠️ Undefined Variable</div>
+            <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--warn"></span>Undefined Variable</div>
             <div class="tooltip-name">${escapeHtml(varName)}</div>
             <div class="tooltip-hint">This variable is not defined</div>
           `;

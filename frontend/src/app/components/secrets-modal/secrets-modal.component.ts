@@ -17,15 +17,13 @@ export class SecretsModalComponent {
   allSecrets = input<SecretIndex>({});
   vaultInfo = input<VaultInfo | null>(null);
 
-  // Internal form state (not inputs)
-  // selectedEnv = '';
+  // Internal form state
   targetEnv = '';
   newKey = '';
   newValue = '';
   showValue = false;
-  filterText = '';
-  filterEnv = 'all';
   resetConfirmText = '';
+  showResetConfirm = false;
 
   private wasOpen = false;
 
@@ -34,7 +32,8 @@ export class SecretsModalComponent {
       const open = this.isOpen();
       if (open && !this.wasOpen) {
         this.targetEnv = (this.selectedEnv() || '').trim();
-		this.resetConfirmText = '';
+        this.resetConfirmText = '';
+        this.showResetConfirm = false;
       }
       this.wasOpen = open;
     });
@@ -51,6 +50,10 @@ export class SecretsModalComponent {
   @HostListener('document:keydown.escape')
   handleEscape(): void {
     if (!this.isOpen()) return;
+    if (this.showResetConfirm) {
+      this.cancelReset();
+      return;
+    }
     this.onClose.emit();
   }
 
@@ -64,24 +67,29 @@ export class SecretsModalComponent {
     this.showValue = !this.showValue;
   }
 
-  getFilteredSecrets(): Record<string, string[]> {
+  /** Flatten secrets index into a sorted array for table display */
+  getFlatSecretList(): Array<{env: string, key: string}> {
     const all = this.allSecrets() || {};
-    const q = this.filterText.trim().toLowerCase();
-    const envFilter = (this.filterEnv || 'all').trim();
-
-    const result: Record<string, string[]> = {};
-    for (const env of Object.keys(all)) {
-      if (envFilter !== 'all' && env !== envFilter) continue;
+    const result: Array<{env: string, key: string}> = [];
+    
+    // Sort environments: 'default' first, then alphabetically
+    const envs = Object.keys(all).sort((a, b) => {
+      if (a === 'default') return -1;
+      if (b === 'default') return 1;
+      return a.localeCompare(b);
+    });
+    
+    for (const env of envs) {
       const keys = all[env] || [];
-      const filtered = q ? keys.filter((k) => k.toLowerCase().includes(q)) : keys;
-      if (filtered.length) result[env] = filtered;
+      for (const key of keys.sort()) {
+        result.push({ env, key });
+      }
     }
     return result;
   }
 
   handleSave() {
     if (!this.newKey || !this.newValue) {
-      alert('Please fill in all fields');
       return;
     }
     this.onSave.emit({
@@ -97,10 +105,21 @@ export class SecretsModalComponent {
     this.onExport.emit();
   }
 
-  triggerReset() {
-  if (!this.isResetEnabled) return;
+  confirmReset() {
+    this.showResetConfirm = true;
+    this.resetConfirmText = '';
+  }
+
+  cancelReset() {
+    this.showResetConfirm = false;
+    this.resetConfirmText = '';
+  }
+
+  executeReset() {
+    if (!this.isResetEnabled) return;
     this.onResetVault.emit();
-  this.resetConfirmText = '';
+    this.showResetConfirm = false;
+    this.resetConfirmText = '';
   }
 
   get isResetEnabled(): boolean {

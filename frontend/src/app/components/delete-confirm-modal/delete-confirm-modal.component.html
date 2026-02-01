@@ -2,7 +2,10 @@
   <div class="rr-modal-shell">
     <div class="rr-modal delete-confirm-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="delete-modal-title">
       <div class="rr-modal__header">
-        <h3 id="delete-modal-title" class="rr-modal__title">🗑️ Delete Secret</h3>
+        <h3 id="delete-modal-title" class="rr-modal__title">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--danger" style="vertical-align: middle; margin-right: 6px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete Secret
+        </h3>
         <button type="button" class="rr-icon-btn rr-modal__close" (click)="onCancel.emit()" aria-label="Close modal">
           <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 6L6 18M6 6l12 12"></path>

@@ -21,11 +21,11 @@ export function getAllSnippetCategories(): ScriptSnippet['category'][] {
 }
 
 const CATEGORY_LABELS: Record<ScriptSnippet['category'], string> = {
-  variables: '📦 Variables',
-  assertions: '✓ Assertions',
-  response: '📥 Response',
-  request: '📤 Request',
-  utility: '🔧 Utility'
+  variables: 'Variables',
+  assertions: 'Assertions',
+  response: 'Response',
+  request: 'Request',
+  utility: 'Utility'
 };
 
 export function getCategoryLabel(category: ScriptSnippet['category']): string {

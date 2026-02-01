@@ -134,7 +134,11 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 		req.Close = true
 	}
 
-	client := &http.Client{}
+	transport := &http.Transport{}
+	if hcl.IsLocalhostURL(url) {
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	client := &http.Client{Transport: transport}
 	if timeoutMs > 0 {
 		client.Timeout = time.Duration(timeoutMs) * time.Millisecond
 	}

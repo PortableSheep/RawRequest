@@ -3,6 +3,7 @@ package httpclientlogic
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"runtime"
 	"strings"
 )
@@ -43,4 +44,15 @@ func BuildDefaultUserAgent(version string) string {
 		ua = fmt.Sprintf("RawRequest/%s", version)
 	}
 	return fmt.Sprintf("%s (Wails; %s/%s)", ua, runtime.GOOS, runtime.GOARCH)
+}
+
+// IsLocalhostURL returns true if the URL points to localhost (127.0.0.1, ::1, or localhost hostname)
+func IsLocalhostURL(rawURL string) bool {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := parsed.Hostname()
+	return host == "localhost" || host == "127.0.0.1" || host == "::1" ||
+		strings.HasSuffix(host, ".localhost")
 }
