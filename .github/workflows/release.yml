@@ -161,15 +161,21 @@ jobs:
         shell: powershell
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path "dist\releases\installer-staging"
-          Copy-Item "build\bin\RawRequest.exe" "dist\releases\installer-staging\"
-          Copy-Item "build\bin\rawrequest-updater.exe" "dist\releases\installer-staging\"
+          $RepoRoot = (Get-Location).Path
+          $StagingDir = Join-Path $RepoRoot "dist\releases\installer-staging"
+          $OutDir = Join-Path $RepoRoot "dist\releases"
+          
+          New-Item -ItemType Directory -Force -Path $StagingDir
+          Copy-Item "build\bin\RawRequest.exe" "$StagingDir\"
+          Copy-Item "build\bin\rawrequest-updater.exe" "$StagingDir\"
           
           # Debug: list staging directory contents
           Write-Host "Staging directory contents:"
-          Get-ChildItem "dist\releases\installer-staging"
+          Get-ChildItem $StagingDir
+          Write-Host "StagingDir: $StagingDir"
+          Write-Host "OutDir: $OutDir"
           
-          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION "build\windows\installer.nsi"
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION /DSTAGING_DIR="$StagingDir" /DOUT_DIR="$OutDir" "build\windows\installer.nsi"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
