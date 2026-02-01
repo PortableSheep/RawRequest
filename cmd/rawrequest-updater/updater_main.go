@@ -434,18 +434,100 @@ func applyUpdate(installPath, newPayloadPath string) error {
 		return nil
 	}
 
-	// Windows/other: installPath is install directory; newPayloadPath is extracted directory
-	backup := installPath + ".old-" + stamp
-	if _, err := os.Stat(installPath); err == nil {
-		if err := os.Rename(installPath, backup); err != nil {
-			return fmt.Errorf("failed to backup existing install dir: %w", err)
+	// Windows: installPath is install directory; newPayloadPath is extracted directory
+	// We can't rename the whole directory while the updater is running from within it.
+	// Instead, copy files from newPayloadPath into installPath, backing up old files.
+	return applyUpdateWindows(installPath, newPayloadPath, stamp)
+}
+
+func applyUpdateWindows(installPath, newPayloadPath, stamp string) error {
+	backupDir := installPath + ".backup-" + stamp
+	if err := os.MkdirAll(backupDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create backup dir: %w", err)
+	}
+
+	// Walk the new payload and copy each file
+	err := filepath.WalkDir(newPayloadPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
+
+		rel, err := filepath.Rel(newPayloadPath, path)
+		if err != nil {
+			return err
+		}
+		if rel == "." {
+			return nil
+		}
+
+		destPath := filepath.Join(installPath, rel)
+		backupPath := filepath.Join(backupDir, rel)
+
+		if d.IsDir() {
+			return os.MkdirAll(destPath, 0o755)
+		}
+
+		// Skip the updater itself - we can't replace ourselves while running
+		if strings.EqualFold(d.Name(), "rawrequest-updater.exe") {
+			// Copy new updater to a temp location; it will be moved on next launch
+			pendingUpdater := filepath.Join(installPath, "rawrequest-updater.exe.new")
+			return copyFileSimple(path, pendingUpdater)
+		}
+
+		// Backup existing file if it exists
+		if _, err := os.Stat(destPath); err == nil {
+			if err := os.MkdirAll(filepath.Dir(backupPath), 0o755); err != nil {
+				return err
+			}
+			// On Windows, we may not be able to rename a file that's in use,
+			// so try to copy it to backup instead
+			if err := copyFileSimple(destPath, backupPath); err != nil {
+				fmt.Printf("Warning: could not backup %s: %v\n", rel, err)
+			}
+		}
+
+		// Copy new file to destination
+		if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
+			return err
+		}
+
+		// Try to remove the old file first (may fail if in use, but that's okay for most files)
+		_ = os.Remove(destPath)
+
+		return copyFileSimple(path, destPath)
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to apply update files: %w", err)
 	}
-	if err := os.Rename(newPayloadPath, installPath); err != nil {
-		_ = os.Rename(backup, installPath)
-		return fmt.Errorf("failed to move new install into place: %w", err)
-	}
+
+	// Clean up backup dir (best effort)
+	// We keep it around for now in case user needs to manually restore
+	fmt.Printf("Backup saved to: %s\n", backupDir)
+
 	return nil
+}
+
+func copyFileSimple(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	info, err := in.Stat()
+	if err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(dst, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, info.Mode())
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }
 
 func relaunch(installPath string) error {
