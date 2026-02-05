@@ -315,7 +315,8 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
               (lower.startsWith('@name') ||
                 lower.startsWith('@depends') ||
                 lower.startsWith('@timeout') ||
-                lower.startsWith('@load'))
+                lower.startsWith('@load') ||
+                lower.startsWith('@no-history'))
             ) {
               diagnostics.push({
                 from: child.from,

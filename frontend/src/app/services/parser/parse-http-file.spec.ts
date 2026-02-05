@@ -93,4 +93,33 @@ describe('parser/parse-http-file', () => {
     expect(parsed.requests[0].url).toBe('https://example.com/one');
     expect(parsed.requests[1].url).toBe('https://example.com/two');
   });
+
+  it('parses @no-history directive (standalone)', () => {
+    const parsed = parseHttpFile([
+      '@no-history',
+      'GET https://example.com/phi-data',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].noHistory).toBe(true);
+  });
+
+  it('parses @no-history directive (with trailing content)', () => {
+    const parsed = parseHttpFile([
+      '@no-history // This request contains PHI',
+      'GET https://example.com/phi-data',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].noHistory).toBe(true);
+  });
+
+  it('noHistory defaults to undefined when not specified', () => {
+    const parsed = parseHttpFile([
+      'GET https://example.com/normal',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].noHistory).toBeUndefined();
+  });
 });

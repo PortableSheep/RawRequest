@@ -30,6 +30,7 @@ export type PendingMetadata = {
   depends?: string;
   loadTest?: any;
   options?: { timeout?: number };
+  noHistory?: boolean;
 };
 
 export type ParseHttpFileDeps = {
@@ -191,6 +192,13 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
         }
         pendingMetadata.options.timeout = timeoutValue;
       }
+      i++;
+      continue;
+    }
+
+    // @no-history directive - response will NOT be saved to disk (for PHI/sensitive data)
+    if (line === '@no-history' || line.startsWith('@no-history ')) {
+      pendingMetadata.noHistory = true;
       i++;
       continue;
     }

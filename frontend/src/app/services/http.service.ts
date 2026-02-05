@@ -158,13 +158,13 @@ export class HttpService {
     } as any);
   }
 
-  async addToHistory(fileId: string, item: HistoryItem, filePath?: string): Promise<HistoryItem[]> {
+  async addToHistory(fileId: string, item: HistoryItem, filePath?: string, options?: { noHistory?: boolean }): Promise<HistoryItem[]> {
     return await addToHistoryHelper(fileId, item, filePath, {
       backend: this.backend,
       dirname,
       basename,
       log: { error: console.error, warn: console.warn, debug: console.debug }
-    } as any);
+    } as any, options);
   }
 
   // File management

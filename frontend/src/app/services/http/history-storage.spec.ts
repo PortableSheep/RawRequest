@@ -114,4 +114,62 @@ describe('history-storage', () => {
     expect(next).toHaveLength(1);
     expect(next[0].method).toBe('PUT');
   });
+
+  it('addToHistory with noHistory=true skips saving response to disk', async () => {
+    const { deps, store } = makeDeps();
+    store.run = JSON.stringify([{ timestamp: '2020-01-01T00:00:00.000Z', method: 'GET' }]);
+
+    const newItem = {
+      timestamp: new Date('2020-01-02T00:00:00.000Z'),
+      responseData: {
+        status: 200,
+        statusText: 'OK',
+        responseTime: 100,
+        requestPreview: { method: 'POST', url: 'https://example.com/phi-data' }
+      }
+    } as any;
+
+    const next = await addToHistory(
+      'id',
+      newItem,
+      undefined,
+      deps as any,
+      { noHistory: true }
+    );
+
+    // Should NOT have saved response to disk
+    expect(store.savedResponse).toBeUndefined();
+    // Should have logged the skip
+    expect(deps.log.debug).toHaveBeenCalledWith(expect.stringContaining('Skipping history save'));
+    // Should still return existing history
+    expect(next).toHaveLength(1);
+    expect(next[0].method).toBe('GET');
+  });
+
+  it('addToHistory with noHistory=false saves response normally', async () => {
+    const { deps, store } = makeDeps();
+    store.run = JSON.stringify([]);
+
+    const newItem = {
+      timestamp: new Date('2020-01-02T00:00:00.000Z'),
+      responseData: {
+        status: 200,
+        statusText: 'OK',
+        responseTime: 100,
+        requestPreview: { method: 'POST', url: 'https://example.com' }
+      }
+    } as any;
+
+    const next = await addToHistory(
+      'id',
+      newItem,
+      undefined,
+      deps as any,
+      { noHistory: false }
+    );
+
+    // Should have saved response
+    expect(store.savedResponse).toContain('"status": 200');
+    expect(next).toHaveLength(1);
+  });
 });

@@ -8,7 +8,8 @@ export interface Request {
   preScript?: string;
   postScript?: string;
   depends?: string;  // Name of request to execute first
-  loadTest?: LoadTestConfig;  // Load test configuration
+  loadTest?: LoadTestConfig;
+  noHistory?: boolean;
   options?: {
     timeout?: number;
     noRedirect?: boolean;
@@ -58,7 +59,6 @@ export interface ChainEntryPreview {
 }
 
 export interface LoadTestConfig {
-  // Locust-ish terminology support (parsed from @load ...)
   // Concurrency / users
   concurrent?: number;
   users?: number;

@@ -1,7 +1,7 @@
 export const METHOD_LINE_REGEX = /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS|TRACE|CONNECT)\s+/i;
 export const DEPENDS_LINE_REGEX = /^@depends\s+/i;
 export const LOAD_LINE_REGEX = /^@load\s+/i;
-export const ANNOTATION_LINE_REGEX = /^@(name|depends|load|timeout)\s+/i;
+export const ANNOTATION_LINE_REGEX = /^@(name|depends|load|timeout|no-history)\s*/i;
 export const SEPARATOR_LINE_REGEX = /^\s*###\s+\S/;
 export const SEPARATOR_PREFIX_REGEX = /^\s*###\s+/;
 

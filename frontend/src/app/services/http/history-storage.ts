@@ -19,6 +19,10 @@ export type HistoryStorageDeps = {
   };
 };
 
+export type AddToHistoryOptions = {
+  noHistory?: boolean;
+};
+
 export async function loadHistory(fileId: string, filePath: string | undefined, deps: HistoryStorageDeps): Promise<HistoryItem[]> {
   if (!fileId) {
     return [];
@@ -46,8 +50,14 @@ export async function addToHistory(
   fileId: string,
   item: HistoryItem,
   filePath: string | undefined,
-  deps: HistoryStorageDeps
+  deps: HistoryStorageDeps,
+  options?: AddToHistoryOptions
 ): Promise<HistoryItem[]> {
+  if (options?.noHistory) {
+    deps.log?.debug?.('[HTTP Service] Skipping history save (noHistory flag set for PHI/sensitive data)');
+    return await loadHistory(fileId, filePath, deps);
+  }
+
   try {
     if (filePath) {
       const saved = await deps.backend.saveResponseFile(filePath, JSON.stringify(item.responseData, null, 2));

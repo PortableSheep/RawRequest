@@ -37,12 +37,10 @@ export class RequestManagerComponent {
   private httpService = inject(HttpService);
   private notificationService = inject(NotificationService);
 
-  // Inputs
   files = input.required<FileTab[]>();
   currentFileIndex = input.required<number>();
   currentEnv = input.required<string>();
 
-  // Outputs
   filesChange = output<FileTab[]>();
   currentFileIndexChange = output<number>();
   currentEnvChange = output<string>();
@@ -55,9 +53,7 @@ export class RequestManagerComponent {
   private activeRequestId: string | null = null;
   private lastExecutedRequestIndex: number | null = null;
 
-  // Execute a request by index
   async executeRequestByIndex(requestIndex: number, requestId?: string): Promise<void> {
-    // Prevent duplicate execution of the same request
     if (
       shouldSkipDuplicateExecution({
         executingRequest: this.executingRequest,
@@ -72,12 +68,11 @@ export class RequestManagerComponent {
     await this.executeRequest(requestIndex, requestId);
   }
 
-  // Request execution
   async executeRequest(requestIndex: number, requestId?: string): Promise<void> {
     const currentFile = this.files()[this.currentFileIndex()];
     if (!currentFile || !currentFile.requests[requestIndex]) return;
 
-    if (this.executingRequest) return; // Prevent duplicate execution
+    if (this.executingRequest) return;
     this.executingRequest = true;
 
     const request = currentFile.requests[requestIndex];
@@ -86,24 +81,20 @@ export class RequestManagerComponent {
     this.activeRequestId = requestId ?? buildRequestId(currentFile.id, requestIndex, Date.now());
 
     try {
-      // Check if this is a load test
       if (request.loadTest) {
         await this.executeLoadTest(requestIndex, envName, this.activeRequestId);
         return;
       }
 
-      // Check if this is a chained request
       if (request.depends) {
         await this.executeChainedRequest(requestIndex, envName, this.activeRequestId ?? undefined);
         return;
       }
 
-      // Regular single request
       const response = await this.httpService.sendRequest(request, variables, this.activeRequestId ?? undefined, envName);
       const chainItems = this.buildChainItems([request], [response.requestPreview], [response], 0);
       const responseWithChain = { ...response, chainItems };
 
-      // Update response data
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, responseWithChain);
       this.filesChange.emit(updatedFiles);
 
@@ -114,21 +105,20 @@ export class RequestManagerComponent {
         response: responseWithChain
       });
 
-      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
-      // Save a response file next to the http file (if present)
-      try {
-        const { SaveResponseFile } = await import('@wailsjs/go/main/App');
-        if (currentFile.filePath) {
-          const saved = await SaveResponseFile(currentFile.filePath, JSON.stringify(responseWithChain, null, 2));
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: request.noHistory });
+
+      if (!request.noHistory) {
+        try {
+          const { SaveResponseFile } = await import('@wailsjs/go/main/App');
+          if (currentFile.filePath) {
+            const saved = await SaveResponseFile(currentFile.filePath, JSON.stringify(responseWithChain, null, 2));
+          }
+        } catch (err) {
+          console.warn('Failed to save response file:', err);
         }
-      } catch (err) {
-        console.warn('Failed to save response file:', err);
       }
 
-      // Send notification if app is in background
       this.notificationService.notifyRequestComplete(request.name, response.status, response.responseTime);
-
-      // Emit execution result
       this.requestExecuted.emit({ requestIndex, response: responseWithChain });
     } catch (error: any) {
       if (this.isCancellationError(error)) {
@@ -147,14 +137,13 @@ export class RequestManagerComponent {
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedError);
       this.filesChange.emit(updatedFiles);
 
-      // Add error to history too
       const errorHistoryItem: HistoryItem = buildHistoryItem({
         now: new Date(),
         method: request.method,
         fallbackUrl: request.url,
         response: decoratedError
       });
-      await this.pushHistoryEntry(currentFile.id, errorHistoryItem, currentFile.filePath);
+      await this.pushHistoryEntry(currentFile.id, errorHistoryItem, currentFile.filePath, { noHistory: request.noHistory });
 
       this.requestExecuted.emit({ requestIndex, response: decoratedError });
     } finally {
@@ -173,17 +162,15 @@ export class RequestManagerComponent {
     return getActiveEnvNameForFile(currentFile, this.currentEnv());
   }
 
-  // Execute chained requests
   private async executeChainedRequest(requestIndex: number, envName: string, requestId?: string): Promise<void> {
     const currentFile = this.files()[this.currentFileIndex()];
     const request = currentFile.requests[requestIndex];
     const variables = this.getCombinedVariables();
 
     try {
-      // Find all requests in the chain
       const chain = this.buildRequestChain(requestIndex);
+      const chainHasNoHistory = chain.some(r => r.noHistory);
 
-      // Execute the chain using Go backend
       const execution = await this.httpService.executeChain(chain, variables, requestId, envName);
       const responses = execution.responses;
 
@@ -195,7 +182,6 @@ export class RequestManagerComponent {
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedLastResponse);
       this.filesChange.emit(updatedFiles);
 
-      // Add to history
       const historyItem: HistoryItem = buildHistoryItem({
         now: new Date(),
         method: request.method,
@@ -203,9 +189,8 @@ export class RequestManagerComponent {
         response: decoratedLastResponse
       });
 
-      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: chainHasNoHistory });
 
-      // Send notification if app is in background
       const totalDuration = responses.reduce((sum, r) => sum + (r?.responseTime || 0), 0);
       const allSuccessful = responses.every(r => r && r.status >= 200 && r.status < 300);
       this.notificationService.notifyChainComplete(responses.length, totalDuration, allSuccessful);
@@ -232,7 +217,6 @@ export class RequestManagerComponent {
     }
   }
 
-  // Build chain of requests by following @depends
   private buildRequestChain(requestIndex: number): Request[] {
     const currentFile = this.files()[this.currentFileIndex()];
     return buildRequestChain(currentFile.requests, requestIndex);
@@ -296,7 +280,7 @@ export class RequestManagerComponent {
         response: summaryResponse
       });
 
-      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath);
+      await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: request.noHistory });
 
       // Send notification if app is in background
       this.notificationService.notifyLoadTestComplete(
@@ -322,8 +306,8 @@ export class RequestManagerComponent {
     }
   }
 
-  private async pushHistoryEntry(fileId: string, entry: HistoryItem, filePath?: string) {
-    const history = await this.httpService.addToHistory(fileId, entry, filePath);
+  private async pushHistoryEntry(fileId: string, entry: HistoryItem, filePath?: string, options?: { noHistory?: boolean }) {
+    const history = await this.httpService.addToHistory(fileId, entry, filePath, options);
     this.history = history;
     this.historyUpdated.emit({ fileId, history });
   }

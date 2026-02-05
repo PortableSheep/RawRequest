@@ -18,7 +18,7 @@ export const CONTENT_TYPES = [
 ] as const;
 
 export const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'] as const;
-export const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env'] as const;
+export const ANNOTATIONS = ['@name', '@depends', '@load', '@timeout', '@env', '@no-history'] as const;
 
 export type LoadTestKey = { label: string; detail: string };
 

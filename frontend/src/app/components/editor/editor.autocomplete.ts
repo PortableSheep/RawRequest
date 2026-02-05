@@ -157,7 +157,7 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
   }
 
   // Check for annotation completion at start of line: @
-  if (lineType === 'AnnotationLine' && textBeforeCursor.match(/^@[a-z]*$/i)) {
+  if (lineType === 'AnnotationLine' && textBeforeCursor.match(/^@[a-z\-]*$/i)) {
     const prefix = textBeforeCursor.slice(1);
     const from = context.pos - prefix.length - 1;
     return {
@@ -165,9 +165,9 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
       options: ANNOTATIONS.map(a => ({
         label: a,
         type: 'keyword',
-        detail: a === '@timeout' ? 'timeout in ms' : ''
+        detail: a === '@timeout' ? 'timeout in ms' : a === '@no-history' ? 'skip saving response to disk (PHI)' : ''
       })),
-      validFor: /^@?[a-z]*$/i
+      validFor: /^@?[a-z\-]*$/i
     };
   }
 

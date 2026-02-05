@@ -1,8 +1,7 @@
 @if (isDrawerVisible()) {
   <div class="console-drawer">
     <div #drawerShell class="console-drawer__shell" aria-hidden="false">
-      <!-- Resize handle -->
-      <div 
+      <div
         class="resize-handle"
         (mousedown)="startResize($event)"
         (touchstart)="startResize($event)"

@@ -342,7 +342,62 @@ X-API-Key: {{apiKey}}
 X-Client-ID: client-demo
 
 ###############################################################################
-# 9. COMPLEX WORKFLOWS
+# 9. SENSITIVE DATA / PHI PROTECTION
+###############################################################################
+# Use @no-history to prevent responses from being saved to disk.
+# This is essential for requests that return PHI (Protected Health Information)
+# or other sensitive data that should never be persisted.
+#
+# When @no-history is set:
+#   - The response is NOT written to the .responses/ folder
+#   - The response is NOT saved to history files on disk
+#   - The response is still displayed in the UI for the current session
+#   - Once you close/navigate away, the response is gone forever
+#
+# Use this for:
+#   - Patient records / medical data (HIPAA compliance)
+#   - Financial data (PCI-DSS compliance)
+#   - Personal identifiable information (GDPR compliance)
+#   - Any data you don't want persisted to disk
+
+### PHI Request Example - response will NOT be saved to disk
+@name phiDataRequest
+@no-history
+GET https://httpbun.com/json
+Accept: application/json
+
+> {
+  // This response will be visible in the UI but never written to disk
+  console.log('PHI data received (not persisted):', response.status);
+}
+
+### Sensitive data in a chain - if ANY request has @no-history, whole chain skips history
+@name sensitiveAuth
+POST https://httpbun.com/post
+Content-Type: application/json
+
+{
+  "action": "authenticate"
+}
+
+> {
+  setVar('sensitiveToken', 'secret-' + Math.random().toString(36).substr(2, 9));
+}
+
+### PHI request depending on auth
+@name phiWithAuth
+@depends sensitiveAuth
+@no-history
+GET https://httpbun.com/get
+Authorization: Bearer {{sensitiveToken}}
+
+> {
+  // Even the auth request response won't be saved since this request has @no-history
+  console.log('Sensitive chain completed - no history saved');
+}
+
+###############################################################################
+# 10. COMPLEX WORKFLOWS
 ###############################################################################
 # Combine multiple features for complex API workflows
 
@@ -419,7 +474,7 @@ X-Session-ID: {{sessionId}}
 }
 
 ###############################################################################
-# 10. ERROR HANDLING
+# 11. ERROR HANDLING
 ###############################################################################
 
 ### Handle 404 error
@@ -445,7 +500,7 @@ GET https://httpbun.com/status/500
 }
 
 ###############################################################################
-# 11. GRAPHQL REQUESTS
+# 12. GRAPHQL REQUESTS
 ###############################################################################
 
 ### GraphQL query
@@ -477,7 +532,7 @@ Content-Type: application/json
 }
 
 ###############################################################################
-# 12. FILE UPLOAD (MULTIPART)
+# 13. FILE UPLOAD (MULTIPART)
 ###############################################################################
 
 ### Upload file with multipart/form-data
@@ -509,7 +564,7 @@ documents
 --boundary123--
 
 ###############################################################################
-# 13. CUSTOM HEADERS & AUTHENTICATION
+# 14. CUSTOM HEADERS & AUTHENTICATION
 ###############################################################################
 
 ### Basic Authentication
@@ -540,7 +595,7 @@ Accept-Language: en-US,en;q=0.9
 Cache-Control: no-cache
 
 ###############################################################################
-# 14. DIFFERENT CONTENT TYPES
+# 15. DIFFERENT CONTENT TYPES
 ###############################################################################
 
 ### JSON request
@@ -588,7 +643,7 @@ This is plain text content.
 It can span multiple lines.
 
 ###############################################################################
-# 15. QUERY PARAMETERS & DYNAMIC URLS
+# 16. QUERY PARAMETERS & DYNAMIC URLS
 ###############################################################################
 
 ### URL with query parameters
@@ -600,7 +655,7 @@ GET https://httpbun.com/get?search={{userName}}&page=1&limit=10&sort=desc
 GET {{baseUrl}}/api/{{apiVersion}}/users/{{userId}}/profile?include=posts,comments
 
 ###############################################################################
-# 16. TESTING & DEBUGGING
+# 17. TESTING & DEBUGGING
 ###############################################################################
 
 ### Timeout override (per-request)
