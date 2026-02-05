@@ -124,15 +124,58 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           wails build -platform windows/amd64 -ldflags "-X main.Version=${VERSION}"
 
+      - name: Build updater helper with UAC manifest
+        shell: bash
+        run: |
+          # Install go-winres for embedding UAC manifest
+          go install github.com/tc-hib/go-winres@latest
+          
+          # Generate Windows resource file with UAC manifest
+          cd cmd/rawrequest-updater
+          go-winres make --arch amd64
+          cd ../..
+          
+          # Build updater with embedded manifest
+          CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o "build/bin/rawrequest-updater.exe" ./cmd/rawrequest-updater
+          
+          # Clean up generated .syso file
+          rm -f cmd/rawrequest-updater/*.syso
+
       - name: Create portable ZIP
         shell: powershell
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
-          New-Item -ItemType Directory -Force -Path "dist/releases"
-          New-Item -ItemType Directory -Force -Path "dist/portable"
-          Copy-Item "build/bin/RawRequest.exe" "dist/portable/"
-          Set-Content -Path "dist/portable/README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed."
-          Compress-Archive -Path "dist/portable/*" -DestinationPath "dist/releases/RawRequest-$VERSION-windows-portable.zip"
+          New-Item -ItemType Directory -Force -Path "dist\releases"
+          New-Item -ItemType Directory -Force -Path "dist\portable"
+          Copy-Item "build\bin\RawRequest.exe" "dist\portable\"
+          Copy-Item "build\bin\rawrequest-updater.exe" "dist\portable\"
+          Set-Content -Path "dist\portable\README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed.`n`nFor auto-updates to work, keep rawrequest-updater.exe in the same folder."
+          Compress-Archive -Path "dist\portable\*" -DestinationPath "dist\releases\RawRequest-$VERSION-windows-portable.zip"
+
+      - name: Install NSIS
+        shell: powershell
+        run: |
+          choco install nsis -y
+
+      - name: Create Windows Installer
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          $RepoRoot = (Get-Location).Path
+          $StagingDir = Join-Path $RepoRoot "dist\releases\installer-staging"
+          $OutDir = Join-Path $RepoRoot "dist\releases"
+          
+          New-Item -ItemType Directory -Force -Path $StagingDir
+          Copy-Item "build\bin\RawRequest.exe" "$StagingDir\"
+          Copy-Item "build\bin\rawrequest-updater.exe" "$StagingDir\"
+          
+          # Debug: list staging directory contents
+          Write-Host "Staging directory contents:"
+          Get-ChildItem $StagingDir
+          Write-Host "StagingDir: $StagingDir"
+          Write-Host "OutDir: $OutDir"
+          
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION /DSTAGING_DIR="$StagingDir" /DOUT_DIR="$OutDir" "build\windows\installer.nsi"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4

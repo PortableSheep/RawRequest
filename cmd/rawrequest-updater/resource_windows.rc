@@ -1,0 +1,4 @@
+#include <winuser.h>
+
+// Embed the manifest for UAC elevation
+1 RT_MANIFEST "rawrequest-updater.exe.manifest"
