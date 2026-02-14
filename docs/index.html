@@ -31,7 +31,7 @@
         <div class="hero-text">
           <p class="eyebrow">Desktop HTTP client</p>
           <h1>Code-first requests, on desktop.</h1>
-          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. History stays next to your file.</p>
+          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. Use the GUI or CLI. History stays next to your file.</p>
           <div class="hero-actions">
             <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
             <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
@@ -120,6 +120,10 @@ Accept: application/json
             <h3>Scripts & chaining</h3>
             <p>Pre/post scripts (goja) with <code>setVar</code>/<code>getVar</code>, request patching, and simple assertions via <code>assert(...)</code>.</p>
           </div>
+          <div class="card">
+            <h3>CLI mode</h3>
+            <p>Run named requests from the terminal with <code>rawrequest run file.http -n requestName</code>. Perfect for scripting and CI.</p>
+          </div>
         </div>
       </section>
 
@@ -172,8 +176,14 @@ brew install --cask rawrequest</code></pre>
             <h3>Windows</h3>
             <p>Download <code>RawRequest-*-windows-portable.zip</code>, extract it, and run <code>RawRequest.exe</code>.</p>
             <p>If SmartScreen warns you, choose “More info” → “Run anyway”.</p>
-          </div>
-          <div class="card">
+          </div>          <div class="card">
+            <h3>CLI Usage</h3>
+            <p>Run requests from the terminal:</p>
+            <pre class="code"><code>rawrequest run api.http -n login -e prod
+rawrequest run api.http -n getData -o body | jq .
+rawrequest list api.http
+rawrequest help</code></pre>
+          </div>          <div class="card">
             <h3>License</h3>
             <p>RawRequest is licensed under the PolyForm Noncommercial License 1.0.0.</p>
             <p><a href="https://github.com/portablesheep/RawRequest/blob/main/LICENSE" target="_blank" rel="noreferrer">Read the license</a></p>

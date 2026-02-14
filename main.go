@@ -2,6 +2,9 @@ package main
 
 import (
 	"embed"
+	"os"
+
+	"rawrequest/internal/cli"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -16,7 +19,13 @@ var assets embed.FS
 var examplesFS embed.FS
 
 func main() {
-	// Create an instance of the app structure
+	// Check for CLI mode
+	if opts := cli.Parse(os.Args); opts != nil {
+		exitCode := cli.Run(opts, Version)
+		os.Exit(exitCode)
+	}
+
+	// GUI mode - Create an instance of the app structure
 	app := NewApp()
 
 	// Create application with options

@@ -17,6 +17,7 @@ Built with [Wails](https://wails.io/) and Angular.
 ## Features
 
 - **HTTP file format**: run requests from `.http` files
+- **CLI mode**: run named requests from the terminal for scripting/CI
 - **Request chaining**: chain requests with `@depends`
 - **Load testing**: built-in load testing with `@load`
 - **Secrets**: encrypted vault + `{{secret:key}}` placeholders
@@ -108,6 +109,32 @@ Authorization: Bearer {{token}}
 Notes:
 - Env vars support either whitespace or an equals sign (e.g. `@env.dev.baseUrl https://...` or `@env.dev.baseUrl = https://...`).
 - Assertions are done in scripts via `assert(...)`.
+
+## CLI Mode
+
+RawRequest can also run from the command line for scripting, automation, and CI pipelines:
+
+```bash
+# Run a named request
+rawrequest run requests.http -n login
+
+# Use a specific environment
+rawrequest run requests.http -n getUsers -e prod
+
+# Set variables from the command line
+rawrequest run requests.http -n createUser -V "username=john" -V "email=john@example.com"
+
+# Output formats: json, body, full, quiet
+rawrequest run requests.http -n getData -o body | jq .
+
+# List all requests in a file
+rawrequest list requests.http
+
+# List available environments
+rawrequest envs requests.http
+```
+
+Run `rawrequest help` for full usage details.
 
 ## Documentation
 
