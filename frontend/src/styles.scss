@@ -88,21 +88,20 @@ body::before {
   background:
     radial-gradient(
       circle at 20% 20%,
-      rgba(37, 99, 235, 0.12),
-      transparent 45%
+      rgba(37, 99, 235, 0.03),
+      transparent 50%
     ),
     radial-gradient(
       circle at 80% 0%,
-      rgba(236, 72, 153, 0.08),
-      transparent 40%
+      rgba(236, 72, 153, 0.02),
+      transparent 50%
     ),
     radial-gradient(
       circle at 50% 80%,
-      rgba(16, 185, 129, 0.12),
-      transparent 45%
+      rgba(16, 185, 129, 0.03),
+      transparent 50%
     ),
     #050506;
-  filter: saturate(108%);
 }
 
 body::after {
@@ -113,8 +112,8 @@ body::after {
   pointer-events: none;
   background: radial-gradient(
     circle at center,
-    rgba(5, 5, 9, 0) 35%,
-    rgba(5, 5, 9, 0.85) 100%
+    rgba(5, 5, 9, 0) 50%,
+    rgba(5, 5, 9, 0.5) 100%
   );
   mix-blend-mode: multiply;
 }
@@ -161,26 +160,25 @@ html[data-theme="light"] {
 
 html[data-theme="light"] body::before {
   background:
-    radial-gradient(circle at 15% 15%, rgba(37, 99, 235, 0.1), transparent 55%),
+    radial-gradient(circle at 15% 15%, rgba(37, 99, 235, 0.03), transparent 60%),
     radial-gradient(
       circle at 80% 0%,
-      rgba(236, 72, 153, 0.05),
-      transparent 55%
+      rgba(236, 72, 153, 0.015),
+      transparent 60%
     ),
     radial-gradient(
       circle at 50% 85%,
-      rgba(16, 185, 129, 0.08),
-      transparent 60%
+      rgba(16, 185, 129, 0.025),
+      transparent 65%
     ),
     #f8fafc;
-  filter: saturate(105%);
 }
 
 html[data-theme="light"] body::after {
   background: radial-gradient(
     circle at center,
-    rgba(248, 250, 252, 0) 40%,
-    rgba(241, 245, 249, 0.75) 100%
+    rgba(248, 250, 252, 0) 50%,
+    rgba(241, 245, 249, 0.5) 100%
   );
   mix-blend-mode: normal;
 }
@@ -1124,8 +1122,8 @@ body {
   border: 1px solid rgba(63, 63, 70, 0.6);
   box-shadow:
     0 25px 60px rgba(3, 7, 18, 0.6),
-    0 10px 25px rgba(59, 130, 246, 0.18);
-  backdrop-filter: blur(18px);
+    0 10px 25px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(12px);
   transition:
     transform 220ms ease,
     box-shadow 220ms ease,
@@ -1151,7 +1149,7 @@ html[data-theme="light"] .glass-panel {
   border: 1px solid rgba(148, 163, 184, 0.45);
   box-shadow:
     0 22px 55px rgba(15, 23, 42, 0.12),
-    0 10px 22px rgba(37, 99, 235, 0.1);
+    0 10px 22px rgba(0, 0, 0, 0.06);
 }
 
 html[data-theme="light"] .glass-panel::before {
@@ -1162,7 +1160,7 @@ html[data-theme="light"] .glass-panel::before {
   transform: translateY(-2px);
   box-shadow:
     0 35px 70px rgba(3, 7, 18, 0.7),
-    0 12px 35px rgba(59, 130, 246, 0.25);
+    0 12px 35px rgba(0, 0, 0, 0.2);
 }
 
 /* Static variant for large panels - no hover lift */
@@ -1188,8 +1186,8 @@ html[data-theme="light"] .glass-panel::before {
   border-radius: inherit;
   background: linear-gradient(
     120deg,
-    rgba(59, 130, 246, 0.4),
-    rgba(16, 185, 129, 0.35)
+    rgba(59, 130, 246, 0.2),
+    rgba(16, 185, 129, 0.18)
   );
   opacity: 0;
   transition: opacity 200ms ease;
@@ -1198,7 +1196,7 @@ html[data-theme="light"] .glass-panel::before {
 
 .btn-ambient:hover::before,
 .btn-ambient:focus-visible::before {
-  opacity: 0.5;
+  opacity: 0.35;
 }
 
 .btn-ambient:hover {
@@ -1208,15 +1206,15 @@ html[data-theme="light"] .glass-panel::before {
 .floating-overlay {
   box-shadow:
     0 30px 65px rgba(2, 6, 23, 0.8),
-    0 15px 40px rgba(59, 130, 246, 0.35);
+    0 15px 40px rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(148, 163, 184, 0.18);
-  backdrop-filter: blur(24px);
+  backdrop-filter: blur(14px);
 }
 
 html[data-theme="light"] .floating-overlay {
   box-shadow:
     0 25px 55px rgba(15, 23, 42, 0.14),
-    0 12px 30px rgba(37, 99, 235, 0.12);
+    0 12px 30px rgba(0, 0, 0, 0.08);
   border: 1px solid rgba(148, 163, 184, 0.45);
 }
 
@@ -1560,8 +1558,8 @@ html[data-theme="light"] .cm-selectionBackground {
   font-weight: 500;
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(59, 130, 246, 0.15);
-  backdrop-filter: blur(12px);
+    0 0 12px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
   animation: toast-enter 250ms ease-out;
 }
 

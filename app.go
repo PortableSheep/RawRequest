@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	"rawrequest/internal/importers"
 	rc "rawrequest/internal/requestchain"
 	rp "rawrequest/internal/responseparse"
 	rb "rawrequest/internal/ringbuffer"
@@ -164,6 +165,16 @@ func (a *App) variablesSnapshot() map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// ImportCollection imports a Postman or Bruno collection from the given path
+// and returns the generated .http file contents.
+func (a *App) ImportCollection(path string) (importers.ImportResult, error) {
+	result, err := importers.ImportFromPath(path)
+	if err != nil {
+		return importers.ImportResult{}, err
+	}
+	return *result, nil
 }
 
 func (a *App) currentEnvVarsSnapshot() map[string]string {

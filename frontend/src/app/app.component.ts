@@ -816,6 +816,44 @@ export class AppComponent implements OnInit, OnDestroy {
     this.applyWorkspaceDerivedState(next);
   }
 
+  async importPostmanCollection() {
+    try {
+      const { OpenImportFileDialog, ImportFromPath } = await import('../../wailsjs/go/main/App');
+      const filePath = await OpenImportFileDialog();
+      if (!filePath) return;
+
+      const result = await ImportFromPath(filePath);
+      if (result?.Files?.length) {
+        for (const file of result.Files) {
+          this.addFileFromContent(file.Name, file.Content);
+        }
+        this.toast.success(`Imported ${result.Files.length} file(s) from Postman collection`);
+      }
+    } catch (err: any) {
+      console.error('Postman import failed:', err);
+      this.toast.error('Import failed: ' + (err?.message || err));
+    }
+  }
+
+  async importBrunoCollection() {
+    try {
+      const { OpenImportDirectoryDialog, ImportFromPath } = await import('../../wailsjs/go/main/App');
+      const dirPath = await OpenImportDirectoryDialog();
+      if (!dirPath) return;
+
+      const result = await ImportFromPath(dirPath);
+      if (result?.Files?.length) {
+        for (const file of result.Files) {
+          this.addFileFromContent(file.Name, file.Content);
+        }
+        this.toast.success(`Imported ${result.Files.length} file(s) from Bruno collection`);
+      }
+    } catch (err: any) {
+      console.error('Bruno import failed:', err);
+      this.toast.error('Import failed: ' + (err?.message || err));
+    }
+  }
+
   private addFileFromContent(fileName: string, content: string, filePath?: string) {
     const updated = this.workspace.addFileFromContent(
       this.LAST_SESSION_KEY,
@@ -852,7 +890,10 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getActiveRequestPreview(): string {
     const request = this.getActiveRequestDetails();
-    return buildActiveRequestPreview(request);
+    const processedUrl = this.activeRequestInfo
+      ? this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+      : undefined;
+    return buildActiveRequestPreview(request, processedUrl);
   }
 
   get activeRunProgressView(): ActiveRunProgress | null {
@@ -861,6 +902,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   getActiveRequestMeta(): string {
     const request = this.getActiveRequestDetails();
+    const processedUrl = this.activeRequestInfo
+      ? this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+      : undefined;
     return buildActiveRequestMeta({
       activeRequestInfo: this.activeRequestInfo,
       isRequestRunning: this.isRequestRunning,
@@ -868,7 +912,8 @@ export class AppComponent implements OnInit, OnDestroy {
       nowMs: this.activeRunNowMs,
       activeRunProgress: this.activeRunProgress,
       activeRequestTimeoutMs: this.getActiveRequestTimeoutMs(),
-      request
+      request,
+      processedUrl
     });
   }
 

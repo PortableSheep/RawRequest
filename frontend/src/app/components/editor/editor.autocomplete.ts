@@ -81,6 +81,11 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
     }
   }
 
+  // Detect whether closeBrackets already inserted }} after cursor
+  const textAfterCursor = lineText.slice(cursorPos);
+  const hasClosingBraces = textAfterCursor.startsWith('}}');
+  const closeSuffix = hasClosingBraces ? '' : '}}';
+
   // Check for secret completion: {{secret:
   const secretMatch = textBeforeCursor.match(/\{\{\s*secret:([a-zA-Z0-9_\-\.]*)$/);
   if (secretMatch) {
@@ -96,7 +101,7 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
         label: k,
         type: 'variable',
         detail: `secret:${env}`,
-        apply: `${k}}}`
+        apply: `${k}${closeSuffix}`
       }));
 
     if (!options.length) return null;
@@ -110,47 +115,15 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
     const from = context.pos - prefix.length;
     const completions: Completion[] = [];
 
-    // Add variables
-    const vars = deps.getVariables();
-    for (const key of Object.keys(vars)) {
-      completions.push({
-        label: key,
-        type: 'variable',
-        detail: vars[key]?.slice(0, 30) || '',
-        apply: `${key}}}`
-      });
-    }
-
-    // Add environment variables
-    const envs = deps.getEnvironments();
-    for (const envName of Object.keys(envs)) {
-      for (const key of Object.keys(envs[envName])) {
-        completions.push({
-          label: `env.${envName}.${key}`,
-          type: 'variable',
-          detail: envs[envName][key]?.slice(0, 30) || '',
-          apply: `env.${envName}.${key}}}`
-        });
-      }
-    }
-
-    // Add request references for chaining
-    const requestNamesList = deps.getRequestNames();
-    for (let i = 0; i < requestNamesList.length; i++) {
-      const reqName = requestNamesList[i] || `request${i + 1}`;
-      completions.push({
-        label: `request${i + 1}.response.body`,
-        type: 'function',
-        detail: reqName,
-        apply: `request${i + 1}.response.body}}`
-      });
-      completions.push({
-        label: `request${i + 1}.response.status`,
-        type: 'function',
-        detail: reqName,
-        apply: `request${i + 1}.response.status}}`
-      });
-    }
+    completions.push(
+      ...buildVarCompletions({
+        vars: deps.getVariables(),
+        envs: deps.getEnvironments(),
+        currentEnv: deps.getCurrentEnv(),
+        requestNames: deps.getRequestNames(),
+        closeSuffix
+      })
+    );
 
     if (completions.length === 0) return null;
     return { from, options: completions, validFor: /^[a-zA-Z0-9_.]*$/ };
@@ -232,4 +205,66 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
   }
 
   return null;
+}
+
+export type VarCompletionItem = { label: string; type: string; detail: string; apply: string };
+
+export function buildVarCompletions(params: {
+  vars: Record<string, string>;
+  envs: Record<string, Record<string, string>>;
+  currentEnv: string;
+  requestNames: string[];
+  closeSuffix?: string;
+}): VarCompletionItem[] {
+  const { vars, envs, currentEnv, requestNames, closeSuffix = '}}' } = params;
+  const completions: VarCompletionItem[] = [];
+
+  // Add variables
+  for (const key of Object.keys(vars)) {
+    completions.push({
+      label: key,
+      type: 'variable',
+      detail: vars[key]?.slice(0, 30) || '',
+      apply: `${key}${closeSuffix}`
+    });
+  }
+
+  // Add environment variables (deduplicated, bare key names)
+  const envKeys = new Set<string>();
+  for (const envName of Object.keys(envs)) {
+    for (const key of Object.keys(envs[envName])) {
+      envKeys.add(key);
+    }
+  }
+  for (const key of envKeys) {
+    if (key in vars) continue;
+    const value = envs[currentEnv]?.[key]
+      ?? Object.values(envs).filter(e => e != null).find(e => key in e)?.[key]
+      ?? '';
+    completions.push({
+      label: key,
+      type: 'variable',
+      detail: value?.slice(0, 30) || '',
+      apply: `${key}${closeSuffix}`
+    });
+  }
+
+  // Add request references for chaining
+  for (let i = 0; i < requestNames.length; i++) {
+    const reqName = requestNames[i] || `request${i + 1}`;
+    completions.push({
+      label: `request${i + 1}.response.body`,
+      type: 'function',
+      detail: reqName,
+      apply: `request${i + 1}.response.body${closeSuffix}`
+    });
+    completions.push({
+      label: `request${i + 1}.response.status`,
+      type: 'function',
+      detail: reqName,
+      apply: `request${i + 1}.response.status${closeSuffix}`
+    });
+  }
+
+  return completions;
 }

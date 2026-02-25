@@ -35,6 +35,8 @@ export class HeaderComponent {
   onReorderTabs = output<{ fromIndex: number; toIndex: number }>();
   onRevealInFinder = output<number>();
   onCloseOtherTabs = output<number>();
+  onImportPostman = output<void>();
+  onImportBruno = output<void>();
 
   draggingIndex: number | null = null;
   dragOverIndex: number | null = null;
@@ -160,6 +162,16 @@ export class HeaderComponent {
 
   handleDonateClick(): void {
     this.onDonateClick.emit();
+    this.closeMoreMenu();
+  }
+
+  handleImportPostmanClick(): void {
+    this.onImportPostman.emit();
+    this.closeMoreMenu();
+  }
+
+  handleImportBrunoClick(): void {
+    this.onImportBruno.emit();
     this.closeMoreMenu();
   }
 

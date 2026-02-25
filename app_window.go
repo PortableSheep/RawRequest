@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"rawrequest/internal/importers"
+
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -133,6 +135,37 @@ func (a *App) OpenFileDialog() ([]string, error) {
 		return nil, err
 	}
 	return files, nil
+}
+
+func (a *App) OpenImportFileDialog() (string, error) {
+	file, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Import Postman Collection",
+		Filters: []runtime.FileFilter{
+			{DisplayName: "Postman Collection (*.json)", Pattern: "*.json"},
+			{DisplayName: "All Files", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return file, nil
+}
+
+func (a *App) OpenImportDirectoryDialog() (string, error) {
+	dir, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "Import Bruno Collection",
+	})
+	if err != nil {
+		return "", err
+	}
+	return dir, nil
+}
+
+func (a *App) ImportFromPath(path string) (*importers.ImportResult, error) {
+	if path == "" {
+		return nil, errors.New("no path provided")
+	}
+	return importers.ImportFromPath(path)
 }
 
 func (a *App) ReadFileContents(filePath string) (string, error) {

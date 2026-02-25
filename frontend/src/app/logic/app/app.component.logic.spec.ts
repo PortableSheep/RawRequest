@@ -124,6 +124,31 @@ describe('app.component.logic', () => {
     ).toBe('POST https://x\n\nhi');
   });
 
+  it('buildActiveRequestPreview uses processedUrl when provided', () => {
+    expect(
+      buildActiveRequestPreview(
+        { method: 'GET', url: '{{baseUrl}}/users', headers: {} } as any,
+        'https://api.example.com/users'
+      )
+    ).toBe('GET https://api.example.com/users');
+  });
+
+  it('buildActiveRequestPreview falls back to request.url when processedUrl is null/undefined', () => {
+    const req = { method: 'GET', url: 'https://fallback.com', headers: {} } as any;
+    expect(buildActiveRequestPreview(req, null)).toBe('GET https://fallback.com');
+    expect(buildActiveRequestPreview(req, undefined)).toBe('GET https://fallback.com');
+    expect(buildActiveRequestPreview(req)).toBe('GET https://fallback.com');
+  });
+
+  it('buildActiveRequestPreview shows resolved URL instead of template variable', () => {
+    expect(
+      buildActiveRequestPreview(
+        { method: 'POST', url: '{{host}}/{{path}}', headers: {}, body: '{"a":1}' } as any,
+        'https://resolved.io/endpoint'
+      )
+    ).toBe('POST https://resolved.io/endpoint\n\n{"a":1}');
+  });
+
   it('buildActiveRequestMeta covers running request with timeout', () => {
     expect(
       buildActiveRequestMeta({
@@ -136,6 +161,51 @@ describe('app.component.logic', () => {
         request: { method: 'GET', url: 'https://x', headers: {} } as any
       })
     ).toBe('Request running · 01:01 elapsed · 00:59 remaining');
+  });
+
+  it('buildActiveRequestMeta uses processedUrl in idle meta line', () => {
+    expect(
+      buildActiveRequestMeta({
+        activeRequestInfo: { type: 'single', startedAt: 0 },
+        isRequestRunning: false,
+        isCancellingActiveRequest: false,
+        nowMs: 0,
+        activeRunProgress: null,
+        activeRequestTimeoutMs: null,
+        request: { method: 'GET', url: '{{baseUrl}}/users', headers: {} } as any,
+        processedUrl: 'https://api.example.com/users'
+      })
+    ).toBe('GET · https://api.example.com/users');
+  });
+
+  it('buildActiveRequestMeta falls back to request.url when processedUrl is null/undefined', () => {
+    const base = {
+      activeRequestInfo: { type: 'single' as const, startedAt: 0 },
+      isRequestRunning: false,
+      isCancellingActiveRequest: false,
+      nowMs: 0,
+      activeRunProgress: null,
+      activeRequestTimeoutMs: null,
+      request: { method: 'POST', url: 'https://fallback.com/api', headers: {} } as any
+    };
+    expect(buildActiveRequestMeta({ ...base, processedUrl: null })).toBe('POST · https://fallback.com/api');
+    expect(buildActiveRequestMeta({ ...base, processedUrl: undefined })).toBe('POST · https://fallback.com/api');
+    expect(buildActiveRequestMeta(base)).toBe('POST · https://fallback.com/api');
+  });
+
+  it('buildActiveRequestMeta shows resolved URL instead of template variable', () => {
+    expect(
+      buildActiveRequestMeta({
+        activeRequestInfo: { type: 'single', startedAt: 0 },
+        isRequestRunning: false,
+        isCancellingActiveRequest: false,
+        nowMs: 0,
+        activeRunProgress: null,
+        activeRequestTimeoutMs: null,
+        request: { method: 'DELETE', url: '{{var}}/resource', headers: {} } as any,
+        processedUrl: 'https://resolved.io/resource'
+      })
+    ).toBe('DELETE · https://resolved.io/resource');
   });
 
   it('buildActiveRequestMeta covers running load test with planned duration', () => {

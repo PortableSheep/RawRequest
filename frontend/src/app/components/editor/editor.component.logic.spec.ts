@@ -34,13 +34,24 @@ describe('editor.component.logic', () => {
   });
 
   describe('shouldCollapseAccidentalSelection', () => {
-    it('collapses when a new selection spans >2 lines', () => {
+    it('collapses when a new selection is created without prior selection', () => {
       expect(
         shouldCollapseAccidentalSelection({
           hadSelectionBefore: false,
           selectionEmptyAfter: false,
           fromLineNumber: 10,
           toLineNumber: 13
+        })
+      ).toBe(true);
+    });
+
+    it('collapses even for small selections (1-2 lines)', () => {
+      expect(
+        shouldCollapseAccidentalSelection({
+          hadSelectionBefore: false,
+          selectionEmptyAfter: false,
+          fromLineNumber: 1,
+          toLineNumber: 2
         })
       ).toBe(true);
     });
@@ -63,18 +74,6 @@ describe('editor.component.logic', () => {
           selectionEmptyAfter: true,
           fromLineNumber: 1,
           toLineNumber: 10
-        })
-      ).toBe(false);
-    });
-
-    it('uses configurable maxLineSpan', () => {
-      expect(
-        shouldCollapseAccidentalSelection({
-          hadSelectionBefore: false,
-          selectionEmptyAfter: false,
-          fromLineNumber: 1,
-          toLineNumber: 4,
-          maxLineSpan: 10
         })
       ).toBe(false);
     });

@@ -96,13 +96,13 @@ export function parseSplitWidthPx(raw: string | null | undefined): number | null
   return n;
 }
 
-export function buildActiveRequestPreview(request: Request | null): string {
+export function buildActiveRequestPreview(request: Request | null, processedUrl?: string | null): string {
   if (!request) {
     return '// Waiting for the next request to start.';
   }
 
   const method = (request.method || 'GET').toUpperCase();
-  const url = request.url || request.name || 'https://';
+  const url = processedUrl || request.url || request.name || 'https://';
   const body = typeof request.body === 'string' ? request.body.trim() : '';
   return body ? `${method} ${url}\n\n${body}` : `${method} ${url}`;
 }
@@ -115,6 +115,7 @@ export function buildActiveRequestMeta(args: {
   activeRunProgress: ActiveRunProgress | null;
   activeRequestTimeoutMs: number | null;
   request: Request | null;
+  processedUrl?: string | null;
 }): string {
   if (!args.activeRequestInfo) {
     return 'Awaiting request';
@@ -152,7 +153,7 @@ export function buildActiveRequestMeta(args: {
   }
 
   const method = args.request?.method?.toUpperCase() || '—';
-  const target = args.request?.url || args.request?.name || 'Untitled request';
+  const target = args.processedUrl || args.request?.url || args.request?.name || 'Untitled request';
   return `${method} · ${target}`;
 }
 

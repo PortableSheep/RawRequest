@@ -44,7 +44,7 @@ export function createEditorLintExtensions(deps: LintDeps) {
   ];
 }
 
-function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
+export function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
   const diagnostics: Diagnostic[] = [];
   const requests = deps.getRequests() || [];
 
@@ -180,6 +180,11 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
         let multipartLikely = false;
         let sawContentBodyLine = false;
 
+        // MethodLine is a direct child of RequestBlock (not wrapped in RequestLine).
+        const methodNode = reqNode.getChild('MethodLine');
+        const sawMethod = !!methodNode;
+        const methodEnd = methodNode ? methodNode.to : -1;
+
     // Track whether we're inside a brace-based script block (< { ... } / > { ... }).
     // Lezer intentionally keeps the grammar simple and may classify script lines as HeaderLine
     // (e.g. JSON key/value pairs). We must suppress structural header/annotation diagnostics
@@ -292,6 +297,25 @@ function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic[] {
             // If the request itself declares multipart, don't warn about header-looking lines later.
             if (lower.startsWith('content-type:') && lower.includes('multipart/form-data')) {
               multipartLikely = true;
+            }
+          }
+
+          if (sawMethod && kind === 'AnnotationLine' && !sawBody && child.from >= methodEnd) {
+            if (
+              lower.startsWith('@name') ||
+              lower.startsWith('@depends') ||
+              lower.startsWith('@timeout') ||
+              lower.startsWith('@load') ||
+              lower.startsWith('@no-history') ||
+              lower.startsWith('@auth')
+            ) {
+              diagnostics.push({
+                from: child.from,
+                to: child.to,
+                severity: 'warning',
+                message: 'Annotation should appear before the request method line'
+              });
+              continue;
             }
           }
 

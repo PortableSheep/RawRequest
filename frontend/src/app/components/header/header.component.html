@@ -206,6 +206,25 @@
                 <button
                         type="button"
                         class="rr-menu__item"
+                        (click)="handleImportPostmanClick()"
+                        role="menuitem"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M12 11v6" /><path d="M9 14l3 3l3 -3" /></svg>
+                    <span>Import Postman Collection…</span>
+                </button>
+                <button
+                        type="button"
+                        class="rr-menu__item"
+                        (click)="handleImportBrunoClick()"
+                        role="menuitem"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /><path d="M12 11v6" /><path d="M9 14l3 3l3 -3" /></svg>
+                    <span>Import Bruno Collection…</span>
+                </button>
+                <div class="rr-menu__sep" aria-hidden="true"></div>
+                <button
+                        type="button"
+                        class="rr-menu__item"
                         (click)="handleOpenExamplesClick()"
                         role="menuitem"
                 >

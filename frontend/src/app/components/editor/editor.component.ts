@@ -326,8 +326,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             if (this.editorContextMenu.show) {
               this.closeEditorContextMenu();
             }
-            // Click-to-jump for @depends targets
-            if (event.button === 0 && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            // Click-to-jump for @depends targets (requires Ctrl/Cmd)
+            if (event.button === 0 && !event.shiftKey && (event.ctrlKey || event.metaKey) && !event.altKey) {
               const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
               if (pos !== null) {
                 const line = view.state.doc.lineAt(pos);
@@ -338,6 +338,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                   if (pos >= from && pos <= to) {
                     const jumped = this.jumpToRequestByName(view, depends.target);
                     if (jumped) {
+                      view.dom.closest('.editor-wrapper')?.classList.remove('cm-ctrl-held');
                       event.preventDefault();
                       event.stopPropagation();
                       return true;
@@ -350,40 +351,66 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
               const scrollTop = view.scrollDOM.scrollTop;
               const hadSelection = !view.state.selection.main.empty;
+              const downX = event.clientX;
+              const downY = event.clientY;
               
-              // Use setTimeout to check after CodeMirror processes the click
-              setTimeout(() => {
-                const newScrollTop = view.scrollDOM.scrollTop;
-                const selection = view.state.selection.main;
-                
-                // If scroll jumped more than 100px, restore it
-                if (Math.abs(newScrollTop - scrollTop) > 100) {
-                  view.scrollDOM.scrollTop = scrollTop;
-                }
-                
-                // If a selection was created but there wasn't one before,
-                // and user didn't drag (mousedown only), collapse it to cursor
-                if (!hadSelection && !selection.empty) {
-                  // Check if this looks like an accidental selection (spans many lines)
-                  const fromLine = view.state.doc.lineAt(selection.from).number;
-                  const toLine = view.state.doc.lineAt(selection.to).number;
-                  if (
-                    shouldCollapseAccidentalSelection({
-                      hadSelectionBefore: hadSelection,
-                      selectionEmptyAfter: selection.empty,
-                      fromLineNumber: fromLine,
-                      toLineNumber: toLine
-                    })
-                  ) {
-                    // Collapse selection to the click point (selection.to is where user clicked)
-                    view.dispatch({
-                      selection: { anchor: selection.to }
-                    });
+              // Track whether the user dragged (intentional selection)
+              const onMouseUp = (upEvent: MouseEvent) => {
+                document.removeEventListener('mouseup', onMouseUp, true);
+                const dx = Math.abs(upEvent.clientX - downX);
+                const dy = Math.abs(upEvent.clientY - downY);
+                const wasDrag = dx > 4 || dy > 4;
+
+                // Use setTimeout to check after CodeMirror processes the click
+                setTimeout(() => {
+                  const newScrollTop = view.scrollDOM.scrollTop;
+                  const selection = view.state.selection.main;
+                  
+                  // If scroll jumped more than 100px, restore it
+                  if (Math.abs(newScrollTop - scrollTop) > 100) {
+                    view.scrollDOM.scrollTop = scrollTop;
                   }
-                }
-              }, 0);
+                  
+                  // If a selection was created but there wasn't one before,
+                  // and user didn't drag, collapse it (accidental scroll+click selection)
+                  if (!wasDrag && !hadSelection && !selection.empty) {
+                    const fromLine = view.state.doc.lineAt(selection.from).number;
+                    const toLine = view.state.doc.lineAt(selection.to).number;
+                    if (
+                      shouldCollapseAccidentalSelection({
+                        hadSelectionBefore: hadSelection,
+                        selectionEmptyAfter: selection.empty,
+                        fromLineNumber: fromLine,
+                        toLineNumber: toLine
+                      })
+                    ) {
+                      view.dispatch({
+                        selection: { anchor: selection.to }
+                      });
+                    }
+                  }
+                }, 0);
+              };
+              document.addEventListener('mouseup', onMouseUp, true);
             }
             return false; // Don't prevent default handling
+          },
+
+          keydown: (event, view) => {
+            if (event.key === 'Control' || event.key === 'Meta') {
+              view.dom.closest('.editor-wrapper')?.classList.add('cm-ctrl-held');
+            }
+            return false;
+          },
+          keyup: (event, view) => {
+            if (event.key === 'Control' || event.key === 'Meta') {
+              view.dom.closest('.editor-wrapper')?.classList.remove('cm-ctrl-held');
+            }
+            return false;
+          },
+          blur: (event, view) => {
+            view.dom.closest('.editor-wrapper')?.classList.remove('cm-ctrl-held');
+            return false;
           },
 
           contextmenu: (event, view) => {

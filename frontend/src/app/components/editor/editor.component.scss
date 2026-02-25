@@ -143,9 +143,24 @@
 
 ::ng-deep .cm-depends-link {
   color: var(--rr-primary);
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 2px;
-  cursor: pointer;
+  cursor: default;
+}
+
+.editor-wrapper.cm-ctrl-held ::ng-deep {
+  .cm-depends-link {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .cm-annotation {
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .cm-request-name {
+    text-decoration: underline;
+    cursor: pointer;
+  }
 }
 
 // We use a custom find/replace UI. Hide CodeMirror's built-in panel.

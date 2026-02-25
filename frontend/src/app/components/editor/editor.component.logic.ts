@@ -34,14 +34,14 @@ export type AccidentalSelectionDecision = {
   selectionEmptyAfter: boolean;
   fromLineNumber: number;
   toLineNumber: number;
-  maxLineSpan?: number;
 };
 
 export function shouldCollapseAccidentalSelection(decision: AccidentalSelectionDecision): boolean {
-  const maxLineSpan = decision.maxLineSpan ?? 2;
   if (decision.hadSelectionBefore) return false;
   if (decision.selectionEmptyAfter) return false;
-  return Math.abs(decision.toLineNumber - decision.fromLineNumber) > maxLineSpan;
+  // If user had no selection and a click created one, always collapse it.
+  // This handles scroll+click creating spurious selections of any size.
+  return true;
 }
 
 export type ContextMenuPositionInput = {
