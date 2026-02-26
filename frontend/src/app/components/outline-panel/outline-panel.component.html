@@ -1,0 +1,63 @@
+<div class="outline-drawer"
+     [class.outline-drawer--open]="isOpen()"
+     tabindex="-1">
+  <div class="outline-drawer__header">
+    <div class="outline-drawer__title">
+      <h5 class="outline-drawer__title-text">Outline</h5>
+      @if (requestCount() > 0) {
+        <div class="outline-drawer__subtitle">{{ requestCount() }} request{{ requestCount() === 1 ? '' : 's' }}</div>
+      }
+    </div>
+    <button type="button"
+            class="rr-icon-btn outline-drawer__close"
+            (click)="onClose.emit()"
+            aria-label="Close outline">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"></line>
+        <line x1="6" y1="6" x2="18" y2="18"></line>
+      </svg>
+    </button>
+  </div>
+
+  <div class="outline-drawer__search">
+    <input type="text"
+           class="outline-drawer__search-input"
+           placeholder="Filter requests..."
+           [(ngModel)]="filterQuery"
+           autocomplete="off"
+           spellcheck="false" />
+  </div>
+
+  <div class="outline-drawer__body rr-no-scrollbar">
+    @for (group of groups(); track group.name) {
+      @if (group.name) {
+        <div class="outline-group">
+          <div class="outline-group__header">{{ group.name }}</div>
+        </div>
+      }
+      @for (entry of group.entries; track entry.requestIndex) {
+        <button class="outline-entry"
+                [class.outline-entry--active]="activeRequestIndex() === entry.requestIndex"
+                [class.outline-entry--grouped]="!!group.name"
+                (click)="selectRequest(entry.requestIndex)"
+                type="button">
+          <span class="outline-entry__method" [attr.data-method]="entry.method">{{ entry.method }}</span>
+          <span class="outline-entry__label" [title]="entry.label">{{ entry.label }}</span>
+        </button>
+      }
+    } @empty {
+      <div class="outline-empty">
+        @if (requestCount() === 0) {
+          <span>No requests found in file.</span>
+        } @else {
+          <span>No matching requests.</span>
+        }
+      </div>
+    }
+  </div>
+</div>
+
+@if (isOpen()) {
+  <div class="outline-drawer__backdrop" (click)="onClose.emit()"></div>
+}

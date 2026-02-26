@@ -214,6 +214,13 @@
         (onClose)="toggleHistory()"
         (onItemClick)="viewHistory($event)">
    </app-history-sidebar>
+   <app-outline-panel
+        [isOpen]="showOutlinePanel"
+        [requests]="currentFile.requests"
+        [activeRequestIndex]="pendingRequestIndex"
+        (onClose)="showOutlinePanel = false"
+        (onRequestSelect)="scrollEditorToRequest($event)">
+   </app-outline-panel>
    <app-history-detail-modal
         [isOpen]="showHistoryModal"
         [item]="selectedHistoryItem"

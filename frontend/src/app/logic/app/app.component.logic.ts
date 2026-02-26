@@ -2,7 +2,7 @@ import type { ActiveRunProgress, FileTab, Request, ScriptLogEntry } from '../../
 
 export type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 
-export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory' | 'cancelRequest';
+export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory' | 'toggleOutline' | 'closeOutline' | 'cancelRequest';
 
 export interface GlobalKeydownDecision {
   action: GlobalKeydownAction;
@@ -204,6 +204,7 @@ export function decideGlobalKeydownAction(args: {
   shiftKey: boolean;
   showHistoryModal: boolean;
   showHistory: boolean;
+  showOutlinePanel?: boolean;
   isRequestRunning?: boolean;
 }): GlobalKeydownDecision {
   const key = args.key || '';
@@ -216,12 +217,20 @@ export function decideGlobalKeydownAction(args: {
     };
   }
 
+  // Cmd/Ctrl+Shift+O → toggle outline panel
+  if ((args.metaKey || args.ctrlKey) && args.shiftKey && key.toLowerCase() === 'o') {
+    return { action: 'toggleOutline', shouldPreventDefault: true, shouldStopPropagation: true };
+  }
+
   if (key !== 'Escape') {
     return { action: 'none', shouldPreventDefault: false, shouldStopPropagation: false };
   }
 
   if (args.showHistoryModal) {
     return { action: 'closeHistoryModal', shouldPreventDefault: true, shouldStopPropagation: true };
+  }
+  if (args.showOutlinePanel) {
+    return { action: 'closeOutline', shouldPreventDefault: true, shouldStopPropagation: true };
   }
   if (args.showHistory) {
     return { action: 'toggleHistory', shouldPreventDefault: true, shouldStopPropagation: true };

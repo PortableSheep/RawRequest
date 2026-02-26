@@ -16,6 +16,7 @@ import {
   UpdateNotificationComponent,
   ScriptSnippetModalComponent
 } from './components';
+import { OutlinePanelComponent } from './components/outline-panel/outline-panel.component';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress, ChainEntryPreview } from './models/http.models';
 import { HttpService } from './services/http.service';
@@ -105,7 +106,8 @@ type AlertType = 'info' | 'success' | 'warning' | 'danger';
     ConsoleDrawerComponent,
     ToastContainerComponent,
     UpdateNotificationComponent,
-    ScriptSnippetModalComponent
+    ScriptSnippetModalComponent,
+    OutlinePanelComponent
   ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
@@ -241,6 +243,7 @@ export class AppComponent implements OnInit, OnDestroy {
   showHistory = false;
   showHistoryModal = false;
   selectedHistoryItem: HistoryItem | null = null;
+  showOutlinePanel = false;
   showLoadTestResults = false;
   loadTestMetrics: any = null;
   showDonationModal = false;
@@ -659,6 +662,14 @@ export class AppComponent implements OnInit, OnDestroy {
     this.showHistory = !this.showHistory;
   }
 
+  toggleOutlinePanel() {
+    this.showOutlinePanel = !this.showOutlinePanel;
+  }
+
+  scrollEditorToRequest(requestIndex: number) {
+    this.editorComponent?.scrollToRequestIndex(requestIndex);
+  }
+
   viewHistory(item: HistoryItem) {
     this.selectedHistoryItem = item;
     this.showHistoryModal = true;
@@ -678,6 +689,7 @@ export class AppComponent implements OnInit, OnDestroy {
       shiftKey: event.shiftKey,
       showHistoryModal: this.showHistoryModal,
       showHistory: this.showHistory,
+      showOutlinePanel: this.showOutlinePanel,
       isRequestRunning: this.isRequestRunning
     });
 
@@ -700,6 +712,12 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       case 'toggleHistory':
         this.toggleHistory();
+        return;
+      case 'toggleOutline':
+        this.toggleOutlinePanel();
+        return;
+      case 'closeOutline':
+        this.showOutlinePanel = false;
         return;
       case 'cancelRequest':
         void this.cancelActiveRequest();

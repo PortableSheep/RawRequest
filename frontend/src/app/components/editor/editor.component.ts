@@ -1054,6 +1054,21 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
+   * Scroll to a request by its index (0-based).
+   */
+  scrollToRequestIndex(requestIndex: number): void {
+    if (!this.editorView) return;
+    const block = this.requestBlockIndex.find(b => b.index === requestIndex);
+    if (block) {
+      this.editorView.dispatch({
+        selection: { anchor: block.from },
+        effects: EditorView.scrollIntoView(block.from, { y: 'start' })
+      });
+      this.editorView.focus();
+    }
+  }
+
+  /**
    * Insert text at a specific position
    */
   insertAt(position: number, text: string): void {

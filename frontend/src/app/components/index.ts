@@ -9,3 +9,4 @@ export { DeleteConfirmModalComponent } from './delete-confirm-modal/delete-confi
 export { ConsoleDrawerComponent } from './console-drawer/console-drawer.component';
 export { UpdateNotificationComponent } from './update-notification/update-notification.component';
 export { ScriptSnippetModalComponent } from './script-snippet-modal/script-snippet-modal.component';
+export { OutlinePanelComponent } from './outline-panel/outline-panel.component';
