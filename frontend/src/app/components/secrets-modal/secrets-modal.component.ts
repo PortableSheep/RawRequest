@@ -2,6 +2,10 @@ import { Component, effect, HostListener, input, output } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { SecretIndex, VaultInfo } from '../../services/secret.service';
+import {
+  SecretRow, SortColumn, SortDirection,
+  buildSecretRows, sortSecretRows, filterSecretRows, countSecretUsage, toggleSort
+} from './secrets-modal.logic';
 
 @Component({
   selector: 'app-secrets-modal',
@@ -16,6 +20,7 @@ export class SecretsModalComponent {
   environments = input<string[]>([]);
   allSecrets = input<SecretIndex>({});
   vaultInfo = input<VaultInfo | null>(null);
+  fileContent = input<string>('');
 
   // Internal form state
   targetEnv = '';
@@ -25,15 +30,21 @@ export class SecretsModalComponent {
   resetConfirmText = '';
   showResetConfirm = false;
 
+  // Sort & filter state
+  sortColumn: SortColumn = 'key';
+  sortDirection: SortDirection = 'asc';
+  filterQuery = '';
+
   private wasOpen = false;
 
   constructor() {
     effect(() => {
       const open = this.isOpen();
       if (open && !this.wasOpen) {
-        this.targetEnv = (this.selectedEnv() || '').trim();
+        this.targetEnv = '';
         this.resetConfirmText = '';
         this.showResetConfirm = false;
+        this.filterQuery = '';
       }
       this.wasOpen = open;
     });
@@ -67,25 +78,23 @@ export class SecretsModalComponent {
     this.showValue = !this.showValue;
   }
 
-  /** Flatten secrets index into a sorted array for table display */
-  getFlatSecretList(): Array<{env: string, key: string}> {
-    const all = this.allSecrets() || {};
-    const result: Array<{env: string, key: string}> = [];
-    
-    // Sort environments: 'default' first, then alphabetically
-    const envs = Object.keys(all).sort((a, b) => {
-      if (a === 'default') return -1;
-      if (b === 'default') return 1;
-      return a.localeCompare(b);
-    });
-    
-    for (const env of envs) {
-      const keys = all[env] || [];
-      for (const key of keys.sort()) {
-        result.push({ env, key });
-      }
-    }
-    return result;
+  /** Build sorted, filtered rows for the table */
+  getDisplayRows(): SecretRow[] {
+    const usageCounts = countSecretUsage(this.fileContent());
+    const rows = buildSecretRows(this.allSecrets(), usageCounts);
+    const filtered = filterSecretRows(rows, this.filterQuery);
+    return sortSecretRows(filtered, this.sortColumn, this.sortDirection);
+  }
+
+  onSortClick(column: SortColumn) {
+    const result = toggleSort(this.sortColumn, this.sortDirection, column);
+    this.sortColumn = result.column;
+    this.sortDirection = result.direction;
+  }
+
+  getSortIndicator(column: SortColumn): string {
+    if (this.sortColumn !== column) return '';
+    return this.sortDirection === 'asc' ? ' ▲' : ' ▼';
   }
 
   handleSave() {

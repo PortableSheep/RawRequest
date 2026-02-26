@@ -248,6 +248,7 @@
         [environments]="getEnvironments()"
         [allSecrets]="allSecrets"
         [vaultInfo]="vaultInfo"
+        [fileContent]="currentFileView().content"
         (onClose)="showSecretsModal = false"
         (onSave)="handleSecretSave($event)"
         (onDeleteClick)="confirmDeleteSecret($event.env, $event.key)"
