@@ -25,7 +25,6 @@ Built with [Wails](https://wails.io/) and Angular.
 - **Secrets**: encrypted vault with `{{secret:key}}` placeholders, sortable manager with usage tracking
 - **Environments**: switch between dev/staging/prod via `@env.*` variables
 - **Scripts**: JavaScript pre/post blocks for dynamic requests, variable extraction, and assertions
-- **OAuth2**: `@auth oauth2` directive with automatic token management
 
 ## Installation
 
