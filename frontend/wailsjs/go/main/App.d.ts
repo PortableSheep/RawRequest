@@ -41,6 +41,8 @@ export function GetVariables():Promise<Record<string, string>>;
 
 export function GetVaultInfo():Promise<main.VaultInfo>;
 
+export function HasMasterPassword():Promise<boolean>;
+
 export function ImportCollection(arg1:string):Promise<importers.ImportResult>;
 
 export function ImportFromPath(arg1:string):Promise<importers.ImportResult>;
@@ -109,6 +111,8 @@ export function SetEnvVariable(arg1:string,arg2:string):Promise<void>;
 
 export function SetEnvironment(arg1:string):Promise<void>;
 
+export function SetMasterPassword(arg1:string):Promise<void>;
+
 export function SetVariable(arg1:string,arg2:string):Promise<void>;
 
 export function ShowSaveDialog(arg1:string):Promise<string>;
@@ -116,3 +120,5 @@ export function ShowSaveDialog(arg1:string):Promise<string>;
 export function StartLoadTest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
 export function StartUpdateAndRestart(arg1:string):Promise<void>;
+
+export function VerifyMasterPassword(arg1:string):Promise<boolean>;

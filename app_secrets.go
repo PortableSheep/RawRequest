@@ -66,6 +66,30 @@ func (a *App) ExportSecrets() (map[string]map[string]string, error) {
 	return vault.Export()
 }
 
+func (a *App) HasMasterPassword() (bool, error) {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return false, err
+	}
+	return vault.HasMasterPassword(), nil
+}
+
+func (a *App) SetMasterPassword(password string) error {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return err
+	}
+	return vault.SetMasterPassword(password)
+}
+
+func (a *App) VerifyMasterPassword(password string) (bool, error) {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return false, err
+	}
+	return vault.VerifyMasterPassword(password)
+}
+
 // SendNotification sends an OS-level notification.
 func (a *App) SendNotification(title, message string) error {
 	// On macOS, use native Notification Center so the notification uses the app icon.

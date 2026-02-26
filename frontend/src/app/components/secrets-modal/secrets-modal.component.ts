@@ -45,6 +45,11 @@ export class SecretsModalComponent {
         this.resetConfirmText = '';
         this.showResetConfirm = false;
         this.filterQuery = '';
+        this.isValuesRevealed = false;
+        this.revealedValues = {};
+        this.showMasterPasswordPrompt = false;
+        this.masterPasswordInput = '';
+        this.masterPasswordError = '';
       }
       this.wasOpen = open;
     });
@@ -55,12 +60,27 @@ export class SecretsModalComponent {
   onDeleteClick = output<{env: string, key: string}>();
   onExport = output<void>();
   onResetVault = output<void>();
+  onSetMasterPassword = output<string>();
+  onVerifyMasterPassword = output<string>();
+  onGetSecretValue = output<{env: string, key: string}>();
 
   Object = Object;
+
+  // Master password & value reveal state
+  showMasterPasswordPrompt = false;
+  masterPasswordInput = '';
+  masterPasswordMode: 'set' | 'verify' = 'verify';
+  masterPasswordError = '';
+  isValuesRevealed = false;
+  revealedValues: Record<string, string> = {};
 
   @HostListener('document:keydown.escape')
   handleEscape(): void {
     if (!this.isOpen()) return;
+    if (this.showMasterPasswordPrompt) {
+      this.showMasterPasswordPrompt = false;
+      return;
+    }
     if (this.showResetConfirm) {
       this.cancelReset();
       return;
@@ -138,5 +158,42 @@ export class SecretsModalComponent {
   getTotalSecretCount(): number {
     const secrets = this.allSecrets();
     return Object.values(secrets).reduce((sum, keys) => sum + (keys?.length || 0), 0);
+  }
+
+  onRevealClick() {
+    const info = this.vaultInfo();
+    if (info?.hasMasterPassword) {
+      this.masterPasswordMode = 'verify';
+    } else {
+      this.masterPasswordMode = 'set';
+    }
+    this.masterPasswordInput = '';
+    this.masterPasswordError = '';
+    this.showMasterPasswordPrompt = true;
+  }
+
+  hideValues() {
+    this.isValuesRevealed = false;
+    this.revealedValues = {};
+  }
+
+  /** Called by parent when master password is verified or set successfully */
+  onMasterPasswordVerified() {
+    this.showMasterPasswordPrompt = false;
+    this.isValuesRevealed = true;
+  }
+
+  /** Called by parent when master password verification fails */
+  onMasterPasswordFailed(message: string) {
+    this.masterPasswordError = message;
+  }
+
+  /** Called by parent to provide a revealed value */
+  setRevealedValue(env: string, key: string, value: string) {
+    this.revealedValues[`${env}:${key}`] = value;
+  }
+
+  getRevealedValue(env: string, key: string): string | undefined {
+    return this.revealedValues[`${env}:${key}`];
   }
 }

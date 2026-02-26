@@ -14,7 +14,8 @@ import {
   DeleteConfirmModalComponent,
   ConsoleDrawerComponent,
   UpdateNotificationComponent,
-  ScriptSnippetModalComponent
+  ScriptSnippetModalComponent,
+  SecretsModalComponent
 } from './components';
 import { OutlinePanelComponent } from './components/outline-panel/outline-panel.component';
 import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
@@ -265,6 +266,7 @@ export class AppComponent implements OnInit, OnDestroy {
   });
 
   @ViewChild('snippetModal') snippetModal!: ScriptSnippetModalComponent;
+  @ViewChild('secretsModal') secretsModal!: SecretsModalComponent;
 
   private destroy$ = new Subject<void>();
   private alertTimeout: any;
@@ -1276,6 +1278,41 @@ export class AppComponent implements OnInit, OnDestroy {
     } catch (error) {
       console.error('Failed to reset vault', error);
       this.toast.error('Failed to reset vault');
+    }
+  }
+
+  async handleSetMasterPassword(password: string) {
+    try {
+      await this.secretService.setMasterPassword(password);
+      await this.loadVaultInfo(true);
+      this.secretsModal?.onMasterPasswordVerified();
+    } catch (error) {
+      console.error('Failed to set master password', error);
+      this.secretsModal?.onMasterPasswordFailed('Failed to set password');
+    }
+  }
+
+  async handleVerifyMasterPassword(password: string) {
+    try {
+      const valid = await this.secretService.verifyMasterPassword(password);
+      if (valid) {
+        this.secretsModal?.onMasterPasswordVerified();
+      } else {
+        this.secretsModal?.onMasterPasswordFailed('Incorrect password');
+      }
+    } catch (error) {
+      console.error('Failed to verify master password', error);
+      this.secretsModal?.onMasterPasswordFailed('Verification failed');
+    }
+  }
+
+  async handleGetSecretValue(env: string, key: string) {
+    try {
+      const value = await this.secretService.getSecretValue(env, key);
+      this.secretsModal?.setRevealedValue(env, key, value);
+    } catch (error) {
+      console.error('Failed to get secret value', error);
+      this.secretsModal?.setRevealedValue(env, key, '(error)');
     }
   }
 

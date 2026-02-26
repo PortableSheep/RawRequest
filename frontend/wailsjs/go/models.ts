@@ -114,6 +114,7 @@ export namespace main {
 	    secretCount: number;
 	    envCount: number;
 	    keySource: string;
+	    hasMasterPassword: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultInfo(source);
@@ -127,6 +128,7 @@ export namespace main {
 	        this.secretCount = source["secretCount"];
 	        this.envCount = source["envCount"];
 	        this.keySource = source["keySource"];
+	        this.hasMasterPassword = source["hasMasterPassword"];
 	    }
 	}
 	export class WindowState {

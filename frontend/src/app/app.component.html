@@ -243,6 +243,7 @@
         (onDonate)="donate($event)">
     </app-donation-modal>
     <app-secrets-modal
+        #secretsModal
         [isOpen]="showSecretsModal"
         [selectedEnv]="currentEnv()"
         [environments]="getEnvironments()"
@@ -253,7 +254,10 @@
         (onSave)="handleSecretSave($event)"
         (onDeleteClick)="confirmDeleteSecret($event.env, $event.key)"
         (onExport)="handleVaultExport()"
-        (onResetVault)="handleVaultReset()">
+        (onResetVault)="handleVaultReset()"
+        (onSetMasterPassword)="handleSetMasterPassword($event)"
+        (onVerifyMasterPassword)="handleVerifyMasterPassword($event)"
+        (onGetSecretValue)="handleGetSecretValue($event.env, $event.key)">
     </app-secrets-modal>
 
     <!-- Delete Confirm Modal Component -->

@@ -17,6 +17,7 @@ import (
 	"rawrequest/internal/secretvaultlogic"
 
 	"github.com/zalando/go-keyring"
+	"golang.org/x/crypto/bcrypt"
 )
 
 const (
@@ -25,12 +26,13 @@ const (
 )
 
 type VaultInfo struct {
-	Directory   string `json:"directory"`
-	KeyPath     string `json:"keyPath"`
-	DataPath    string `json:"dataPath"`
-	SecretCount int    `json:"secretCount"`
-	EnvCount    int    `json:"envCount"`
-	KeySource   string `json:"keySource"`
+	Directory         string `json:"directory"`
+	KeyPath           string `json:"keyPath"`
+	DataPath          string `json:"dataPath"`
+	SecretCount       int    `json:"secretCount"`
+	EnvCount          int    `json:"envCount"`
+	KeySource         string `json:"keySource"`
+	HasMasterPassword bool   `json:"hasMasterPassword"`
 }
 
 type SecretVault struct {
@@ -96,12 +98,13 @@ func (sv *SecretVault) Info() (*VaultInfo, error) {
 		source = "unknown"
 	}
 	return &VaultInfo{
-		Directory:   sv.dir,
-		KeyPath:     sv.keyPath,
-		DataPath:    sv.dataPath,
-		SecretCount: secretCount,
-		EnvCount:    envCount,
-		KeySource:   source,
+		Directory:         sv.dir,
+		KeyPath:           sv.keyPath,
+		DataPath:          sv.dataPath,
+		SecretCount:       secretCount,
+		EnvCount:          envCount,
+		KeySource:         source,
+		HasMasterPassword: sv.HasMasterPassword(),
 	}, nil
 }
 
@@ -351,3 +354,40 @@ func (sv *SecretVault) decrypt(ciphertext []byte) ([]byte, error) {
 }
 
 // Note: deterministic env/key normalization and key listing helpers live in internal/secretvaultlogic.
+
+// Master password support — stores a bcrypt hash in a separate file.
+// This is a UI convenience gate, not a security boundary.
+
+func (sv *SecretVault) masterPasswordPath() string {
+	return filepath.Join(sv.dir, ".master.hash")
+}
+
+func (sv *SecretVault) HasMasterPassword() bool {
+	_, err := os.ReadFile(sv.masterPasswordPath())
+	return err == nil
+}
+
+func (sv *SecretVault) SetMasterPassword(password string) error {
+	sv.mu.Lock()
+	defer sv.mu.Unlock()
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(sv.masterPasswordPath(), hash, 0o600)
+}
+
+func (sv *SecretVault) VerifyMasterPassword(password string) (bool, error) {
+	hash, err := os.ReadFile(sv.masterPasswordPath())
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, errors.New("no master password set")
+		}
+		return false, err
+	}
+	if err := bcrypt.CompareHashAndPassword(hash, []byte(password)); err != nil {
+		return false, nil
+	}
+	return true, nil
+}

@@ -78,6 +78,10 @@ export function GetVaultInfo() {
   return window['go']['main']['App']['GetVaultInfo']();
 }
 
+export function HasMasterPassword() {
+  return window['go']['main']['App']['HasMasterPassword']();
+}
+
 export function ImportCollection(arg1) {
   return window['go']['main']['App']['ImportCollection'](arg1);
 }
@@ -210,6 +214,10 @@ export function SetEnvVariable(arg1, arg2) {
   return window['go']['main']['App']['SetEnvVariable'](arg1, arg2);
 }
 
+export function SetMasterPassword(arg1) {
+  return window['go']['main']['App']['SetMasterPassword'](arg1);
+}
+
 export function SetEnvironment(arg1) {
   return window['go']['main']['App']['SetEnvironment'](arg1);
 }
@@ -228,4 +236,8 @@ export function StartLoadTest(arg1, arg2, arg3, arg4, arg5, arg6) {
 
 export function StartUpdateAndRestart(arg1) {
   return window['go']['main']['App']['StartUpdateAndRestart'](arg1);
+}
+
+export function VerifyMasterPassword(arg1) {
+  return window['go']['main']['App']['VerifyMasterPassword'](arg1);
 }

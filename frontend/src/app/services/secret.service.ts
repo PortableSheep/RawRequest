@@ -8,7 +8,9 @@ import {
   GetVaultInfo,
   ListSecrets,
   ResetVault,
-  SaveSecret
+  SaveSecret,
+  SetMasterPassword,
+  VerifyMasterPassword
 } from '@wailsjs/go/main/App';
 
 export type SecretIndex = Partial<Record<string, string[]>>;
@@ -173,5 +175,14 @@ export class SecretService {
 
   private handleMissingSecret(env: string, key: string) {
     this.missingSecretSubject.next({ env: this.normalizeEnv(env), key });
+  }
+
+  async setMasterPassword(password: string): Promise<void> {
+    await SetMasterPassword(password);
+    this.invalidateVaultInfo();
+  }
+
+  async verifyMasterPassword(password: string): Promise<boolean> {
+    return VerifyMasterPassword(password);
   }
 }
