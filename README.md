@@ -159,6 +159,18 @@ Configure your AI client to use RawRequest as an MCP server. The server uses std
 }
 ```
 
+**GitHub Copilot CLI** (`~/.copilot/mcp-config.json`):
+```json
+{
+  "mcpServers": {
+    "rawrequest": {
+      "command": "rawrequest",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
 **Claude Desktop** (`claude_desktop_config.json`):
 ```json
 {
