@@ -59,7 +59,10 @@ class LightningGutterMarker extends GutterMarker {
   }
 }
 
-export function createRequestGutter(onExecuteRequest: (requestIndex: number) => void): Extension {
+export function createRequestGutter(
+  onExecuteRequest: (requestIndex: number) => void,
+  getBlockIndex?: () => Array<{ from: number; to: number; index: number }>
+): Extension {
   return gutter({
     class: 'cm-gutter-play',
     lineMarker: (view: EditorView, line: BlockInfo) => {
@@ -67,39 +70,9 @@ export function createRequestGutter(onExecuteRequest: (requestIndex: number) => 
       const lineContent = view.state.doc.line(lineNo).text;
       const trimmedLine = lineContent.trimStart();
 
-      const isRunnableRequestStart = (targetLineNo: number): { runnable: boolean; index: number } => {
-        let inRequest = false;
-        let requestIndex = -1;
-
-        for (let i = 1; i <= targetLineNo; i++) {
-          const text = view.state.doc.line(i).text;
-
-          if (isSeparatorLine(text)) {
-            inRequest = false;
-            continue;
-          }
-
-          if (isMethodLine(text)) {
-            if (!inRequest) {
-              requestIndex++;
-              inRequest = true;
-              if (i === targetLineNo) {
-                return { runnable: true, index: requestIndex };
-              }
-            } else {
-              if (i === targetLineNo) {
-                return { runnable: false, index: requestIndex };
-              }
-            }
-          }
-        }
-
-        return { runnable: false, index: -1 };
-      };
-
       // Show play button only on the first request line in a request block.
       if (isMethodLine(lineContent)) {
-        const res = isRunnableRequestStart(lineNo);
+        const res = isRunnableRequestStart(view, lineNo, getBlockIndex);
         if (res.runnable && res.index >= 0) {
           return new PlayGutterMarker(onExecuteRequest, res.index);
         }
@@ -119,4 +92,50 @@ export function createRequestGutter(onExecuteRequest: (requestIndex: number) => 
 
     lineMarkerChange: (update: ViewUpdate) => update.docChanged
   });
+}
+
+function isRunnableRequestStart(
+  view: EditorView,
+  targetLineNo: number,
+  getBlockIndex?: () => Array<{ from: number; to: number; index: number }>
+): { runnable: boolean; index: number } {
+  // Fast path: use cached block index with binary search
+  const blocks = getBlockIndex?.();
+  if (blocks?.length) {
+    const lineObj = view.state.doc.line(targetLineNo);
+    const pos = lineObj.from;
+    let lo = 0;
+    let hi = blocks.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      const block = blocks[mid];
+      if (pos < block.from) {
+        hi = mid - 1;
+      } else if (pos > block.to) {
+        lo = mid + 1;
+      } else {
+        // pos is inside this block — runnable only if pos is exactly the block start
+        return { runnable: pos === block.from, index: block.index };
+      }
+    }
+    return { runnable: false, index: -1 };
+  }
+
+  // Slow fallback: scan lines up to target
+  let inRequest = false;
+  let requestIndex = -1;
+  for (let i = 1; i <= targetLineNo; i++) {
+    const text = view.state.doc.line(i).text;
+    if (isSeparatorLine(text)) { inRequest = false; continue; }
+    if (isMethodLine(text)) {
+      if (!inRequest) {
+        requestIndex++;
+        inRequest = true;
+        if (i === targetLineNo) return { runnable: true, index: requestIndex };
+      } else {
+        if (i === targetLineNo) return { runnable: false, index: requestIndex };
+      }
+    }
+  }
+  return { runnable: false, index: -1 };
 }

@@ -40,7 +40,7 @@ export type LintDeps = {
 export function createEditorLintExtensions(deps: LintDeps) {
   return [
     lintGutter(),
-    linter((view) => computeDiagnostics(view, deps), { delay: 250 })
+    linter((view) => computeDiagnostics(view, deps), { delay: 500 })
   ];
 }
 

@@ -319,7 +319,10 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos),
           onExecuteRequest: (index) => this.requestExecute.emit(index)
         }),
-        createRequestGutter((index) => this.requestExecute.emit(index)),
+        createRequestGutter(
+          (index) => this.requestExecute.emit(index),
+          () => this.requestBlockIndex
+        ),
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
@@ -858,7 +861,57 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
         const tree = syntaxTree(view.state);
 
-        for (let i = 1; i <= view.state.doc.lines; i++) {
+        // Determine viewport range with margin
+        const { from: vpFrom, to: vpTo } = view.viewport;
+        const vpStartLine = view.state.doc.lineAt(vpFrom).number;
+        const vpEndLine = view.state.doc.lineAt(vpTo).number;
+        const margin = 20;
+        const startLine = Math.max(1, vpStartLine - margin);
+        const endLine = Math.min(view.state.doc.lines, vpEndLine + margin);
+
+        // Quick scan lines before viewport to establish inScript/inRequestBlock state
+        for (let i = 1; i < startLine; i++) {
+          const text = view.state.doc.line(i).text;
+          const trimmedText = text.trimStart();
+          if (isSeparatorLine(text)) { inRequestBlock = false; }
+          if (isMethodLine(text) && !inRequestBlock) { inRequestBlock = true; }
+          const scriptStartMatch = trimmedText.match(/^([<>])\s*\{/);
+          if (scriptStartMatch && !inScript) {
+            inScript = true;
+            scriptBraceDepth = 0;
+            for (const char of text) {
+              if (char === '{') scriptBraceDepth++;
+              if (char === '}') scriptBraceDepth--;
+            }
+            if (scriptBraceDepth <= 0) inScript = false;
+            continue;
+          }
+          if (!inScript && (trimmedText === '<' || trimmedText === '>')) continue;
+          if (!inScript && trimmedText.startsWith('{')) {
+            const prevLine = i > 1 ? view.state.doc.line(i - 1).text.trim() : '';
+            if (prevLine === '<' || prevLine === '>') {
+              inScript = true;
+              scriptBraceDepth = 0;
+              for (const char of text) {
+                if (char === '{') scriptBraceDepth++;
+                if (char === '}') scriptBraceDepth--;
+              }
+              if (scriptBraceDepth <= 0) inScript = false;
+              continue;
+            }
+          }
+          if (inScript) {
+            for (const char of text) {
+              if (char === '{') scriptBraceDepth++;
+              if (char === '}') scriptBraceDepth--;
+            }
+            if (scriptBraceDepth <= 0) inScript = false;
+          }
+        }
+
+        // Decorate only lines in the viewport range (with margin)
+
+        for (let i = startLine; i <= endLine; i++) {
           const line = view.state.doc.line(i);
           const text = line.text;
           const trimmedText = text.trimStart();
