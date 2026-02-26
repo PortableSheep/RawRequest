@@ -17,6 +17,7 @@
       <nav class="nav-links">
         <a href="#screenshots">Screenshots</a>
         <a href="#features">Features</a>
+        <a href="#mcp">MCP</a>
         <a href="#workflow">Workflow</a>
         <a href="#install">Install</a>
         <a href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">GitHub</a>
@@ -31,7 +32,7 @@
         <div class="hero-text">
           <p class="eyebrow">Desktop HTTP client</p>
           <h1>Code-first requests, on desktop.</h1>
-          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. Use the GUI or CLI. History stays next to your file.</p>
+          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. Use the GUI, CLI, or let an AI drive it via MCP.</p>
           <div class="hero-actions">
             <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
             <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
@@ -102,27 +103,43 @@ Accept: application/json
         <div class="grid">
           <div class="card">
             <h3>Code-first editor</h3>
-            <p>CodeMirror 6 with search, folding, linting, and variable diagnostics that match your current file + env.</p>
+            <p>CodeMirror 6 with syntax highlighting, folding, linting, variable diagnostics, and viewport-optimized performance for large files.</p>
+          </div>
+          <div class="card">
+            <h3>Request navigation</h3>
+            <p>Outline panel (<kbd>⌘⇧O</kbd>) to browse and filter requests. Command palette (<kbd>⌘P</kbd>) for fuzzy search to jump to any request instantly.</p>
           </div>
           <div class="card">
             <h3>Built-in load testing</h3>
-            <p>Turn a request into a load test with <code>@load</code>, then watch progress and results without switching tools.</p>
+            <p>Turn a request into a load test with <code>@load</code>. Configure duration, users, ramp-up, and target RPS. Watch progress and get percentile breakdowns.</p>
           </div>
           <div class="card">
-            <h3>Secrets & envs</h3>
-            <p>Use <code>{{secret:key}}</code> placeholders and environment variables without sprinkling secrets into request files.</p>
+            <h3>Secrets manager</h3>
+            <p>Encrypted vault with <code>{{secret:key}}</code> placeholders. Sortable table with usage tracking, shared pool across environments, and optional master password to reveal values.</p>
           </div>
           <div class="card">
-            <h3>Portable history</h3>
-            <p>History and responses live beside your .http file (or working directory for unsaved files). Predictable, reviewable.</p>
+            <h3>Scripts &amp; chaining</h3>
+            <p>JavaScript pre/post scripts with <code>setVar</code>, <code>assert</code>, and <code>console.log</code>. Chain requests via <code>@depends</code> and reference prior responses.</p>
           </div>
           <div class="card">
-            <h3>Scripts & chaining</h3>
-            <p>Pre/post scripts (goja) with <code>setVar</code>/<code>getVar</code>, request patching, and simple assertions via <code>assert(...)</code>.</p>
+            <h3>Environments</h3>
+            <p>Define variables per environment with <code>@env.dev.baseUrl</code> syntax. Switch between dev, staging, and production with a single click.</p>
+          </div>
+          <div class="card">
+            <h3>OAuth2 support</h3>
+            <p>Automatic token management with <code>@auth oauth2</code>. Configure grant type, client credentials, and scopes per request.</p>
           </div>
           <div class="card">
             <h3>CLI mode</h3>
-            <p>Run named requests from the terminal with <code>rawrequest run file.http -n requestName</code>. Perfect for scripting and CI.</p>
+            <p>Run named requests from the terminal with <code>rawrequest run</code>. JSON, body, or quiet output. Secrets resolve automatically.</p>
+          </div>
+          <div class="card">
+            <h3>MCP server</h3>
+            <p>Let AI assistants (GitHub Copilot, Claude) discover and execute requests from <code>.http</code> files via chat. One config, all projects.</p>
+          </div>
+          <div class="card">
+            <h3>Portable history</h3>
+            <p>History and responses live beside your .http file. Predictable, reviewable, and easy to share or version control.</p>
           </div>
         </div>
       </section>
@@ -157,6 +174,62 @@ Accept: application/json
         </div>
       </section>
 
+      <section id="mcp" class="mcp-section">
+        <div class="section-title">
+          <h2>MCP Server</h2>
+          <p>Let AI assistants discover and run your HTTP requests via chat.</p>
+        </div>
+
+        <div class="mcp-layout">
+          <div class="mcp-info">
+            <p>RawRequest acts as an <a href="https://modelcontextprotocol.io" target="_blank" rel="noreferrer">MCP</a> server, giving AI assistants like GitHub Copilot, Claude, and others direct access to your <code>.http</code> files. Configure it once — it works across all your projects.</p>
+
+            <div class="mcp-tools">
+              <div class="mcp-tool">
+                <code>list_requests</code>
+                <span>Discover all requests in a file</span>
+              </div>
+              <div class="mcp-tool">
+                <code>run_request</code>
+                <span>Execute a request and get the full response</span>
+              </div>
+              <div class="mcp-tool">
+                <code>list_environments</code>
+                <span>See available environments and their variables</span>
+              </div>
+              <div class="mcp-tool">
+                <code>set_variable</code>
+                <span>Set variables for subsequent requests</span>
+              </div>
+            </div>
+
+            <p>Secrets resolve automatically from the same encrypted vault as the GUI. Tell the AI which file to use via <code>copilot-instructions.md</code> or in conversation.</p>
+          </div>
+
+          <div class="mcp-config">
+            <div class="card-header">VS Code / Copilot &nbsp;—&nbsp; .vscode/mcp.json</div>
+            <pre class="code"><code>{
+  "servers": {
+    "rawrequest": {
+      "type": "stdio",
+      "command": "rawrequest",
+      "args": ["mcp"]
+    }
+  }
+}</code></pre>
+            <div class="card-header" style="margin-top: 16px;">Claude Desktop</div>
+            <pre class="code"><code>{
+  "mcpServers": {
+    "rawrequest": {
+      "command": "rawrequest",
+      "args": ["mcp"]
+    }
+  }
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
       <section id="install" class="install">
         <div class="section-title">
           <h2>Install</h2>
@@ -177,11 +250,13 @@ brew install --cask rawrequest</code></pre>
             <p>Download <code>RawRequest-*-windows-portable.zip</code>, extract it, and run <code>RawRequest.exe</code>.</p>
             <p>If SmartScreen warns you, choose “More info” → “Run anyway”.</p>
           </div>          <div class="card">
-            <h3>CLI Usage</h3>
+            <h3>CLI &amp; MCP</h3>
             <p>Run requests from the terminal:</p>
             <pre class="code"><code>rawrequest run api.http -n login -e prod
 rawrequest run api.http -n getData -o body | jq .
-rawrequest list api.http
+rawrequest list api.http</code></pre>
+            <p>Start MCP server for AI assistants:</p>
+            <pre class="code"><code>rawrequest mcp
 rawrequest help</code></pre>
           </div>          <div class="card">
             <h3>License</h3>

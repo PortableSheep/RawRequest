@@ -2,7 +2,7 @@
 
 RawRequest is a code-first desktop HTTP client.
 
-Write requests in `.http` files, run them with environment variables and secrets, add small JavaScript scripts where needed, and keep history/results alongside your work.
+Write requests in `.http` files, run them with environment variables and secrets, add small JavaScript scripts where needed, and keep history/results alongside your work. Control it from the GUI, the CLI, or let an AI drive it via MCP.
 
 Built with [Wails](https://wails.io/) and Angular.
 
@@ -16,13 +16,16 @@ Built with [Wails](https://wails.io/) and Angular.
 
 ## Features
 
-- **HTTP file format**: run requests from `.http` files
+- **Code-first editor**: CodeMirror 6 with syntax highlighting, folding, linting, and variable diagnostics
+- **Request navigation**: outline panel (<kbd>⌘ Shift O</kbd>) and command palette (<kbd>⌘ P</kbd>) for quick access to any request
 - **CLI mode**: run named requests from the terminal for scripting/CI
-- **Request chaining**: chain requests with `@depends`
-- **Load testing**: built-in load testing with `@load`
-- **Secrets**: encrypted vault + `{{secret:key}}` placeholders
-- **Environments**: switch between dev/staging/prod via `@env.*`
-- **Scripts**: JavaScript pre/post blocks for dynamic requests and assertions
+- **MCP server**: let AI assistants (Copilot, Claude) discover and execute requests via chat
+- **Request chaining**: chain requests with `@depends` and reference prior responses
+- **Load testing**: built-in load testing with `@load` — RPS limiting, ramp-up, percentile breakdowns
+- **Secrets**: encrypted vault with `{{secret:key}}` placeholders, sortable manager with usage tracking
+- **Environments**: switch between dev/staging/prod via `@env.*` variables
+- **Scripts**: JavaScript pre/post blocks for dynamic requests, variable extraction, and assertions
+- **OAuth2**: `@auth oauth2` directive with automatic token management
 
 ## Installation
 

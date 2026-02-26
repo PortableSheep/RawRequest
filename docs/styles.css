@@ -311,6 +311,72 @@ h1, h2, h3 {
   margin-top: 70px;
 }
 
+.mcp-section {
+  margin-top: 70px;
+}
+
+.mcp-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+  align-items: start;
+}
+
+.mcp-info {
+  font-size: 16px;
+}
+
+.mcp-info a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mcp-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.mcp-tool {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.mcp-tool code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 14px;
+  color: var(--accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mcp-tool span {
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.mcp-config {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 768px) {
+  .mcp-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
 .steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
