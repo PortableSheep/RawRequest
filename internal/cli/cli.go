@@ -15,6 +15,7 @@ const (
 	CommandRun     Command = "run"
 	CommandList    Command = "list"
 	CommandEnvs    Command = "envs"
+	CommandMCP     Command = "mcp"
 	CommandVersion Command = "version"
 	CommandHelp    Command = "help"
 )
@@ -53,7 +54,7 @@ func Parse(args []string) *Options {
 	// Check if first argument is a command
 	cmd := strings.ToLower(args[1])
 	switch cmd {
-	case "run", "list", "envs", "version", "help", "--help", "-h", "--version", "-v":
+	case "run", "list", "envs", "mcp", "version", "help", "--help", "-h", "--version", "-v":
 		// CLI mode
 	default:
 		return nil // Unknown command, run GUI
@@ -76,6 +77,20 @@ func Parse(args []string) *Options {
 	}
 
 	opts.Command = Command(cmd)
+
+	// MCP command: no file required, optional --env flag
+	if opts.Command == CommandMCP {
+		fs := flag.NewFlagSet("rawrequest-mcp", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		fs.StringVar(&opts.Environment, "env", "", "Default environment to use")
+		fs.StringVar(&opts.Environment, "e", "", "Default environment (shorthand)")
+		if len(args) > 2 {
+			if err := fs.Parse(args[2:]); err != nil {
+				opts.ShowHelp = true
+			}
+		}
+		return opts
+	}
 
 	// Need at least a file argument for run/list/envs
 	if len(args) < 3 {
@@ -152,10 +167,11 @@ Usage:
   rawrequest run <file> [options]     Execute requests from an .http file
   rawrequest list <file>              List all named requests in a file
   rawrequest envs <file>              List environments defined in a file
+  rawrequest mcp [options]            Start MCP server for AI assistant integration
   rawrequest version                  Show version
   rawrequest help                     Show this help
 
-Options:
+Run Options:
   -n, --name <name>      Request name to execute (can be repeated for chains)
                          If omitted, executes all requests in the file
   -e, --env <env>        Environment to use (default: "default")
@@ -164,6 +180,9 @@ Options:
   -o, --output <format>  Output format: json|body|full|quiet (default: full)
   --verbose              Show request details before execution
   --no-scripts           Disable pre/post scripts
+
+MCP Options:
+  -e, --env <env>        Default environment for requests
 
 Output Formats:
   json    JSON response with status, headers, body, and timing
@@ -192,6 +211,10 @@ Examples:
 
   # List environments
   rawrequest envs api.http
+
+  # Start MCP server for AI assistants (Copilot, Claude, etc.)
+  rawrequest mcp
+  rawrequest mcp --env dev
 
 `, version)
 }

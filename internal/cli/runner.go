@@ -10,19 +10,27 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
 
+// SecretResolver can retrieve secret values by environment and key.
+type SecretResolver interface {
+	GetSecret(env, key string) (string, error)
+}
+
 // Runner executes HTTP requests in CLI mode
 type Runner struct {
-	httpClient *http.Client
-	variables  map[string]string
-	envVars    map[string]string
-	verbose    bool
-	noScripts  bool
-	timeout    time.Duration
-	version    string
+	httpClient     *http.Client
+	variables      map[string]string
+	envVars        map[string]string
+	verbose        bool
+	noScripts      bool
+	timeout        time.Duration
+	version        string
+	secretResolver SecretResolver
+	environment    string
 }
 
 // NewRunner creates a new CLI runner
@@ -35,12 +43,13 @@ func NewRunner(opts *Options, version string) *Runner {
 				},
 			},
 		},
-		variables: opts.Variables,
-		envVars:   make(map[string]string),
-		verbose:   opts.Verbose,
-		noScripts: opts.NoScripts,
-		timeout:   time.Duration(opts.Timeout) * time.Second,
-		version:   version,
+		variables:   opts.Variables,
+		envVars:     make(map[string]string),
+		verbose:     opts.Verbose,
+		noScripts:   opts.NoScripts,
+		timeout:     time.Duration(opts.Timeout) * time.Second,
+		version:     version,
+		environment: opts.Environment,
 	}
 }
 
@@ -339,6 +348,9 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 func (r *Runner) resolveVariables(input string) string {
 	result := input
 
+	// Replace secrets: {{secret:KEY}}
+	result = r.resolveSecrets(result)
+
 	// Replace variables from CLI args and file
 	for k, v := range r.variables {
 		result = strings.ReplaceAll(result, "{{"+k+"}}", v)
@@ -358,6 +370,55 @@ func (r *Runner) resolveVariables(input string) string {
 	}
 
 	return result
+}
+
+var secretPattern = regexp.MustCompile(`\{\{\s*secret:([a-zA-Z0-9_\-\.]+)\s*\}\}`)
+
+func (r *Runner) resolveSecrets(input string) string {
+	if r.secretResolver == nil {
+		return input
+	}
+	return secretPattern.ReplaceAllStringFunc(input, func(match string) string {
+		sub := secretPattern.FindStringSubmatch(match)
+		if len(sub) < 2 {
+			return match
+		}
+		key := sub[1]
+		env := r.environment
+		if env == "" {
+			env = "default"
+		}
+		// Try environment-specific first, then fall back to default
+		val, err := r.secretResolver.GetSecret(env, key)
+		if err != nil && env != "default" {
+			val, err = r.secretResolver.GetSecret("default", key)
+		}
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)
+			return match
+		}
+		return val
+	})
+}
+
+// SetSecretResolver sets the secret resolver for {{secret:KEY}} placeholders.
+func (r *Runner) SetSecretResolver(sr SecretResolver) {
+	r.secretResolver = sr
+}
+
+// SetEnvironment sets the active environment name.
+func (r *Runner) SetEnvironment(env string) {
+	r.environment = env
+}
+
+// SetVariable sets a runtime variable.
+func (r *Runner) SetVariable(key, value string) {
+	r.variables[key] = value
+}
+
+// ResolveForTest exposes resolveVariables for testing.
+func (r *Runner) ResolveForTest(input string) string {
+	return r.resolveVariables(input)
 }
 
 func outputResults(results []ResponseResult, format OutputFormat) {

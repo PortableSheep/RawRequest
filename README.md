@@ -136,6 +136,64 @@ rawrequest envs requests.http
 
 Run `rawrequest help` for full usage details.
 
+## MCP Server (AI Assistant Integration)
+
+RawRequest can act as an [MCP](https://modelcontextprotocol.io) server, allowing AI assistants like GitHub Copilot, Claude, and others to discover and execute HTTP requests from your `.http` files via chat.
+
+### Setup
+
+Configure your AI client to use RawRequest as an MCP server. The server uses stdio transport — no ports or HTTP endpoints needed.
+
+**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
+```json
+{
+  "servers": {
+    "rawrequest": {
+      "type": "stdio",
+      "command": "rawrequest",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Claude Desktop** (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "rawrequest": {
+      "command": "rawrequest",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+You can optionally set a default environment: `"args": ["mcp", "--env", "dev"]`
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_requests` | List all requests in a `.http` file (name, method, URL, group) |
+| `run_request` | Execute a named request and return the full response |
+| `list_environments` | Show available environments and their variables |
+| `set_variable` | Set a variable for use in subsequent requests |
+
+### Telling the AI about your files
+
+Add a note in your project's `copilot-instructions.md`, `claude.md`, or similar:
+
+```markdown
+## API Testing
+Use the RawRequest MCP server to run HTTP requests.
+The API definitions are in `api.http`. Use the "dev" environment.
+```
+
+### Secrets
+
+The MCP server can resolve `{{secret:KEY}}` placeholders using the same encrypted vault as the GUI (stored at `~/.config/rawrequest/secrets/`). Set up secrets in the GUI first, then they work automatically in MCP mode.
+
 ## Documentation
 
 - The landing page lives in [docs/index.html](./docs/index.html).
