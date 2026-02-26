@@ -91,6 +91,9 @@ build_windows() {
     mkdir -p "$BUILD_DIR/releases/portable"
     cp "./build/bin/${APP_NAME}.exe" "$BUILD_DIR/releases/portable/"
 
+    # Include CLI setup script
+    cp "$PROJECT_ROOT/scripts/setup-cli.bat" "$BUILD_DIR/releases/portable/"
+
     # Build and include updater helper
     print_status "Building updater helper..."
     CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o "$BUILD_DIR/releases/portable/rawrequest-updater.exe" ./cmd/rawrequest-updater
@@ -100,6 +103,12 @@ $APP_NAME - Portable Edition
 Version: $VERSION
 
 Simply run ${APP_NAME}.exe to start the application.
+
+CLI Setup:
+  Run setup-cli.bat to add 'rawrequest' to your PATH.
+  This enables CLI and MCP usage:
+    rawrequest run api.http -n login
+    rawrequest mcp
 
 Note: On first run, Windows SmartScreen may show a warning.
 Click "More info" then "Run anyway" to proceed.

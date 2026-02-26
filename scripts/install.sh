@@ -72,9 +72,22 @@ cp -R "$APP_PATH" "$INSTALL_DIR/"
 # Remove quarantine attribute
 xattr -dr com.apple.quarantine "$INSTALL_DIR/RawRequest.app" 2>/dev/null || true
 
+# Create CLI symlink so 'rawrequest' is available on PATH
+CLI_LINK="/usr/local/bin/rawrequest"
+CLI_TARGET="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
+echo "Creating CLI symlink at $CLI_LINK..."
+if [ -L "$CLI_LINK" ] || [ -e "$CLI_LINK" ]; then
+    sudo rm -f "$CLI_LINK"
+fi
+sudo ln -s "$CLI_TARGET" "$CLI_LINK"
+
 echo -e "${GREEN}✓ RawRequest installed successfully!${NC}"
 echo ""
 echo "To open RawRequest:"
 echo "  open /Applications/RawRequest.app"
+echo ""
+echo "CLI usage:"
+echo "  rawrequest run api.http -n login"
+echo "  rawrequest mcp"
 echo ""
 echo "Or find it in your Applications folder."
