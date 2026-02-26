@@ -24,6 +24,7 @@ var examplesFS embed.FS
 func main() {
 	// Check for CLI mode
 	if opts := cli.Parse(os.Args); opts != nil {
+		suppressGUI()
 		if opts.Command == cli.CommandMCP {
 			if err := startMCPServer(opts); err != nil {
 				fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
