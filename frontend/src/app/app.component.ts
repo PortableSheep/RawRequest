@@ -17,6 +17,7 @@ import {
   ScriptSnippetModalComponent
 } from './components';
 import { OutlinePanelComponent } from './components/outline-panel/outline-panel.component';
+import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
 import { ToastContainerComponent } from './components/toast-container/toast-container.component';
 import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress, ChainEntryPreview } from './models/http.models';
 import { HttpService } from './services/http.service';
@@ -107,7 +108,8 @@ type AlertType = 'info' | 'success' | 'warning' | 'danger';
     ToastContainerComponent,
     UpdateNotificationComponent,
     ScriptSnippetModalComponent,
-    OutlinePanelComponent
+    OutlinePanelComponent,
+    CommandPaletteComponent
   ],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.scss']
@@ -244,6 +246,7 @@ export class AppComponent implements OnInit, OnDestroy {
   showHistoryModal = false;
   selectedHistoryItem: HistoryItem | null = null;
   showOutlinePanel = false;
+  showCommandPalette = false;
   showLoadTestResults = false;
   loadTestMetrics: any = null;
   showDonationModal = false;
@@ -718,6 +721,9 @@ export class AppComponent implements OnInit, OnDestroy {
         return;
       case 'closeOutline':
         this.showOutlinePanel = false;
+        return;
+      case 'toggleCommandPalette':
+        this.showCommandPalette = !this.showCommandPalette;
         return;
       case 'cancelRequest':
         void this.cancelActiveRequest();

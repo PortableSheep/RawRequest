@@ -1,0 +1,97 @@
+.rr-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  padding-top: 15vh;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.rr-palette-dialog {
+  width: 560px;
+  max-height: 420px;
+  display: flex;
+  flex-direction: column;
+  background: var(--rr-surface, #1e1e1e);
+  border: 1px solid var(--rr-border, #333);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.rr-palette-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  border-bottom: 1px solid var(--rr-border, #333);
+  background: transparent;
+  color: var(--rr-text, #ccc);
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  box-sizing: border-box;
+
+  &::placeholder {
+    color: var(--rr-text-muted, #666);
+  }
+}
+
+.rr-palette-results {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.rr-palette-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  color: var(--rr-text, #ccc);
+  font-size: 13px;
+
+  &--selected {
+    background: var(--rr-highlight, #2a2a2a);
+  }
+}
+
+.rr-palette-method {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 3px;
+  min-width: 52px;
+  text-align: center;
+  flex-shrink: 0;
+
+  &--get { color: #61affe; background: rgba(97, 175, 254, 0.1); }
+  &--post { color: #49cc90; background: rgba(73, 204, 144, 0.1); }
+  &--put { color: #fca130; background: rgba(252, 161, 48, 0.1); }
+  &--patch { color: #50e3c2; background: rgba(80, 227, 194, 0.1); }
+  &--delete { color: #f93e3e; background: rgba(249, 62, 62, 0.1); }
+  &--head { color: #9012fe; background: rgba(144, 18, 254, 0.1); }
+  &--options { color: #0d5aa7; background: rgba(13, 90, 167, 0.1); }
+}
+
+.rr-palette-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rr-palette-group {
+  color: var(--rr-text-muted, #666);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.rr-palette-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--rr-text-muted, #666);
+  font-size: 13px;
+}

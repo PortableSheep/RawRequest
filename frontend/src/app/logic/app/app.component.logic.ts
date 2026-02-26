@@ -2,7 +2,7 @@ import type { ActiveRunProgress, FileTab, Request, ScriptLogEntry } from '../../
 
 export type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 
-export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory' | 'toggleOutline' | 'closeOutline' | 'cancelRequest';
+export type GlobalKeydownAction = 'none' | 'save' | 'saveAs' | 'closeHistoryModal' | 'toggleHistory' | 'toggleOutline' | 'closeOutline' | 'toggleCommandPalette' | 'cancelRequest';
 
 export interface GlobalKeydownDecision {
   action: GlobalKeydownAction;
@@ -220,6 +220,11 @@ export function decideGlobalKeydownAction(args: {
   // Cmd/Ctrl+Shift+O → toggle outline panel
   if ((args.metaKey || args.ctrlKey) && args.shiftKey && key.toLowerCase() === 'o') {
     return { action: 'toggleOutline', shouldPreventDefault: true, shouldStopPropagation: true };
+  }
+
+  // Cmd/Ctrl+P → toggle command palette
+  if ((args.metaKey || args.ctrlKey) && key.toLowerCase() === 'p') {
+    return { action: 'toggleCommandPalette', shouldPreventDefault: true, shouldStopPropagation: true };
   }
 
   if (key !== 'Escape') {

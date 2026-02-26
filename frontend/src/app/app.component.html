@@ -221,6 +221,12 @@
         (onClose)="showOutlinePanel = false"
         (onRequestSelect)="scrollEditorToRequest($event)">
    </app-outline-panel>
+   <app-command-palette
+        [isOpen]="showCommandPalette"
+        [requests]="currentFile.requests"
+        (onClose)="showCommandPalette = false"
+        (onRequestSelect)="scrollEditorToRequest($event)">
+   </app-command-palette>
    <app-history-detail-modal
         [isOpen]="showHistoryModal"
         [item]="selectedHistoryItem"

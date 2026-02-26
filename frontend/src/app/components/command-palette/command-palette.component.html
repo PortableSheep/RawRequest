@@ -1,0 +1,34 @@
+@if (isOpen()) {
+  <div class="rr-palette-overlay" (click)="onClose.emit()">
+    <div class="rr-palette-dialog" (click)="$event.stopPropagation()" (keydown)="onKeydown($event)">
+      <input
+        #searchInput
+        class="rr-palette-input"
+        type="text"
+        placeholder="Type to search requests..."
+        [ngModel]="query()"
+        (ngModelChange)="onQueryChange($event)"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div class="rr-palette-results">
+        @for (match of results(); track match.item.requestIndex; let i = $index) {
+          <div
+            class="rr-palette-item"
+            [class.rr-palette-item--selected]="i === selectedIndex()"
+            (click)="selectItem(match)"
+            (mouseenter)="selectedIndex.set(i)"
+          >
+            <span [class]="getMethodClass(match.item.method)">{{ match.item.method }}</span>
+            <span class="rr-palette-label">{{ match.item.label || match.item.url }}</span>
+            @if (match.item.group) {
+              <span class="rr-palette-group">{{ match.item.group }}</span>
+            }
+          </div>
+        } @empty {
+          <div class="rr-palette-empty">No matching requests</div>
+        }
+      </div>
+    </div>
+  </div>
+}
