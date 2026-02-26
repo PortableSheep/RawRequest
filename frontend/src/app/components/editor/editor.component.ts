@@ -355,6 +355,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               const hadSelection = !view.state.selection.main.empty;
               const downX = event.clientX;
               const downY = event.clientY;
+              // Capture the document position the user actually clicked on
+              const clickedPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
               
               // Track whether the user dragged (intentional selection)
               const onMouseUp = (upEvent: MouseEvent) => {
@@ -365,13 +367,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
                 // Use setTimeout to check after CodeMirror processes the click
                 setTimeout(() => {
-                  const newScrollTop = view.scrollDOM.scrollTop;
                   const selection = view.state.selection.main;
-                  
-                  // If scroll jumped more than 100px, restore it
-                  if (Math.abs(newScrollTop - scrollTop) > 100) {
-                    view.scrollDOM.scrollTop = scrollTop;
-                  }
                   
                   // If a selection was created but there wasn't one before,
                   // and user didn't drag, collapse it (accidental scroll+click selection)
@@ -386,8 +382,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                         toLineNumber: toLine
                       })
                     ) {
+                      // Use the captured click position so cursor goes where the
+                      // user actually clicked, not selection.to which may be the
+                      // old cursor position if the user scrolled upward.
+                      const targetPos = clickedPos ?? selection.head;
                       view.dispatch({
-                        selection: { anchor: selection.to }
+                        selection: { anchor: targetPos }
                       });
                     }
                   }
