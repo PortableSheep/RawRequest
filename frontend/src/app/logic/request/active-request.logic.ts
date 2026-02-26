@@ -10,6 +10,7 @@ export type ActiveRequestInfo = {
   canCancel: boolean;
   type: 'single' | 'chain' | 'load';
   startedAt: number;
+  processedUrl?: string;
 };
 
 export type LoadRunUiState = {

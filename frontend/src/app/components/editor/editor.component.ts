@@ -348,7 +348,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               }
             }
 
-            if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
+            // Skip accidental-selection prevention for double/triple clicks
+            // (event.detail >= 2) so word/line selection works naturally.
+            if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.detail < 2) {
               const scrollTop = view.scrollDOM.scrollTop;
               const hadSelection = !view.state.selection.main.empty;
               const downX = event.clientX;

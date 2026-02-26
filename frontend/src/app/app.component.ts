@@ -78,6 +78,8 @@ import {
 import { buildStopActiveRunTickPatch } from './logic/active-run/active-run-stop.logic';
 import { decideActiveRunTickActions } from './logic/active-run/active-run-tick.logic';
 import { buildActiveRequestInfo, buildInitialLoadRunUiState } from './logic/request/active-request.logic';
+import { getCombinedVariablesForFile, getActiveEnvNameForFile } from './components/request-manager/env-vars';
+import { hydrateText } from './services/http/hydration';
 import { consumeQueuedRequest } from './logic/request/request-queue.logic';
 import { buildPendingRequestResetPatch } from './logic/request/pending-request-reset.logic';
 import { buildCancelActiveRequestErrorPatch, decideCancelActiveRequest } from './logic/request/cancel-active-request.logic';
@@ -537,6 +539,18 @@ export class AppComponent implements OnInit, OnDestroy {
     this.activeRequestInfo = buildActiveRequestInfo(activeFile.id, requestIndex, request, now);
     this.isCancellingActiveRequest = false;
 
+    // Eagerly hydrate the URL so the pending modal shows the resolved URL
+    const variables = getCombinedVariablesForFile(activeFile, this.currentEnvSignal());
+    const envName = getActiveEnvNameForFile(activeFile, this.currentEnvSignal());
+    const capturedId = this.activeRequestInfo.id;
+    hydrateText(request.url, variables, envName, (text, env) => this.secretService.replaceSecrets(text, env))
+      .then(resolved => {
+        if (this.activeRequestInfo?.id === capturedId) {
+          this.activeRequestInfo = { ...this.activeRequestInfo, processedUrl: resolved };
+        }
+      })
+      .catch(() => {});
+
     const loadRun = buildInitialLoadRunUiState(this.loadUsersSeriesMaxPoints, this.loadRpsSeriesMaxPoints);
     this.activeRunProgress = loadRun.activeRunProgress;
 
@@ -891,7 +905,8 @@ export class AppComponent implements OnInit, OnDestroy {
   getActiveRequestPreview(): string {
     const request = this.getActiveRequestDetails();
     const processedUrl = this.activeRequestInfo
-      ? this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+         ?? this.activeRequestInfo.processedUrl)
       : undefined;
     return buildActiveRequestPreview(request, processedUrl);
   }
@@ -903,7 +918,8 @@ export class AppComponent implements OnInit, OnDestroy {
   getActiveRequestMeta(): string {
     const request = this.getActiveRequestDetails();
     const processedUrl = this.activeRequestInfo
-      ? this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
+         ?? this.activeRequestInfo.processedUrl)
       : undefined;
     return buildActiveRequestMeta({
       activeRequestInfo: this.activeRequestInfo,
