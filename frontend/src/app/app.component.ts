@@ -15,7 +15,6 @@ import {
   ConsoleDrawerComponent,
   UpdateNotificationComponent,
   ScriptSnippetModalComponent,
-  SecretsModalComponent
 } from './components';
 import { OutlinePanelComponent } from './components/outline-panel/outline-panel.component';
 import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
@@ -238,6 +237,7 @@ export class AppComponent implements OnInit, OnDestroy {
     canCancel: boolean;
     type: 'single' | 'chain' | 'load';
     startedAt: number;
+    processedUrl?: string;
   } | null = null;
   isCancellingActiveRequest = false;
   downloadProgress: { downloaded: number; total: number } | null = null;
@@ -554,7 +554,7 @@ export class AppComponent implements OnInit, OnDestroy {
     hydrateText(request.url, variables, envName, (text, env) => this.secretService.replaceSecrets(text, env))
       .then(resolved => {
         if (this.activeRequestInfo?.id === capturedId) {
-          this.activeRequestInfo = { ...this.activeRequestInfo, processedUrl: resolved };
+          this.activeRequestInfo = { ...this.activeRequestInfo!, processedUrl: resolved };
         }
       })
       .catch(() => {});

@@ -168,6 +168,7 @@ export function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic
   // These don't depend on the parsed request model and help catch structural mistakes early.
   {
     const doc = view.state.doc;
+    const seenNames = new Map<string, { from: number; to: number }>();
     tree.iterate({
       enter: (node) => {
         if (node.type.name !== 'RequestBlock') return;
@@ -362,6 +363,18 @@ export function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic
                   severity: 'warning',
                   message: 'Missing @name value'
                 });
+              } else {
+                const prev = seenNames.get(nameArg);
+                if (prev) {
+                  diagnostics.push({
+                    from: child.from,
+                    to: child.to,
+                    severity: 'error',
+                    message: `Duplicate @name "${nameArg}"`
+                  });
+                } else {
+                  seenNames.set(nameArg, { from: child.from, to: child.to });
+                }
               }
             }
 

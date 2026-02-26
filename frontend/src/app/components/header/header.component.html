@@ -176,6 +176,28 @@
         <button
             type="button"
             class="rr-btn btn-ambient"
+            (click)="onOutlineClick.emit()"
+            title="Outline (⌘/Ctrl+Shift+O)"
+            aria-label="Toggle outline panel"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M5 6v.01" /><path d="M5 12v.01" /><path d="M5 18v.01" /></svg>
+            <span>Outline</span>
+        </button>
+
+        <button
+            type="button"
+            class="rr-btn btn-ambient"
+            (click)="onSearchRequestsClick.emit()"
+            title="Search Requests (⌘/Ctrl+P)"
+            aria-label="Search requests"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><circle cx="10" cy="10" r="7" /><path d="M21 21l-6 -6" /></svg>
+            <span>Search</span>
+        </button>
+
+        <button
+            type="button"
+            class="rr-btn btn-ambient"
             (click)="onHistoryClick.emit()"
             title="History"
             aria-label="View request history"

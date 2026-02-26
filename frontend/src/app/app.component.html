@@ -20,7 +20,9 @@
             (onRevealInFinder)="revealInFinder($event)"
             (onCloseOtherTabs)="closeOtherTabs($event)"
             (onImportPostman)="importPostmanCollection()"
-            (onImportBruno)="importBrunoCollection()">
+            (onImportBruno)="importBrunoCollection()"
+            (onOutlineClick)="toggleOutlinePanel()"
+            (onSearchRequestsClick)="showCommandPalette = !showCommandPalette">>
     </app-header>
 
     <main class="rr-app__main">

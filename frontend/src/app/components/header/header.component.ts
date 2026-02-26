@@ -37,6 +37,8 @@ export class HeaderComponent {
   onCloseOtherTabs = output<number>();
   onImportPostman = output<void>();
   onImportBruno = output<void>();
+  onOutlineClick = output<void>();
+  onSearchRequestsClick = output<void>();
 
   draggingIndex: number | null = null;
   dragOverIndex: number | null = null;

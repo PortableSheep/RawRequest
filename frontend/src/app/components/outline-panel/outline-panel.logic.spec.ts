@@ -16,12 +16,12 @@ describe('outline-panel.logic', () => {
 
     it('uses request name as label when available', () => {
       const entries = buildOutlineEntries([makeRequest({ name: 'GetUsers', method: 'GET' })]);
-      expect(entries).toEqual([{ requestIndex: 0, method: 'GET', label: 'GetUsers', group: null }]);
+      expect(entries).toEqual([{ requestIndex: 0, method: 'GET', label: 'GetUsers', url: 'https://example.com/users', group: null }]);
     });
 
-    it('extracts path from URL as fallback label', () => {
+    it('uses full URL as fallback label', () => {
       const entries = buildOutlineEntries([makeRequest({ url: 'https://api.example.com/v1/users' })]);
-      expect(entries[0].label).toBe('/v1/users');
+      expect(entries[0].label).toBe('https://api.example.com/v1/users');
     });
 
     it('uses full URL when no path extractable', () => {
@@ -31,7 +31,7 @@ describe('outline-panel.logic', () => {
 
     it('handles template variables in URL', () => {
       const entries = buildOutlineEntries([makeRequest({ url: '{{baseUrl}}/users' })]);
-      expect(entries[0].label).toBe('/users');
+      expect(entries[0].label).toBe('{{baseUrl}}/users');
     });
 
     it('preserves group from request', () => {
@@ -48,8 +48,8 @@ describe('outline-panel.logic', () => {
   describe('groupOutlineEntries', () => {
     it('puts ungrouped entries first', () => {
       const entries = [
-        { requestIndex: 0, method: 'GET', label: 'A', group: null },
-        { requestIndex: 1, method: 'POST', label: 'B', group: 'Auth' }
+        { requestIndex: 0, method: 'GET', label: 'A', url: '', group: null },
+        { requestIndex: 1, method: 'POST', label: 'B', url: '', group: 'Auth' }
       ];
       const groups = groupOutlineEntries(entries);
       expect(groups.length).toBe(2);
@@ -60,8 +60,8 @@ describe('outline-panel.logic', () => {
 
     it('groups multiple requests under same group', () => {
       const entries = [
-        { requestIndex: 0, method: 'POST', label: 'Login', group: 'Auth' },
-        { requestIndex: 1, method: 'POST', label: 'Logout', group: 'Auth' }
+        { requestIndex: 0, method: 'POST', label: 'Login', url: '', group: 'Auth' },
+        { requestIndex: 1, method: 'POST', label: 'Logout', url: '', group: 'Auth' }
       ];
       const groups = groupOutlineEntries(entries);
       expect(groups.length).toBe(1);
@@ -75,9 +75,9 @@ describe('outline-panel.logic', () => {
 
   describe('filterOutlineEntries', () => {
     const entries = [
-      { requestIndex: 0, method: 'GET', label: 'GetUsers', group: 'Users' },
-      { requestIndex: 1, method: 'POST', label: 'Login', group: 'Auth' },
-      { requestIndex: 2, method: 'DELETE', label: 'RemoveUser', group: null }
+      { requestIndex: 0, method: 'GET', label: 'GetUsers', url: 'https://example.com/users', group: 'Users' },
+      { requestIndex: 1, method: 'POST', label: 'Login', url: 'https://example.com/auth', group: 'Auth' },
+      { requestIndex: 2, method: 'DELETE', label: 'RemoveUser', url: 'https://example.com/users/1', group: null }
     ];
 
     it('returns all entries for empty query', () => {

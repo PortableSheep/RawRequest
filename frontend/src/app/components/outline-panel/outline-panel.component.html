@@ -22,9 +22,11 @@
 
   <div class="outline-drawer__search">
     <input type="text"
+           #filterInput
            class="outline-drawer__search-input"
            placeholder="Filter requests..."
-           [(ngModel)]="filterQuery"
+           [ngModel]="filterQuery()"
+           (ngModelChange)="filterQuery.set($event)"
            autocomplete="off"
            spellcheck="false" />
   </div>

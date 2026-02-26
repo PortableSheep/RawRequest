@@ -4,6 +4,7 @@ export interface OutlineEntry {
   requestIndex: number;
   method: string;
   label: string;
+  url: string;
   group: string | null;
 }
 
@@ -16,7 +17,8 @@ export function buildOutlineEntries(requests: Request[]): OutlineEntry[] {
   return requests.map((r, i) => ({
     requestIndex: i,
     method: (r.method || 'GET').toUpperCase(),
-    label: r.name || extractPathFromUrl(r.url) || r.url || '(unnamed)',
+    label: r.name || r.url || '(unnamed)',
+    url: r.url || '',
     group: r.group || null
   }));
 }
@@ -62,6 +64,7 @@ export function filterOutlineEntries(entries: OutlineEntry[], query: string): Ou
   return entries.filter(e =>
     e.label.toLowerCase().includes(q) ||
     e.method.toLowerCase().includes(q) ||
+    e.url.toLowerCase().includes(q) ||
     (e.group || '').toLowerCase().includes(q)
   );
 }

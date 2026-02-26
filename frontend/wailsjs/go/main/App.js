@@ -214,12 +214,12 @@ export function SetEnvVariable(arg1, arg2) {
   return window['go']['main']['App']['SetEnvVariable'](arg1, arg2);
 }
 
-export function SetMasterPassword(arg1) {
-  return window['go']['main']['App']['SetMasterPassword'](arg1);
-}
-
 export function SetEnvironment(arg1) {
   return window['go']['main']['App']['SetEnvironment'](arg1);
+}
+
+export function SetMasterPassword(arg1) {
+  return window['go']['main']['App']['SetMasterPassword'](arg1);
 }
 
 export function SetVariable(arg1, arg2) {
