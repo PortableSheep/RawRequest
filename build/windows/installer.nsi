@@ -3,6 +3,7 @@
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "WordFunc.nsh"
 
 ; --------------------------------
 ; General Configuration
