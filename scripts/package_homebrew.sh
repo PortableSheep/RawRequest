@@ -38,10 +38,11 @@ rm -rf "$TARGET_DIR"/*
 # Copy the app bundle
 cp -R "$BUILD_DIR/RawRequest.app" "$TARGET_DIR/"
 
-# Copy CLI binary + service launcher (required for split-architecture tooling)
+# Extract CLI binary from app bundle if standalone build not available
 if [[ ! -x "$BUILD_DIR/RawRequest" ]]; then
-  echo "Missing CLI binary at $BUILD_DIR/RawRequest. Build step must produce rawrequest CLI." >&2
-  exit 1
+  echo "Extracting CLI binary from app bundle..."
+  cp "$BUILD_DIR/RawRequest.app/Contents/MacOS/RawRequest" "$BUILD_DIR/RawRequest"
+  chmod +x "$BUILD_DIR/RawRequest"
 fi
 cp "$BUILD_DIR/RawRequest" "$TARGET_DIR/rawrequest"
 cat > "$TARGET_DIR/rawrequest-service" << 'EOF'
