@@ -188,7 +188,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-release
-          path: dist/releases/*
+          path: |
+            dist/releases/*
+            !dist/releases/installer-staging
 
   release:
     needs: [build-macos, build-windows]
@@ -262,7 +264,7 @@ jobs:
       - name: Generate SHA256 checksums
         run: |
           cd artifacts
-          sha256sum * > SHA256SUMS.txt
+          find . -maxdepth 1 -type f ! -name SHA256SUMS.txt -exec sha256sum {} + > SHA256SUMS.txt
           echo "--- SHA256 Checksums ---"
           cat SHA256SUMS.txt
 
