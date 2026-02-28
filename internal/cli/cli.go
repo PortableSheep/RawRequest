@@ -243,6 +243,7 @@ Usage:
   rawrequest list <file>              List all named requests in a file
   rawrequest envs <file>              List environments defined in a file
   rawrequest mcp [options]            Start MCP server for AI assistant integration
+  rawrequest service [options]        Start local HTTP backend service
   rawrequest version                  Show version
   rawrequest help                     Show this help
 
@@ -268,6 +269,9 @@ Load Test Options:
   --adaptive             Enable adaptive load control
   -o, --output <format>  Output: full|json|quiet (default: full)
   --service <url>        Service URL (default: auto-start on 127.0.0.1:7345)
+
+Service Options:
+  --addr <host:port>     Address to bind (default: 127.0.0.1:7345)
 
 MCP Options:
   -e, --env <env>        Default environment for requests
@@ -310,6 +314,10 @@ Examples:
   # Start MCP server for AI assistants (Copilot, Claude, etc.)
   rawrequest mcp
   rawrequest mcp --env dev
+
+  # Start HTTP backend service
+  rawrequest service
+  rawrequest service --addr 0.0.0.0:8080
 
 `, version)
 }

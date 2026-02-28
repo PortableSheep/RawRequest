@@ -159,6 +159,20 @@ jobs:
           }
           Compress-Archive -Path "dist/portable/*" -DestinationPath "dist/releases/RawRequest-$VERSION-windows-portable.zip"
 
+      - name: Install NSIS
+        shell: powershell
+        run: |
+          choco install nsis -y
+
+      - name: Create Windows Installer
+        shell: powershell
+        run: |
+          $VERSION = "${{ steps.version.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path "dist\releases\installer-staging"
+          Copy-Item "build\bin\RawRequest.exe" "dist\releases\installer-staging\"
+          Copy-Item "dist\portable\rawrequest-updater.exe" "dist\releases\installer-staging\"
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION "build\windows\installer.nsi"
+
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
