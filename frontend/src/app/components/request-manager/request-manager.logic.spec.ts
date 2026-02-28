@@ -113,11 +113,17 @@ describe('request-manager.logic', () => {
     const resp = buildLoadTestSummaryResponse({
       metrics,
       results: { startTime: 1000, endTime: 2500 },
-      statusText: 'Load Test Complete'
+      statusText: 'Load Test Complete',
+      method: 'GET',
+      url: 'https://example.com/api',
+      name: 'healthCheck'
     });
 
     expect(resp.status).toBe(200);
     expect(resp.responseTime).toBe(1500);
     expect(resp.body).toContain('"totalRequests"');
+    expect(resp.requestPreview?.method).toBe('GET (Load Test)');
+    expect(resp.requestPreview?.url).toBe('https://example.com/api');
+    expect(resp.processedUrl).toBe('https://example.com/api');
   });
 });

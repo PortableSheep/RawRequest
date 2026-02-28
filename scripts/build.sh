@@ -92,7 +92,16 @@ build_windows() {
     cp "./build/bin/${APP_NAME}.exe" "$BUILD_DIR/releases/portable/"
 
     # Include CLI setup script
+    if [[ ! -f "$PROJECT_ROOT/scripts/install.ps1" ]]; then
+        print_error "Missing scripts/install.ps1"
+        return 1
+    fi
     cp "$PROJECT_ROOT/scripts/setup-cli.bat" "$BUILD_DIR/releases/portable/"
+    cp "$PROJECT_ROOT/scripts/install.ps1" "$BUILD_DIR/releases/portable/"
+    cat > "$BUILD_DIR/releases/portable/rawrequest-service.cmd" << 'EOF'
+@echo off
+"%~dp0RawRequest.exe" service %*
+EOF
 
     # Build and include updater helper
     print_status "Building updater helper..."
@@ -109,10 +118,22 @@ CLI Setup:
   This enables CLI and MCP usage:
     rawrequest run api.http -n login
     rawrequest mcp
+    rawrequest service
 
 Note: On first run, Windows SmartScreen may show a warning.
 Click "More info" then "Run anyway" to proceed.
+
+Automated install (PowerShell):
+  powershell -ExecutionPolicy Bypass -File install.ps1
 EOF
+
+    # Validate split-architecture launchers/helpers are present in portable package
+    for required in RawRequest.exe setup-cli.bat install.ps1 rawrequest-service.cmd rawrequest-updater.exe; do
+        if [[ ! -f "$BUILD_DIR/releases/portable/$required" ]]; then
+            print_error "Portable package missing required file: $required"
+            return 1
+        fi
+    done
     
     cd "$BUILD_DIR/releases"
     zip -r "${APP_NAME}-${VERSION}-windows-portable.zip" "portable"

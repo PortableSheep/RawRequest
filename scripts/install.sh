@@ -1,5 +1,5 @@
 #!/bin/bash
-# RawRequest Homebrew Installation Script
+# RawRequest macOS Installation Script
 # 
 # Usage:
 #   curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.sh | bash
@@ -12,6 +12,7 @@ set -e
 REPO="portablesheep/RawRequest"
 VERSION="${1:-latest}"
 INSTALL_DIR="/Applications"
+BIN_DIR="${RAWREQUEST_BIN_DIR:-}"
 
 # Colors
 RED='\033[0;31m'
@@ -24,10 +25,36 @@ echo -e "${GREEN}Installing RawRequest...${NC}"
 # Check OS
 if [[ "$OSTYPE" != "darwin"* ]]; then
     echo -e "${RED}Error: This installer only supports macOS.${NC}"
-    echo "For Windows, download the portable ZIP from:"
-    echo "https://github.com/${REPO}/releases"
+    echo "For Windows, use the PowerShell installer:"
+    echo "  irm https://raw.githubusercontent.com/${REPO}/main/scripts/install.ps1 | iex"
     exit 1
 fi
+
+if [ -z "$BIN_DIR" ]; then
+    for candidate in /usr/local/bin /opt/homebrew/bin "$HOME/.local/bin"; do
+        if [[ ":$PATH:" == *":$candidate:"* ]]; then
+            BIN_DIR="$candidate"
+            break
+        fi
+    done
+fi
+
+if [ -z "$BIN_DIR" ]; then
+    BIN_DIR="/usr/local/bin"
+fi
+
+USE_SUDO=1
+if [[ "$BIN_DIR" == "$HOME/"* ]]; then
+    USE_SUDO=0
+fi
+
+run_install_cmd() {
+    if [ "$USE_SUDO" -eq 1 ]; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
 
 # Get latest version if not specified
 if [ "$VERSION" = "latest" ]; then
@@ -73,13 +100,28 @@ cp -R "$APP_PATH" "$INSTALL_DIR/"
 xattr -dr com.apple.quarantine "$INSTALL_DIR/RawRequest.app" 2>/dev/null || true
 
 # Create CLI symlink so 'rawrequest' is available on PATH
-CLI_LINK="/usr/local/bin/rawrequest"
+run_install_cmd mkdir -p "$BIN_DIR"
+CLI_LINK="$BIN_DIR/rawrequest"
 CLI_TARGET="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
 echo "Creating CLI symlink at $CLI_LINK..."
 if [ -L "$CLI_LINK" ] || [ -e "$CLI_LINK" ]; then
-    sudo rm -f "$CLI_LINK"
+    run_install_cmd rm -f "$CLI_LINK"
 fi
-sudo ln -s "$CLI_TARGET" "$CLI_LINK"
+run_install_cmd ln -s "$CLI_TARGET" "$CLI_LINK"
+
+# Install a service launcher command for split architecture workflows.
+SERVICE_CMD="$BIN_DIR/rawrequest-service"
+SERVICE_SCRIPT="$TMP_DIR/rawrequest-service"
+cat > "$SERVICE_SCRIPT" << 'EOF'
+#!/bin/bash
+set -euo pipefail
+exec "__RAWREQUEST_CLI_LINK__" service "$@"
+EOF
+sed -i.bak "s|__RAWREQUEST_CLI_LINK__|$CLI_LINK|g" "$SERVICE_SCRIPT"
+rm -f "$SERVICE_SCRIPT.bak"
+chmod +x "$SERVICE_SCRIPT"
+echo "Creating service launcher at $SERVICE_CMD..."
+run_install_cmd install -m 755 "$SERVICE_SCRIPT" "$SERVICE_CMD"
 
 echo -e "${GREEN}✓ RawRequest installed successfully!${NC}"
 echo ""
@@ -89,5 +131,12 @@ echo ""
 echo "CLI usage:"
 echo "  rawrequest run api.http -n login"
 echo "  rawrequest mcp"
+echo "  rawrequest service"
+echo "  rawrequest-service"
+if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+    echo ""
+    echo -e "${YELLOW}Note:${NC} $BIN_DIR is not currently on PATH in this shell."
+    echo "Add it to your shell profile to run rawrequest directly."
+fi
 echo ""
 echo "Or find it in your Applications folder."

@@ -196,4 +196,13 @@ export class SecretsModalComponent {
   getRevealedValue(env: string, key: string): string | undefined {
     return this.revealedValues[`${env}:${key}`];
   }
+
+  submitMasterPassword() {
+    if (!this.masterPasswordInput) return;
+    if (this.masterPasswordMode === 'set') {
+      this.onSetMasterPassword.emit(this.masterPasswordInput);
+    } else {
+      this.onVerifyMasterPassword.emit(this.masterPasswordInput);
+    }
+  }
 }

@@ -16,6 +16,8 @@ const (
 	CommandList    Command = "list"
 	CommandEnvs    Command = "envs"
 	CommandMCP     Command = "mcp"
+	CommandService Command = "service"
+	CommandLoad    Command = "load"
 	CommandVersion Command = "version"
 	CommandHelp    Command = "help"
 )
@@ -41,7 +43,16 @@ type Options struct {
 	Output       OutputFormat
 	Verbose      bool
 	NoScripts    bool
+	ServiceAddr  string
 	ShowHelp     bool
+	// Load test options
+	LoadUsers    int
+	LoadDuration string  // e.g. "30s", "2m"
+	LoadRPS      int
+	LoadRampUp   string  // e.g. "10s"
+	LoadFailRate float64
+	LoadAdaptive bool
+	Workspace    string  // MCP workspace root
 }
 
 // Parse parses command line arguments and returns Options.
@@ -54,7 +65,7 @@ func Parse(args []string) *Options {
 	// Check if first argument is a command
 	cmd := strings.ToLower(args[1])
 	switch cmd {
-	case "run", "list", "envs", "mcp", "version", "help", "--help", "-h", "--version", "-v":
+	case "run", "list", "envs", "mcp", "service", "load", "version", "help", "--help", "-h", "--version", "-v":
 		// CLI mode
 	default:
 		return nil // Unknown command, run GUI
@@ -64,6 +75,7 @@ func Parse(args []string) *Options {
 		Variables:   make(map[string]string),
 		Environment: "default",
 		Output:      OutputFull,
+		ServiceAddr: "127.0.0.1:7345",
 	}
 
 	// Handle simple commands
@@ -84,6 +96,68 @@ func Parse(args []string) *Options {
 		fs.SetOutput(os.Stderr)
 		fs.StringVar(&opts.Environment, "env", "", "Default environment to use")
 		fs.StringVar(&opts.Environment, "e", "", "Default environment (shorthand)")
+		fs.StringVar(&opts.Workspace, "workspace", ".", "Workspace root for file discovery")
+		fs.StringVar(&opts.Workspace, "w", ".", "Workspace root (shorthand)")
+		if len(args) > 2 {
+			if err := fs.Parse(args[2:]); err != nil {
+				opts.ShowHelp = true
+			}
+		}
+		return opts
+	}
+
+	if opts.Command == CommandLoad {
+		// Need at least a file argument
+		if len(args) < 3 {
+			opts.ShowHelp = true
+			return opts
+		}
+		opts.File = args[2]
+
+		fs := flag.NewFlagSet("rawrequest-load", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+
+		var names stringSlice
+		var vars stringSlice
+
+		fs.Var(&names, "name", "Request name to load test (required)")
+		fs.Var(&names, "n", "Request name (shorthand)")
+		fs.StringVar(&opts.Environment, "env", "default", "Environment to use")
+		fs.StringVar(&opts.Environment, "e", "default", "Environment (shorthand)")
+		fs.Var(&vars, "var", "Set variable: key=value (can be repeated)")
+		fs.Var(&vars, "V", "Set variable (shorthand)")
+		fs.IntVar(&opts.LoadUsers, "users", 10, "Max concurrent users")
+		fs.StringVar(&opts.LoadDuration, "duration", "30s", "Test duration (e.g. 30s, 2m)")
+		fs.IntVar(&opts.LoadRPS, "rps", 0, "Target requests per second (0=unlimited)")
+		fs.StringVar(&opts.LoadRampUp, "ramp-up", "", "Ramp-up time (e.g. 10s)")
+		fs.Float64Var(&opts.LoadFailRate, "fail-rate", 0, "Failure rate threshold to abort (0.0-1.0)")
+		fs.BoolVar(&opts.LoadAdaptive, "adaptive", false, "Enable adaptive load control")
+		fs.StringVar((*string)(&opts.Output), "output", "full", "Output format: full|json|quiet")
+		fs.StringVar((*string)(&opts.Output), "o", "full", "Output format (shorthand)")
+		fs.StringVar(&opts.ServiceAddr, "service", opts.ServiceAddr, "Service URL (default: auto-start)")
+		fs.IntVar(&opts.Timeout, "timeout", 30, "Per-request timeout in seconds")
+
+		if len(args) > 3 {
+			if err := fs.Parse(args[3:]); err != nil {
+				opts.ShowHelp = true
+				return opts
+			}
+		}
+
+		opts.RequestNames = []string(names)
+		for _, v := range vars {
+			if idx := strings.Index(v, "="); idx > 0 {
+				opts.Variables[v[:idx]] = v[idx+1:]
+			}
+		}
+
+		return opts
+	}
+
+	if opts.Command == CommandService {
+		fs := flag.NewFlagSet("rawrequest-service", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+		fs.StringVar(&opts.ServiceAddr, "addr", opts.ServiceAddr, "Address to bind service (host:port)")
 		if len(args) > 2 {
 			if err := fs.Parse(args[2:]); err != nil {
 				opts.ShowHelp = true
@@ -165,6 +239,7 @@ func PrintHelp(version string) {
 Usage:
   rawrequest                          Launch GUI
   rawrequest run <file> [options]     Execute requests from an .http file
+  rawrequest load <file> [options]    Run load tests against requests
   rawrequest list <file>              List all named requests in a file
   rawrequest envs <file>              List environments defined in a file
   rawrequest mcp [options]            Start MCP server for AI assistant integration
@@ -181,8 +256,22 @@ Run Options:
   --verbose              Show request details before execution
   --no-scripts           Disable pre/post scripts
 
+Load Test Options:
+  -n, --name <name>      Request name to load test (required)
+  -e, --env <env>        Environment to use (default: "default")
+  -V, --var <key=value>  Set variable (can be repeated)
+  --users <n>            Max concurrent users (default: 10)
+  --duration <duration>  Test duration (e.g. 30s, 2m; default: 30s)
+  --rps <n>              Target requests per second (0=unlimited)
+  --ramp-up <duration>   Ramp-up time to reach max users
+  --fail-rate <0.0-1.0>  Failure rate threshold to abort
+  --adaptive             Enable adaptive load control
+  -o, --output <format>  Output: full|json|quiet (default: full)
+  --service <url>        Service URL (default: auto-start on 127.0.0.1:7345)
+
 MCP Options:
   -e, --env <env>        Default environment for requests
+  -w, --workspace <dir>  Workspace root for .http file discovery (default: .)
 
 Output Formats:
   json    JSON response with status, headers, body, and timing
@@ -211,6 +300,12 @@ Examples:
 
   # List environments
   rawrequest envs api.http
+
+  # Run a load test
+  rawrequest load api.http -n "getUsers" --users 50 --duration 60s --rps 200
+
+  # Load test with adaptive control
+  rawrequest load api.http -n "search" --users 100 --duration 2m --adaptive
 
   # Start MCP server for AI assistants (Copilot, Claude, etc.)
   rawrequest mcp

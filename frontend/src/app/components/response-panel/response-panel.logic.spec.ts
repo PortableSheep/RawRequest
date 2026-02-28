@@ -2,6 +2,7 @@ import { ChainEntryPreview, Request, ResponseData } from '../../models/http.mode
 import {
   formatBytesForResponsePanel,
   getChainItemsForResponsePanel,
+  getPreferredExpandedEntryId,
   getStatusClassForEntry,
   getStatusLabelForEntry
 } from './response-panel.logic';
@@ -122,6 +123,28 @@ describe('response-panel.logic', () => {
       expect(getStatusClassForEntry(mk(301))).toBe('rr-status rr-status--warning');
       expect(getStatusClassForEntry(mk(404))).toBe('rr-status rr-status--error');
       expect(getStatusClassForEntry(mk(0))).toBe('rr-status rr-status--error');
+    });
+  });
+
+  describe('getPreferredExpandedEntryId', () => {
+    const entries: ChainEntryPreview[] = [
+      { id: 'a', label: 'A', request: { method: 'GET', url: '/a', headers: {} }, response: null },
+      { id: 'b', label: 'B', request: { method: 'GET', url: '/b', headers: {} }, response: null },
+      { id: 'c', label: 'C', request: { method: 'GET', url: '/c', headers: {} }, response: null },
+    ];
+
+    it('returns null for empty entries', () => {
+      expect(getPreferredExpandedEntryId([], null)).toBeNull();
+      expect(getPreferredExpandedEntryId([], 'x')).toBeNull();
+    });
+
+    it('keeps current expanded id when still present', () => {
+      expect(getPreferredExpandedEntryId(entries, 'b')).toBe('b');
+    });
+
+    it('falls back to last entry when current is null or missing', () => {
+      expect(getPreferredExpandedEntryId(entries, null)).toBe('c');
+      expect(getPreferredExpandedEntryId(entries, 'missing')).toBe('c');
     });
   });
 

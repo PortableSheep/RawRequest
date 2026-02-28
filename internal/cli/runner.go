@@ -5,19 +5,31 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptrace"
 	"os"
 	"regexp"
 	"strings"
 	"time"
+
+	hcl "rawrequest/internal/httpclientlogic"
+	se "rawrequest/internal/scriptexec"
+	sr "rawrequest/internal/scriptruntime"
 )
 
 // SecretResolver can retrieve secret values by environment and key.
 type SecretResolver interface {
 	GetSecret(env, key string) (string, error)
+}
+
+// ScriptLogEntry represents a single log entry from a script execution.
+type ScriptLogEntry struct {
+	Timestamp string `json:"timestamp"`
+	Level     string `json:"level"`
+	Source    string `json:"source"`
+	Message   string `json:"message"`
 }
 
 // Runner executes HTTP requests in CLI mode
@@ -31,6 +43,7 @@ type Runner struct {
 	version        string
 	secretResolver SecretResolver
 	environment    string
+	logCallback    func(level, source, message string)
 }
 
 // NewRunner creates a new CLI runner
@@ -66,6 +79,7 @@ type ResponseResult struct {
 	Timing       TimingInfo        `json:"timing"`
 	Size         int64             `json:"size"`
 	Error        string            `json:"error,omitempty"`
+	ScriptLogs   []ScriptLogEntry  `json:"scriptLogs,omitempty"`
 }
 
 // TimingInfo contains request timing breakdown
@@ -93,6 +107,8 @@ func Run(opts *Options, version string) int {
 		return runEnvs(opts)
 	case CommandRun:
 		return runRequests(opts, version)
+	case CommandLoad:
+		return RunLoadTest(opts, version)
 	default:
 		PrintHelp(version)
 		return 1
@@ -166,6 +182,11 @@ func runRequests(opts *Options, version string) int {
 	parsed := ParseHttpFile(string(content))
 	runner := NewRunner(opts, version)
 
+	// Wire up script log output for CLI
+	runner.SetLogCallback(func(level, source, message string) {
+		fmt.Fprintf(os.Stderr, "[%s] [%s] %s\n", source, level, message)
+	})
+
 	// Load global variables from file
 	for k, v := range parsed.Variables {
 		if _, exists := runner.variables[k]; !exists {
@@ -224,6 +245,25 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 		Headers:     make(map[string]string),
 	}
 
+	// Collect script logs during execution
+	var scriptLogs []ScriptLogEntry
+	appendLog := func(level, source, message string) {
+		message = strings.TrimSpace(message)
+		if message == "" {
+			return
+		}
+		entry := ScriptLogEntry{
+			Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
+			Level:     strings.ToLower(level),
+			Source:    source,
+			Message:   message,
+		}
+		scriptLogs = append(scriptLogs, entry)
+		if r.logCallback != nil {
+			r.logCallback(level, source, message)
+		}
+	}
+
 	// Resolve variables in URL
 	url := r.resolveVariables(req.URL)
 	result.URL = url
@@ -236,6 +276,45 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 
 	// Resolve variables in body
 	body := r.resolveVariables(req.Body)
+
+	// Execute pre-script
+	var scriptCtx *sr.ExecutionContext
+	if !r.noScripts && req.PreScript != "" {
+		cleaned := cleanScript(req.PreScript)
+		if cleaned != "" {
+			scriptCtx = &sr.ExecutionContext{
+				Request: map[string]interface{}{
+					"method":  req.Method,
+					"url":     url,
+					"headers": headers,
+					"body":    body,
+					"name":    req.Name,
+				},
+				Variables: r.variablesSnapshot(),
+			}
+			se.Execute(cleaned, scriptCtx, "pre", se.Dependencies{
+				VariablesSnapshot: r.variablesSnapshot,
+				GetVar:            r.getVariable,
+				SetVar:            r.SetVariable,
+				AppendLog:         appendLog,
+			})
+			// Apply any request modifications from the pre-script
+			if v, ok := scriptCtx.Request["url"].(string); ok {
+				url = v
+				result.URL = url
+			}
+			if v, ok := scriptCtx.Request["body"].(string); ok {
+				body = v
+			}
+			if v, ok := scriptCtx.Request["method"].(string); ok {
+				result.Method = v
+				req.Method = v
+			}
+			if h := extractStringHeaders(scriptCtx.Request["headers"]); h != nil {
+				headers = h
+			}
+		}
+	}
 
 	if r.verbose {
 		fmt.Fprintf(os.Stderr, "==> %s %s\n", req.Method, url)
@@ -260,88 +339,95 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 		reqBody = strings.NewReader(body)
 	}
 
-	httpReq, err := http.NewRequestWithContext(ctx, req.Method, url, reqBody)
+	execResult, err := hcl.Execute(hcl.ExecuteInput{
+		Context:               ctx,
+		Method:                req.Method,
+		URL:                   url,
+		Headers:               headers,
+		Body:                  reqBody,
+		RawBody:               body,
+		DefaultUserAgent:      fmt.Sprintf("RawRequest/%s", r.version),
+		SetDefaultContentType: true,
+		Client:                r.httpClient,
+	})
 	if err != nil {
-		result.Error = fmt.Sprintf("Error creating request: %s", err)
-		return result
-	}
-
-	// Set headers
-	for k, v := range headers {
-		httpReq.Header.Set(k, v)
-	}
-
-	// Default headers
-	if httpReq.Header.Get("User-Agent") == "" {
-		httpReq.Header.Set("User-Agent", fmt.Sprintf("RawRequest/%s", r.version))
-	}
-	if body != "" && httpReq.Header.Get("Content-Type") == "" {
-		httpReq.Header.Set("Content-Type", "application/json")
-	}
-
-	// Timing
-	var timing TimingInfo
-	var dnsStart, dnsEnd, connectStart, connectEnd, tlsStart, tlsEnd, firstByteTime time.Time
-	startTime := time.Now()
-
-	trace := &httptrace.ClientTrace{
-		DNSStart:             func(_ httptrace.DNSStartInfo) { dnsStart = time.Now() },
-		DNSDone:              func(_ httptrace.DNSDoneInfo) { dnsEnd = time.Now() },
-		ConnectStart:         func(_, _ string) { connectStart = time.Now() },
-		ConnectDone:          func(_, _ string, _ error) { connectEnd = time.Now() },
-		TLSHandshakeStart:    func() { tlsStart = time.Now() },
-		TLSHandshakeDone:     func(_ tls.ConnectionState, _ error) { tlsEnd = time.Now() },
-		GotFirstResponseByte: func() { firstByteTime = time.Now() },
-	}
-	httpReq = httpReq.WithContext(httptrace.WithClientTrace(ctx, trace))
-
-	// Execute request
-	resp, err := r.httpClient.Do(httpReq)
-	if err != nil {
+		var execErr *hcl.ExecuteError
+		if errors.As(err, &execErr) {
+			switch execErr.Stage {
+			case hcl.StageCreateRequest:
+				result.Error = fmt.Sprintf("Error creating request: %s", execErr)
+				result.ScriptLogs = scriptLogs
+				return result
+			case hcl.StageReadBody:
+				result.Error = fmt.Sprintf("Error reading response: %s", execErr)
+				result.ScriptLogs = scriptLogs
+				return result
+			default:
+				result.Error = fmt.Sprintf("Request failed: %s", execErr)
+				result.ScriptLogs = scriptLogs
+				return result
+			}
+		}
 		result.Error = fmt.Sprintf("Request failed: %s", err)
-		return result
-	}
-	defer resp.Body.Close()
-
-	// Read body
-	contentStart := time.Now()
-	respBody, err := io.ReadAll(resp.Body)
-	contentEnd := time.Now()
-	if err != nil {
-		result.Error = fmt.Sprintf("Error reading response: %s", err)
+		result.ScriptLogs = scriptLogs
 		return result
 	}
 
-	// Calculate timing
-	if !dnsStart.IsZero() && !dnsEnd.IsZero() {
-		timing.DNSLookup = dnsEnd.Sub(dnsStart).Milliseconds()
+	result.Status = execResult.StatusCode
+	result.StatusText = execResult.StatusText
+	result.ResponseTime = execResult.Timing.Total
+	result.Timing = TimingInfo{
+		DNSLookup:       execResult.Timing.DNSLookup,
+		TCPConnect:      execResult.Timing.TCPConnect,
+		TLSHandshake:    execResult.Timing.TLSHandshake,
+		TimeToFirstByte: execResult.Timing.TimeToFirstByte,
+		ContentTransfer: execResult.Timing.ContentTransfer,
+		Total:           execResult.Timing.Total,
 	}
-	if !connectStart.IsZero() && !connectEnd.IsZero() {
-		timing.TCPConnect = connectEnd.Sub(connectStart).Milliseconds()
-	}
-	if !tlsStart.IsZero() && !tlsEnd.IsZero() {
-		timing.TLSHandshake = tlsEnd.Sub(tlsStart).Milliseconds()
-	}
-	if !firstByteTime.IsZero() {
-		timing.TimeToFirstByte = firstByteTime.Sub(startTime).Milliseconds()
-	}
-	timing.ContentTransfer = contentEnd.Sub(contentStart).Milliseconds()
-	timing.Total = time.Since(startTime).Milliseconds()
+	result.Size = execResult.Size
+	result.Body = string(execResult.Body)
+	result.Headers = execResult.ResponseHeaders
 
-	// Build result
-	result.Status = resp.StatusCode
-	result.StatusText = resp.Status
-	result.ResponseTime = timing.Total
-	result.Timing = timing
-	result.Size = int64(len(respBody))
-	result.Body = string(respBody)
-
-	for k, v := range resp.Header {
-		if len(v) > 0 {
-			result.Headers[strings.ToLower(k)] = v[0]
+	// Execute post-script
+	if !r.noScripts && req.PostScript != "" {
+		cleaned := cleanScript(req.PostScript)
+		if cleaned != "" {
+			responseData := map[string]interface{}{
+				"status":       execResult.StatusCode,
+				"statusText":   execResult.StatusText,
+				"headers":      execResult.ResponseHeaders,
+				"body":         string(execResult.Body),
+				"text":         string(execResult.Body),
+				"responseTime": execResult.Timing.Total,
+				"size":         execResult.Size,
+			}
+			var jsonData interface{}
+			if json.Unmarshal(execResult.Body, &jsonData) == nil {
+				responseData["json"] = jsonData
+			}
+			if scriptCtx == nil {
+				scriptCtx = &sr.ExecutionContext{
+					Request: map[string]interface{}{
+						"method":  req.Method,
+						"url":     url,
+						"headers": headers,
+						"body":    body,
+						"name":    req.Name,
+					},
+				}
+			}
+			scriptCtx.Response = responseData
+			scriptCtx.Variables = r.variablesSnapshot()
+			se.Execute(cleaned, scriptCtx, "post", se.Dependencies{
+				VariablesSnapshot: r.variablesSnapshot,
+				GetVar:            r.getVariable,
+				SetVar:            r.SetVariable,
+				AppendLog:         appendLog,
+			})
 		}
 	}
 
+	result.ScriptLogs = scriptLogs
 	return result
 }
 
@@ -416,9 +502,92 @@ func (r *Runner) SetVariable(key, value string) {
 	r.variables[key] = value
 }
 
+func (r *Runner) variablesSnapshot() map[string]string {
+	snap := make(map[string]string, len(r.variables)+len(r.envVars))
+	for k, v := range r.envVars {
+		snap[k] = v
+	}
+	for k, v := range r.variables {
+		snap[k] = v
+	}
+	return snap
+}
+
+func (r *Runner) getVariable(key string) (string, bool) {
+	if v, ok := r.variables[key]; ok {
+		return v, true
+	}
+	if v, ok := r.envVars[key]; ok {
+		return v, true
+	}
+	return "", false
+}
+
+// GetVariables returns the current runner variables.
+func (r *Runner) GetVariables() map[string]string {
+	return r.variables
+}
+
 // ResolveForTest exposes resolveVariables for testing.
 func (r *Runner) ResolveForTest(input string) string {
 	return r.resolveVariables(input)
+}
+
+// SetLogCallback sets the callback for script log output.
+func (r *Runner) SetLogCallback(fn func(level, source, message string)) {
+	r.logCallback = fn
+}
+
+// cleanScript strips script block markers (< { ... } or > { ... }).
+func cleanScript(script string) string {
+	lines := strings.Split(script, "\n")
+	lines = trimScriptEdges(lines)
+	if len(lines) == 0 {
+		return ""
+	}
+	if first := strings.TrimSpace(lines[0]); strings.HasPrefix(first, "<") || strings.HasPrefix(first, ">") {
+		lines = lines[1:]
+	}
+	lines = trimScriptEdges(lines)
+	if len(lines) == 0 {
+		return ""
+	}
+	if strings.TrimSpace(lines[len(lines)-1]) == "}" {
+		lines = lines[:len(lines)-1]
+	}
+	lines = trimScriptEdges(lines)
+	if len(lines) == 0 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
+}
+
+func trimScriptEdges(lines []string) []string {
+	for len(lines) > 0 && strings.TrimSpace(lines[0]) == "" {
+		lines = lines[1:]
+	}
+	for len(lines) > 0 && strings.TrimSpace(lines[len(lines)-1]) == "" {
+		lines = lines[:len(lines)-1]
+	}
+	return lines
+}
+
+// extractStringHeaders converts headers from a script context (which may be
+// map[string]interface{} or map[string]string) back into map[string]string.
+func extractStringHeaders(v interface{}) map[string]string {
+	switch h := v.(type) {
+	case map[string]string:
+		return h
+	case map[string]interface{}:
+		out := make(map[string]string, len(h))
+		for k, val := range h {
+			if s, ok := val.(string); ok {
+				out[k] = s
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 func outputResults(results []ResponseResult, format OutputFormat) {

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, effect, input, signal, untracked, HostListener, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnDestroy, effect, input, signal, untracked, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
@@ -6,6 +6,7 @@ import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseDa
 import {
   formatBytesForResponsePanel,
   getChainItemsForResponsePanel,
+  getPreferredExpandedEntryId,
   getStatusClassForEntry,
   getStatusLabelForEntry
 } from './response-panel.logic';
@@ -22,7 +23,8 @@ export interface DownloadProgress {
   standalone: true,
   imports: [CommonModule, VirtualResponseBodyComponent],
   templateUrl: './response-panel.component.html',
-  styleUrls: ['./response-panel.component.scss']
+  styleUrls: ['./response-panel.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResponsePanelComponent implements OnDestroy {
   responseData = input<ResponseData | null>(null);
@@ -136,13 +138,9 @@ export class ResponsePanelComponent implements OnDestroy {
       if (tabsChanged || Object.keys(currentTabs).length !== Object.keys(normalizedTabs).length) {
         this.entryTabs.set(normalizedTabs);
       }
-      const stillValid = current ? entries.some(entry => entry.id === current) : false;
-      if (stillValid) {
-        return;
-      }
-      const preferred = entries.find(entry => entry.isPrimary) ?? entries[entries.length - 1];
-      if (preferred) {
-        this.expandedEntryId.set(preferred.id);
+      const preferred = getPreferredExpandedEntryId(entries, current);
+      if (preferred !== current) {
+        this.expandedEntryId.set(preferred);
       }
     });
   }

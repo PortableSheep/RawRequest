@@ -9,21 +9,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/http/httptrace"
 	"os"
 	"strings"
 	"time"
 
 	hcl "rawrequest/internal/httpclientlogic"
-
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-func (a *App) SendRequest(method, url, headersJson, body string) string {
+func (a *App) sendRequest(method, url, headersJson, body string) string {
 	return a.performRequest(context.Background(), "", method, url, headersJson, body, 0)
 }
 
-func (a *App) SendRequestWithID(requestID, method, url, headersJson, body string) string {
+func (a *App) sendRequestWithID(requestID, method, url, headersJson, body string) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.registerCancel(requestID, cancel)
@@ -31,7 +28,7 @@ func (a *App) SendRequestWithID(requestID, method, url, headersJson, body string
 	return a.performRequest(ctx, requestID, method, url, headersJson, body, 0)
 }
 
-func (a *App) SendRequestWithTimeout(requestID, method, url, headersJson, body string, timeoutMs int) string {
+func (a *App) sendRequestWithTimeout(requestID, method, url, headersJson, body string, timeoutMs int) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.registerCancel(requestID, cancel)
@@ -43,7 +40,6 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 	headers := hcl.ParseHeadersJSON(headersJson)
 
 	var reqBody io.Reader
-	var contentType string
 
 	if hcl.IsFileUploadBody(body) {
 		if filePath, ok := hcl.ExtractFileReferencePath(body); ok {
@@ -59,81 +55,6 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 		reqBody = strings.NewReader(body)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, url, reqBody)
-	if err != nil {
-		return fmt.Sprintf("Error: %s", err)
-	}
-
-	for k, v := range headers {
-		if strings.ToLower(k) == "content-type" {
-			contentType = v
-		}
-		req.Header.Set(k, v)
-	}
-
-	if hcl.ShouldSetDefaultContentType(contentType, body) {
-		req.Header.Set("Content-Type", "application/json")
-	}
-
-	if strings.TrimSpace(req.Header.Get("User-Agent")) == "" {
-		req.Header.Set("User-Agent", hcl.BuildDefaultUserAgent(Version))
-	}
-
-	effectiveHeaders := make(map[string]string)
-	for k, values := range req.Header {
-		if len(values) > 0 {
-			effectiveHeaders[k] = values[0]
-		}
-	}
-	requestMeta := struct {
-		Method  string            `json:"method"`
-		URL     string            `json:"url"`
-		Headers map[string]string `json:"headers"`
-		Body    string            `json:"body,omitempty"`
-	}{
-		Method:  method,
-		URL:     url,
-		Headers: effectiveHeaders,
-		Body:    body,
-	}
-	requestMetaJSON, _ := json.Marshal(requestMeta)
-
-	var dnsStart, dnsEnd time.Time
-	var connectStart, connectEnd time.Time
-	var tlsStart, tlsEnd time.Time
-	var gotFirstByte time.Time
-	requestStart := time.Now()
-
-	trace := &httptrace.ClientTrace{
-		DNSStart: func(_ httptrace.DNSStartInfo) {
-			dnsStart = time.Now()
-		},
-		DNSDone: func(_ httptrace.DNSDoneInfo) {
-			dnsEnd = time.Now()
-		},
-		ConnectStart: func(_, _ string) {
-			connectStart = time.Now()
-		},
-		ConnectDone: func(_, _ string, _ error) {
-			connectEnd = time.Now()
-		},
-		TLSHandshakeStart: func() {
-			tlsStart = time.Now()
-		},
-		TLSHandshakeDone: func(_ tls.ConnectionState, _ error) {
-			tlsEnd = time.Now()
-		},
-		GotFirstResponseByte: func() {
-			gotFirstByte = time.Now()
-		},
-	}
-
-	req = req.WithContext(httptrace.WithClientTrace(ctx, trace))
-
-	if timeoutMs > 0 || ctx.Done() != nil {
-		req.Close = true
-	}
-
 	transport := &http.Transport{}
 	if hcl.IsLocalhostURL(url) {
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
@@ -143,63 +64,77 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 		client.Timeout = time.Duration(timeoutMs) * time.Millisecond
 	}
 
-	resp, err := client.Do(req)
-	contentDownloadStart := time.Now()
+	execResult, err := hcl.Execute(hcl.ExecuteInput{
+		Context:               ctx,
+		Method:                method,
+		URL:                   url,
+		Headers:               headers,
+		Body:                  reqBody,
+		RawBody:               body,
+		DefaultUserAgent:      hcl.BuildDefaultUserAgent(Version),
+		SetDefaultContentType: true,
+		CloseConnection:       timeoutMs > 0 || ctx.Done() != nil,
+		Client:                client,
+		ReadBody: func(ctx context.Context, resp *http.Response) ([]byte, error) {
+			return a.readBodyWithProgress(ctx, resp, requestID)
+		},
+	})
 	if err != nil {
-		if errors.Is(err, context.Canceled) || ctx.Err() == context.Canceled {
-			return requestCancelledResponse
-		}
-		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "timeout") {
-			return fmt.Sprintf("Error: Request timeout after %dms", timeoutMs)
+		var execErr *hcl.ExecuteError
+		if errors.As(err, &execErr) {
+			switch execErr.Stage {
+			case hcl.StageDoRequest:
+				if errors.Is(execErr, context.Canceled) || ctx.Err() == context.Canceled {
+					return requestCancelledResponse
+				}
+				if errors.Is(execErr, context.DeadlineExceeded) || strings.Contains(execErr.Error(), "timeout") {
+					return fmt.Sprintf("Error: Request timeout after %dms", timeoutMs)
+				}
+				return fmt.Sprintf("Error: %s", execErr)
+			case hcl.StageReadBody:
+				return fmt.Sprintf("Error reading body: %s", execErr)
+			case hcl.StageCreateRequest:
+				return fmt.Sprintf("Error: %s", execErr)
+			}
 		}
 		return fmt.Sprintf("Error: %s", err)
 	}
-	defer resp.Body.Close()
 
-	respBody, err := a.readBodyWithProgress(ctx, resp, requestID)
-	contentDownloadEnd := time.Now()
-	if err != nil {
-		return fmt.Sprintf("Error reading body: %s", err)
+	requestMeta := struct {
+		Method  string            `json:"method"`
+		URL     string            `json:"url"`
+		Headers map[string]string `json:"headers"`
+		Body    string            `json:"body,omitempty"`
+	}{
+		Method:  method,
+		URL:     url,
+		Headers: execResult.RequestHeaders,
+		Body:    body,
 	}
-	requestEnd := time.Now()
+	requestMetaJSON, _ := json.Marshal(requestMeta)
 
 	timing := TimingBreakdown{
-		Total: requestEnd.Sub(requestStart).Milliseconds(),
-	}
-	if !dnsEnd.IsZero() && !dnsStart.IsZero() {
-		timing.DNSLookup = dnsEnd.Sub(dnsStart).Milliseconds()
-	}
-	if !connectEnd.IsZero() && !connectStart.IsZero() {
-		timing.TCPConnect = connectEnd.Sub(connectStart).Milliseconds()
-	}
-	if !tlsEnd.IsZero() && !tlsStart.IsZero() {
-		timing.TLSHandshake = tlsEnd.Sub(tlsStart).Milliseconds()
-	}
-	if !gotFirstByte.IsZero() {
-		timing.TimeToFirstByte = gotFirstByte.Sub(requestStart).Milliseconds()
-	}
-	timing.ContentTransfer = contentDownloadEnd.Sub(contentDownloadStart).Milliseconds()
-
-	respHeaders := make(map[string]string)
-	for key, values := range resp.Header {
-		if len(values) > 0 {
-			respHeaders[strings.ToLower(key)] = values[0]
-		}
+		DNSLookup:       execResult.Timing.DNSLookup,
+		TCPConnect:      execResult.Timing.TCPConnect,
+		TLSHandshake:    execResult.Timing.TLSHandshake,
+		TimeToFirstByte: execResult.Timing.TimeToFirstByte,
+		ContentTransfer: execResult.Timing.ContentTransfer,
+		Total:           execResult.Timing.Total,
 	}
 
 	metadata := ResponseMetadata{
 		Timing:  timing,
-		Size:    int64(len(respBody)),
-		Headers: respHeaders,
+		Size:    execResult.Size,
+		Headers: execResult.ResponseHeaders,
 	}
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return fmt.Sprintf(
 		"Status: %s\nRequest: %s\nHeaders: %s\nBody: %s",
-		resp.Status,
+		execResult.StatusText,
 		string(requestMetaJSON),
 		string(metadataJSON),
-		string(respBody),
+		string(execResult.Body),
 	)
 }
 
@@ -223,7 +158,7 @@ func (a *App) clearCancel(requestID string) {
 	a.cancelMutex.Unlock()
 }
 
-func (a *App) CancelRequest(requestID string) {
+func (a *App) cancelRequest(requestID string) {
 	if requestID == "" {
 		return
 	}
@@ -293,10 +228,7 @@ func (a *App) readBodyWithProgress(ctx context.Context, resp *http.Response, req
 }
 
 func (a *App) emitDownloadProgress(requestID string, downloaded, total int64) {
-	if a.ctx == nil {
-		return
-	}
-	wailsruntime.EventsEmit(a.ctx, "request:download-progress", map[string]any{
+	a.emitEvent("request:download-progress", map[string]any{
 		"requestId":  requestID,
 		"downloaded": downloaded,
 		"total":      total,

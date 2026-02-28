@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect, inject } from '@angular/core';
 
 import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, RangeSetBuilder, Compartment, Prec } from '@codemirror/state';
@@ -53,7 +53,8 @@ const rawRequestHttpSupport = new LanguageSupport(rawRequestHttpLanguage);
   standalone: true,
   imports: [],
   templateUrl: './editor.component.html',
-  styleUrls: ['./editor.component.scss']
+  styleUrls: ['./editor.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class EditorComponent implements AfterViewInit, OnDestroy {
   @ViewChild('wrapper', { static: true }) wrapperContainer!: ElementRef<HTMLElement>;
@@ -159,6 +160,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    if (this.searchStatsTimer !== undefined) {
+      clearTimeout(this.searchStatsTimer);
+    }
+    if (this.searchFlashTimer !== undefined) {
+      clearTimeout(this.searchFlashTimer);
+    }
     if (this.editorView) {
       this.editorView.destroy();
     }

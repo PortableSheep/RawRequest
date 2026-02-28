@@ -32,6 +32,13 @@ func main() {
 			}
 			os.Exit(0)
 		}
+		if opts.Command == cli.CommandService {
+			if err := startServiceServer(opts); err != nil {
+				fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}
 		exitCode := cli.Run(opts, Version)
 		os.Exit(exitCode)
 	}
@@ -87,5 +94,6 @@ func startMCPServer(opts *cli.Options) error {
 		DefaultEnv:     opts.Environment,
 		SecretResolver: secretResolver,
 		Version:        Version,
+		Workspace:      opts.Workspace,
 	})
 }

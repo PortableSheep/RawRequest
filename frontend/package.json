@@ -5,6 +5,8 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "build:stats": "ng build --configuration production --stats-json --no-progress",
+    "perf:baseline": "npm run build:stats && node scripts/perf-baseline.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "jest",
     "test:watch": "jest --watch"

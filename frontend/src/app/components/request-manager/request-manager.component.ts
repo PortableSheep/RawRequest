@@ -107,17 +107,6 @@ export class RequestManagerComponent {
 
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: request.noHistory });
 
-      if (!request.noHistory) {
-        try {
-          const { SaveResponseFile } = await import('@wailsjs/go/main/App');
-          if (currentFile.filePath) {
-            const saved = await SaveResponseFile(currentFile.filePath, JSON.stringify(responseWithChain, null, 2));
-          }
-        } catch (err) {
-          console.warn('Failed to save response file:', err);
-        }
-      }
-
       this.notificationService.notifyRequestComplete(request.name, response.status, response.responseTime);
       this.requestExecuted.emit({ requestIndex, response: responseWithChain });
     } catch (error: any) {
@@ -260,7 +249,10 @@ export class RequestManagerComponent {
       const summaryResponse: ResponseData = buildLoadTestSummaryResponse({
         metrics,
         results,
-        statusText
+        statusText,
+        method: request.method,
+        url: request.url,
+        name: request.name
       });
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, summaryResponse);

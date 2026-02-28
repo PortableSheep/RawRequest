@@ -1,21 +1,10 @@
-import { Injectable } from '@angular/core';
+import { Inject, Injectable } from '@angular/core';
 import { Subject } from 'rxjs';
-import type { main } from '@wailsjs/go/models';
-import {
-  DeleteSecret,
-  ExportSecrets,
-  GetSecretValue,
-  GetVaultInfo,
-  ListSecrets,
-  ResetVault,
-  SaveSecret,
-  SetMasterPassword,
-  VerifyMasterPassword
-} from '@wailsjs/go/main/App';
+import { BACKEND_CLIENT, BackendClientContract } from './backend-client.contract';
 
 export type SecretIndex = Partial<Record<string, string[]>>;
 
-export type VaultInfo = main.VaultInfo;
+export type VaultInfo = any;
 
 @Injectable({ providedIn: 'root' })
 export class SecretService {
@@ -27,18 +16,20 @@ export class SecretService {
   private missingSecretSubject = new Subject<{ env: string; key: string }>();
   private missingSecret$ = this.missingSecretSubject.asObservable();
 
+  constructor(@Inject(BACKEND_CLIENT) private readonly backend: BackendClientContract) {}
+
   async list(refresh = false): Promise<SecretIndex> {
     if (!refresh && Object.keys(this.lastSnapshot).length) {
       return this.lastSnapshot;
     }
-    const result = await ListSecrets();
+    const result = await this.backend.listSecrets();
     this.lastSnapshot = result || {};
     return this.lastSnapshot;
   }
 
   async save(env: string, key: string, value: string): Promise<SecretIndex> {
     const normalizedEnv = this.normalizeEnv(env);
-    const snapshot = await SaveSecret(normalizedEnv, key, value);
+    const snapshot = await this.backend.saveSecret(normalizedEnv, key, value);
     this.lastSnapshot = snapshot || {};
     const cacheKey = this.buildCacheKey(normalizedEnv, key);
     this.cache.set(cacheKey, value);
@@ -48,7 +39,7 @@ export class SecretService {
 
   async remove(env: string, key: string): Promise<SecretIndex> {
     const normalizedEnv = this.normalizeEnv(env);
-    const snapshot = await DeleteSecret(normalizedEnv, key);
+    const snapshot = await this.backend.deleteSecret(normalizedEnv, key);
     this.lastSnapshot = snapshot || {};
     const cacheKey = this.buildCacheKey(normalizedEnv, key);
     this.cache.delete(cacheKey);
@@ -86,7 +77,7 @@ export class SecretService {
       return { value, found: true };
     }
 
-    const fetchPromise = GetSecretValue(env, key)
+    const fetchPromise = this.backend.getSecretValue(env, key)
       .then((value: string) => {
         this.cache.set(cacheKey, value);
         return value;
@@ -138,20 +129,20 @@ export class SecretService {
     if (!force && this.vaultInfoCache) {
       return this.vaultInfoCache;
     }
-    const info = await GetVaultInfo();
+    const info = await this.backend.getVaultInfo();
     this.vaultInfoCache = info ?? null;
     return this.vaultInfoCache;
   }
 
   async resetVault(): Promise<void> {
-    await ResetVault();
+    await this.backend.resetVault();
     this.clearCache();
     this.lastSnapshot = {};
     this.vaultInfoCache = null;
   }
 
   async export(): Promise<string> {
-    const secrets = await ExportSecrets();
+    const secrets = await this.backend.exportSecrets();
     const normalized = secrets || {};
     return JSON.stringify(normalized, null, 2);
   }
@@ -178,11 +169,11 @@ export class SecretService {
   }
 
   async setMasterPassword(password: string): Promise<void> {
-    await SetMasterPassword(password);
+    await this.backend.setMasterPassword(password);
     this.invalidateVaultInfo();
   }
 
   async verifyMasterPassword(password: string): Promise<boolean> {
-    return VerifyMasterPassword(password);
+    return this.backend.verifyMasterPassword(password);
   }
 }

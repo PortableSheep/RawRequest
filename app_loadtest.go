@@ -12,8 +12,6 @@ import (
 	"rawrequest/internal/loadtestbridge"
 	lp "rawrequest/internal/loadtestpayload"
 	"rawrequest/internal/loadtestrunlogic"
-
-	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const (
@@ -37,7 +35,7 @@ type loadTestResults struct {
 	Adaptive            *lt.AdaptiveSummary `json:"adaptive,omitempty"`
 }
 
-func (a *App) StartLoadTest(requestID, method, url, headersJSON, body, loadConfigJSON string) error {
+func (a *App) startLoadTest(requestID, method, url, headersJSON, body, loadConfigJSON string) error {
 	requestID, method, url, err := loadtestbridge.NormalizeStartArgs(requestID, method, url)
 	if err != nil {
 		return err
@@ -54,12 +52,10 @@ func (a *App) StartLoadTest(requestID, method, url, headersJSON, body, loadConfi
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				if a.ctx != nil {
-					wailsruntime.EventsEmit(a.ctx, loadTestErrorEventName, map[string]any{
-						"requestId": requestID,
-						"message":   "Load test panicked",
-					})
-				}
+				a.emitEvent(loadTestErrorEventName, map[string]any{
+					"requestId": requestID,
+					"message":   "Load test panicked",
+				})
 			}
 			cancel()
 			a.clearCancel(requestID)
@@ -150,9 +146,6 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 	progressTicker := time.NewTicker(200 * time.Millisecond)
 	defer progressTicker.Stop()
 	emitProgress := func(force bool, done bool) {
-		if a.ctx == nil {
-			return
-		}
 		payload := lp.BuildProgressPayload(lp.ProgressInput{
 			RequestID:         requestID,
 			StartedAtMs:       startMs,
@@ -167,7 +160,7 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 			Aborted:           aborted.Load(),
 			AbortReason:       abortReason.Load().(string),
 		})
-		wailsruntime.EventsEmit(a.ctx, loadTestProgressEventName, payload)
+		a.emitEvent(loadTestProgressEventName, payload)
 		_ = force
 	}
 
@@ -396,9 +389,7 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 				RtMu:              &rtMu,
 				ResponseTimes:     responseTimes,
 			})
-			if a.ctx != nil {
-				wailsruntime.EventsEmit(a.ctx, loadTestDoneEventName, lp.DonePayload{RequestID: requestID, Results: res})
-			}
+			a.emitEvent(loadTestDoneEventName, lp.DonePayload{RequestID: requestID, Results: res})
 			return
 		case <-usersDone:
 			emitProgress(true, true)
@@ -421,9 +412,7 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 				RtMu:              &rtMu,
 				ResponseTimes:     responseTimes,
 			})
-			if a.ctx != nil {
-				wailsruntime.EventsEmit(a.ctx, loadTestDoneEventName, lp.DonePayload{RequestID: requestID, Results: res})
-			}
+			a.emitEvent(loadTestDoneEventName, lp.DonePayload{RequestID: requestID, Results: res})
 			return
 		case <-progressTicker.C:
 			emitProgress(false, false)

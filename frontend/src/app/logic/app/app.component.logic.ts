@@ -217,6 +217,11 @@ export function decideGlobalKeydownAction(args: {
     };
   }
 
+  // Cmd/Ctrl+Shift+H → toggle history panel
+  if ((args.metaKey || args.ctrlKey) && args.shiftKey && key.toLowerCase() === 'h') {
+    return { action: 'toggleHistory', shouldPreventDefault: true, shouldStopPropagation: true };
+  }
+
   // Cmd/Ctrl+Shift+O → toggle outline panel
   if ((args.metaKey || args.ctrlKey) && args.shiftKey && key.toLowerCase() === 'o') {
     return { action: 'toggleOutline', shouldPreventDefault: true, shouldStopPropagation: true };

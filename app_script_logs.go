@@ -5,8 +5,6 @@ import (
 	"time"
 
 	rb "rawrequest/internal/ringbuffer"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 func (a *App) appendScriptLog(level, source, message string) {
@@ -29,9 +27,7 @@ func (a *App) appendScriptLog(level, source, message string) {
 	}
 	a.scriptLogs.Append(entry)
 	a.scriptLogMutex.Unlock()
-	if a.ctx != nil {
-		runtime.EventsEmit(a.ctx, scriptLogEventName, entry)
-	}
+	a.emitEvent(scriptLogEventName, entry)
 }
 
 func (a *App) RecordScriptLog(level, source, message string) {

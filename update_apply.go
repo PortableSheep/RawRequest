@@ -93,7 +93,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 
 	// If we already have a prepared update for this version, apply it now.
 	if st, err := a.loadPreparedUpdateState(); err == nil && st != nil && st.Version == latestVersion {
-		wailsruntime.EventsEmit(a.ctx, "update:status", map[string]any{"message": "Applying update…"})
+		a.emitEvent("update:status", map[string]any{"message": "Applying update…"})
 
 		exePath, err := os.Executable()
 		if err != nil {
@@ -107,7 +107,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		}
 		if err := ensureInstallParentDirWritable(installPath); err != nil {
 			msg := fmt.Sprintf("Install location not writable: %v", err)
-			wailsruntime.EventsEmit(a.ctx, "update:error", map[string]any{"message": msg})
+			a.emitEvent("update:error", map[string]any{"message": msg})
 			return errors.New(msg)
 		}
 
@@ -152,7 +152,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 	// If another version was prepared previously, discard it and download fresh.
 	a.clearPreparedUpdateState()
 
-	wailsruntime.EventsEmit(a.ctx, "update:status", map[string]any{"message": "Starting update…"})
+	a.emitEvent("update:status", map[string]any{"message": "Starting update…"})
 
 	exePath, err := os.Executable()
 	if err != nil {
@@ -173,17 +173,17 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		return err
 	}
 
-	wailsruntime.EventsEmit(a.ctx, "update:status", map[string]any{"message": "Downloading update…"})
+	a.emitEvent("update:status", map[string]any{"message": "Downloading update…"})
 	artifactDir := filepath.Dir(a.preparedUpdateStatePath())
 	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 		return err
 	}
 
 	artifactPath, shaHex, err := downloadUpdateArtifact(artifactURL, artifactDir, func(written, total int64) {
-		wailsruntime.EventsEmit(a.ctx, "update:progress", updateapplylogic.BuildDownloadProgressPayload(written, total))
+		a.emitEvent("update:progress", updateapplylogic.BuildDownloadProgressPayload(written, total))
 	})
 	if err != nil {
-		wailsruntime.EventsEmit(a.ctx, "update:error", map[string]any{"message": err.Error()})
+		a.emitEvent("update:error", map[string]any{"message": err.Error()})
 		return err
 	}
 
@@ -196,8 +196,8 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 		Downloaded: true,
 	})
 
-	wailsruntime.EventsEmit(a.ctx, "update:ready", map[string]any{"version": latestVersion})
-	wailsruntime.EventsEmit(a.ctx, "update:status", map[string]any{"message": "Update downloaded. Restart to install."})
+	a.emitEvent("update:ready", map[string]any{"version": latestVersion})
+	a.emitEvent("update:status", map[string]any{"message": "Update downloaded. Restart to install."})
 	return nil
 }
 
@@ -205,9 +205,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 // Safe to call even if no update is prepared.
 func (a *App) ClearPreparedUpdate() {
 	a.clearPreparedUpdateState()
-	if a.ctx != nil {
-		wailsruntime.EventsEmit(a.ctx, "update:status", map[string]any{"message": "Cleared prepared update."})
-	}
+	a.emitEvent("update:status", map[string]any{"message": "Cleared prepared update."})
 }
 
 func downloadUpdateArtifact(url string, destDir string, onProgress func(written, total int64)) (path string, sha256Hex string, err error) {

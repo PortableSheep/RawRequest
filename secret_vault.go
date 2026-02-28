@@ -40,6 +40,7 @@ type SecretVault struct {
 	keyPath        string
 	dataPath       string
 	key            []byte
+	gcm            cipher.AEAD
 	keySource      string
 	mu             sync.Mutex
 	keyringService string
@@ -76,6 +77,7 @@ func (sv *SecretVault) Reset() error {
 		_ = keyring.Delete(sv.keyringService, sv.keyringUser)
 	}
 	sv.key = nil
+	sv.gcm = nil
 	sv.keySource = ""
 	return nil
 }
@@ -318,12 +320,24 @@ func (sv *SecretVault) writeKeyring(value string) error {
 	return keyring.Set(sv.keyringService, sv.keyringUser, value)
 }
 
-func (sv *SecretVault) encrypt(plaintext []byte) ([]byte, error) {
+func (sv *SecretVault) ensureGCMLocked() (cipher.AEAD, error) {
+	if sv.gcm != nil {
+		return sv.gcm, nil
+	}
 	block, err := aes.NewCipher(sv.key)
 	if err != nil {
 		return nil, err
 	}
 	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	sv.gcm = gcm
+	return gcm, nil
+}
+
+func (sv *SecretVault) encrypt(plaintext []byte) ([]byte, error) {
+	gcm, err := sv.ensureGCMLocked()
 	if err != nil {
 		return nil, err
 	}
@@ -331,16 +345,11 @@ func (sv *SecretVault) encrypt(plaintext []byte) ([]byte, error) {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, err
 	}
-	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
-	return ciphertext, nil
+	return gcm.Seal(nonce, nonce, plaintext, nil), nil
 }
 
 func (sv *SecretVault) decrypt(ciphertext []byte) ([]byte, error) {
-	block, err := aes.NewCipher(sv.key)
-	if err != nil {
-		return nil, err
-	}
-	gcm, err := cipher.NewGCM(block)
+	gcm, err := sv.ensureGCMLocked()
 	if err != nil {
 		return nil, err
 	}
@@ -348,9 +357,7 @@ func (sv *SecretVault) decrypt(ciphertext []byte) ([]byte, error) {
 	if len(ciphertext) < nonceSize {
 		return nil, errors.New("ciphertext too short")
 	}
-	nonce := ciphertext[:nonceSize]
-	payload := ciphertext[nonceSize:]
-	return gcm.Open(nil, nonce, payload, nil)
+	return gcm.Open(nil, ciphertext[:nonceSize], ciphertext[nonceSize:], nil)
 }
 
 // Note: deterministic env/key normalization and key listing helpers live in internal/secretvaultlogic.

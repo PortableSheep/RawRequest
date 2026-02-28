@@ -31,7 +31,7 @@ func TestExecuteRequests_PreScriptSetVarAffectsPlaceholders(t *testing.T) {
 		},
 	}
 
-	out := app.ExecuteRequests(requests)
+	out := app.executeRequests(requests)
 	if out == "" {
 		t.Fatalf("expected non-empty response")
 	}
@@ -64,7 +64,7 @@ func TestExecuteRequests_PreScriptCanSetHeader(t *testing.T) {
 		},
 	}
 
-	out := app.ExecuteRequests(requests)
+	out := app.executeRequests(requests)
 	if out == "" {
 		t.Fatalf("expected non-empty response")
 	}
@@ -112,7 +112,7 @@ func TestExecuteRequests_ResponseVariablesAffectNextRequest(t *testing.T) {
 		},
 	}
 
-	out := app.ExecuteRequests(requests)
+	out := app.executeRequests(requests)
 	if out == "" {
 		t.Fatalf("expected non-empty response")
 	}

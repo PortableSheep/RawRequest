@@ -5,8 +5,6 @@ import {importers} from '../models';
 
 export function AddEnvVariable(arg1:string,arg2:string):Promise<void>;
 
-export function CancelRequest(arg1:string):Promise<void>;
-
 export function CheckForUpdates():Promise<main.UpdateInfo>;
 
 export function ClearPreparedUpdate():Promise<void>;
@@ -15,9 +13,7 @@ export function ClearScriptLogs():Promise<void>;
 
 export function DeleteSecret(arg1:string,arg2:string):Promise<Record<string, Array<string>>>;
 
-export function ExecuteRequests(arg1:Array<Record<string, any>>):Promise<string>;
-
-export function ExecuteRequestsWithID(arg1:string,arg2:Array<Record<string, any>>):Promise<string>;
+export function EnsureServiceRunning(arg1:string):Promise<void>;
 
 export function ExportSecrets():Promise<Record<string, Record<string, string>>>;
 
@@ -73,8 +69,6 @@ export function OpenImportFileDialog():Promise<string>;
 
 export function OpenReleaseURL(arg1:string):Promise<void>;
 
-export function ParseHttp(arg1:string,arg2:Record<string, string>,arg3:Record<string, string>):Promise<Array<Record<string, any>>>;
-
 export function ParseResponseForVariables(arg1:string):Promise<void>;
 
 export function ReadFileContents(arg1:string):Promise<string>;
@@ -101,12 +95,6 @@ export function SaveWindowState():Promise<void>;
 
 export function SendNotification(arg1:string,arg2:string):Promise<void>;
 
-export function SendRequest(arg1:string,arg2:string,arg3:string,arg4:string):Promise<string>;
-
-export function SendRequestWithID(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<string>;
-
-export function SendRequestWithTimeout(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:number):Promise<string>;
-
 export function SetEnvVariable(arg1:string,arg2:string):Promise<void>;
 
 export function SetEnvironment(arg1:string):Promise<void>;
@@ -116,8 +104,6 @@ export function SetMasterPassword(arg1:string):Promise<void>;
 export function SetVariable(arg1:string,arg2:string):Promise<void>;
 
 export function ShowSaveDialog(arg1:string):Promise<string>;
-
-export function StartLoadTest(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
 export function StartUpdateAndRestart(arg1:string):Promise<void>;
 

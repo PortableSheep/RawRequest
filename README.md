@@ -1,94 +1,79 @@
 # RawRequest
 
-RawRequest is a code-first desktop HTTP client.
-
-Write requests in `.http` files, run them with environment variables and secrets, add small JavaScript scripts where needed, and keep history/results alongside your work. Control it from the GUI, the CLI, or let an AI drive it via MCP.
-
-Built with [Wails](https://wails.io/) and Angular.
-
-## Screenshots
+**Code-first HTTP client.** Write requests in `.http` files. Run them from the terminal, your AI assistant, or a full desktop GUI.
 
 ![Main window](docs/MainWindow.png)
 
-![Load test in progress](docs/LoadTestInProgress.png)
+## Quick Install
 
-![Load test results](docs/LoadTestResult.png)
+**macOS (Homebrew):**
+```bash
+brew tap portablesheep/rawrequest https://github.com/portablesheep/homebrew-rawrequest
+brew install --cask rawrequest
+```
 
-## Features
-
-- **Code-first editor**: CodeMirror 6 with syntax highlighting, folding, linting, and variable diagnostics
-- **Request navigation**: outline panel (<kbd>⌘ Shift O</kbd>) and command palette (<kbd>⌘ P</kbd>) for quick access to any request
-- **CLI mode**: run named requests from the terminal for scripting/CI
-- **MCP server**: let AI assistants (Copilot, Claude) discover and execute requests via chat
-- **Request chaining**: chain requests with `@depends` and reference prior responses
-- **Load testing**: built-in load testing with `@load` — RPS limiting, ramp-up, percentile breakdowns
-- **Secrets**: encrypted vault with `{{secret:key}}` placeholders, sortable manager with usage tracking
-- **Environments**: switch between dev/staging/prod via `@env.*` variables
-- **Scripts**: JavaScript pre/post blocks for dynamic requests, variable extraction, and assertions
-
-## Installation
-
-### macOS
-
-#### Quick Install (Recommended)
+**macOS / Linux (curl):**
 ```bash
 curl -fsSL https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.sh | bash
 ```
 
-#### Homebrew
-```bash
-# Tap this repository
-brew tap portablesheep/rawrequest https://github.com/portablesheep/homebrew-rawrequest
-
-# Install
-brew install --cask rawrequest
-
-# Link to Applications (optional)
-ln -sf $(brew --prefix)/opt/rawrequest/RawRequest.app /Applications/
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/install.ps1 | iex
 ```
 
-#### Manual Install
-1. Download the latest macOS artifact from [Releases](https://github.com/portablesheep/RawRequest/releases) (e.g. `.dmg` or `RawRequest-v*-macos-universal.tar.gz`)
-2. Open the DMG and drag RawRequest to Applications, or extract the tarball
-3. On first launch, right-click and select "Open" to bypass Gatekeeper
+**Manual:** Download from [Releases](https://github.com/portablesheep/RawRequest/releases).
 
-### Windows
+## What is RawRequest?
 
-1. Download `RawRequest-*-windows-portable.zip` from [Releases](https://github.com/portablesheep/RawRequest/releases)
-2. Extract to any folder
-3. Run `RawRequest.exe`
-4. If SmartScreen warns you, click "More info" → "Run anyway"
+RawRequest has two components that share the same `.http` file format and execution engine:
 
-## Quick Start
+| | **rawrequest CLI** | **RawRequest Desktop** |
+|---|---|---|
+| **What** | Single binary — CLI commands + MCP mode | GUI application |
+| **For** | Terminal, CI/CD, AI assistants | Editing, visual testing, managing secrets |
+| **Install** | `brew install`, `curl`, or download binary | `.dmg` / `.exe` from Releases |
 
-Create a file called `requests.http`:
+## .http File Format
 
 ```http
-# Environment variables
+# === Environments ===
 @env.dev.baseUrl = http://localhost:3000
 @env.prod.baseUrl = https://api.example.com
 
-# Optional globals (useful for defaults + autocomplete)
+# === Variables ===
 @contentType = application/json
 
-### Simple GET request
+### GET request
 GET {{baseUrl}}/users
 Accept: application/json
 
-### POST with JSON body
+### POST with body
 POST {{baseUrl}}/users
+Content-Type: {{contentType}}
+
+{
+  "name": "Jane",
+  "email": "jane@example.com"
+}
+
+### Secrets
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "name": "Example User",
-  "email": "example@company.test"
+  "password": "{{secret:myPassword}}"
 }
 
-### Request with pre/post scripts
+### Scripts (pre and post)
 @name login
-@timeout 15000
 POST {{baseUrl}}/auth/login
-Content-Type: {{contentType}}
+Content-Type: application/json
+
+< {
+  // Pre-request script
+  console.log('Logging in...');
+}
 
 {
   "username": "admin",
@@ -96,62 +81,165 @@ Content-Type: {{contentType}}
 }
 
 > {
+  // Post-response script
   assert(response.status === 200, `Expected 200, got ${response.status}`);
   setVar('token', response.json.token);
-  console.log('Logged in!');
 }
 
-### Chained request (runs after login)
+### Request chaining
 @name getProfile
 @depends login
 GET {{baseUrl}}/profile
 Authorization: Bearer {{token}}
+
+### Load testing
+@name healthCheck
+@load
+duration: 30s
+users: 50
+rampUp: 5s
+targetRPS: 200
+
+GET {{baseUrl}}/health
 ```
 
-Notes:
-- Env vars support either whitespace or an equals sign (e.g. `@env.dev.baseUrl https://...` or `@env.dev.baseUrl = https://...`).
-- Assertions are done in scripts via `assert(...)`.
+**Key syntax:**
+- `###` separates requests
+- `@name` identifies a request for chaining/targeting
+- `@depends` declares dependencies on other named requests
+- `@env.<env>.<var>` defines per-environment variables
+- `@timeout` sets per-request timeout in milliseconds
+- `{{var}}` interpolates variables; `{{secret:key}}` resolves secrets
+- `< { }` pre-request script; `> { }` post-response script
+- Scripts have access to `request`, `response`, `setVar()`, `assert()`, `console.log()`
 
-## CLI Mode
+## CLI
 
-RawRequest can also run from the command line for scripting, automation, and CI pipelines:
+### `rawrequest run` — Execute requests
 
 ```bash
 # Run a named request
-rawrequest run requests.http -n login
+rawrequest run api.http -n login
 
-# Use a specific environment
-rawrequest run requests.http -n getUsers -e prod
+# Use an environment
+rawrequest run api.http -n getUsers -e prod
 
-# Set variables from the command line
-rawrequest run requests.http -n createUser -V "username=john" -V "email=john@example.com"
+# Set variables
+rawrequest run api.http -n createUser -V "username=john" -V "email=john@test.com"
 
-# Output formats: json, body, full, quiet
-rawrequest run requests.http -n getData -o body | jq .
+# Output formats: full (default), json, body, quiet
+rawrequest run api.http -n getData -o body | jq .
 
-# List all requests in a file
-rawrequest list requests.http
+# Skip pre/post scripts
+rawrequest run api.http -n getData --no-scripts
 
-# List available environments
-rawrequest envs requests.http
+# Verbose mode (show request details)
+rawrequest run api.http -n login --verbose
 ```
 
-Run `rawrequest help` for full usage details.
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--name` | `-n` | *(required)* | Request name (repeatable) |
+| `--env` | `-e` | `default` | Environment |
+| `--var` | `-V` | | Variable `key=value` (repeatable) |
+| `--output` | `-o` | `full` | Output format: `full\|json\|body\|quiet` |
+| `--timeout` | | `30` | Timeout in seconds |
+| `--verbose` | | `false` | Show request details |
+| `--no-scripts` | | `false` | Disable pre/post scripts |
 
-## MCP Server (AI Assistant Integration)
+### `rawrequest load` — Run load tests
 
-RawRequest can act as an [MCP](https://modelcontextprotocol.io) server, allowing AI assistants like GitHub Copilot, Claude, and others to discover and execute HTTP requests from your `.http` files via chat.
+Run load tests against named requests from the command line.
+
+```bash
+# Basic load test — 10 users for 30 seconds
+rawrequest load api.http -n healthCheck
+
+# Custom concurrency and duration
+rawrequest load api.http -n healthCheck --users 50 --duration 2m
+
+# Rate limiting with ramp-up
+rawrequest load api.http -n healthCheck --rps 200 --ramp-up 10s --users 100
+
+# Abort if failure rate exceeds threshold
+rawrequest load api.http -n healthCheck --users 50 --fail-rate 0.05
+
+# Adaptive load control
+rawrequest load api.http -n healthCheck --adaptive --users 100
+
+# JSON output for CI pipelines
+rawrequest load api.http -n healthCheck -o json
+```
+
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--name` | `-n` | *(required)* | Request name to load test |
+| `--env` | `-e` | `default` | Environment |
+| `--var` | `-V` | | Variable `key=value` (repeatable) |
+| `--users` | | `10` | Max concurrent users |
+| `--duration` | | `30s` | Test duration (e.g. `30s`, `2m`) |
+| `--rps` | | `0` | Target requests/sec (0 = unlimited) |
+| `--ramp-up` | | | Ramp-up period (e.g. `10s`) |
+| `--fail-rate` | | `0` | Failure rate threshold to abort (0.0–1.0) |
+| `--adaptive` | | `false` | Enable adaptive load control |
+| `--output` | `-o` | `full` | Output format: `full\|json\|quiet` |
+| `--timeout` | | `30` | Per-request timeout in seconds |
+
+Output includes response time percentiles (P50, P95, P99), throughput, error breakdown, and status code distribution.
+
+### `rawrequest list` — List requests
+
+```bash
+rawrequest list api.http
+```
+
+### `rawrequest envs` — List environments
+
+```bash
+rawrequest envs api.http
+```
+
+## MCP Server
+
+RawRequest works as an [MCP](https://modelcontextprotocol.io) server, letting AI assistants discover and execute your HTTP requests via chat. Uses stdio transport — no ports needed.
 
 ### Setup
 
-Configure your AI client to use RawRequest as an MCP server. The server uses stdio transport — no ports or HTTP endpoints needed.
+```bash
+rawrequest mcp [--workspace <dir>] [--env <name>]
+```
 
-**VS Code / GitHub Copilot** (`.vscode/mcp.json`):
+| Flag | Short | Default | Description |
+|------|-------|---------|-------------|
+| `--workspace` | `-w` | `.` | Root directory for `.http` file discovery |
+| `--env` | `-e` | | Default environment for requests |
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `list_files` | Discover all `.http` files in the workspace |
+| `list_requests` | List requests in a file (name, method, URL, group) |
+| `run_request` | Execute a named request and return the full response |
+| `list_environments` | Show environments and their variables |
+| `set_variable` | Set a session variable for subsequent requests |
+
+### Auto-Discovery
+
+When a tool's `file` parameter is omitted, RawRequest automatically searches the workspace:
+- **One `.http` file found** → used automatically
+- **Multiple files found** → error prompts to specify a file or use `list_files`
+- **No files found** → error message
+
+### Configuration Examples
+
+Most clients launch MCP servers from your project directory. Since `--workspace` defaults to `.` (current directory), you typically don't need it — auto-discovery just works.
+
+**Claude Code** — project (`.mcp.json` in project root):
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "rawrequest": {
-      "type": "stdio",
       "command": "rawrequest",
       "args": ["mcp"]
     }
@@ -159,7 +247,7 @@ Configure your AI client to use RawRequest as an MCP server. The server uses std
 }
 ```
 
-**GitHub Copilot CLI** (`~/.copilot/mcp-config.json`):
+**Claude Code** — global (`~/.claude.json`):
 ```json
 {
   "mcpServers": {
@@ -177,41 +265,70 @@ Configure your AI client to use RawRequest as an MCP server. The server uses std
   "mcpServers": {
     "rawrequest": {
       "command": "rawrequest",
+      "args": ["mcp", "--workspace", "/absolute/path/to/project"]
+    }
+  }
+}
+```
+
+> Claude Desktop does not support variable expansion or cwd — an absolute path is required.
+
+**GitHub Copilot — VS Code** (`.vscode/mcp.json`):
+```json
+{
+  "servers": {
+    "rawrequest": {
+      "type": "stdio",
+      "command": "rawrequest",
+      "args": ["mcp", "--workspace", "${workspaceFolder}"]
+    }
+  }
+}
+```
+
+**GitHub Copilot — project-wide** (`.github/copilot-mcp.json`):
+```json
+{
+  "servers": {
+    "rawrequest": {
+      "command": "rawrequest",
+      "args": ["mcp", "--workspace", "${workspaceFolder}"]
+    }
+  }
+}
+```
+
+**GitHub Copilot CLI** — global (`~/.copilot/mcp-config.json`):
+```json
+{
+  "mcpServers": {
+    "rawrequest": {
+      "command": "rawrequest",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-You can optionally set a default environment: `"args": ["mcp", "--env", "dev"]`
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `list_requests` | List all requests in a `.http` file (name, method, URL, group) |
-| `run_request` | Execute a named request and return the full response |
-| `list_environments` | Show available environments and their variables |
-| `set_variable` | Set a variable for use in subsequent requests |
-
-### Telling the AI about your files
-
-Add a note in your project's `copilot-instructions.md`, `claude.md`, or similar:
-
-```markdown
-## API Testing
-Use the RawRequest MCP server to run HTTP requests.
-The API definitions are in `api.http`. Use the "dev" environment.
-```
-
 ### Secrets
 
-The MCP server can resolve `{{secret:KEY}}` placeholders using the same encrypted vault as the GUI (stored at `~/.config/rawrequest/secrets/`). Set up secrets in the GUI first, then they work automatically in MCP mode.
+The MCP server resolves `{{secret:KEY}}` placeholders using the same encrypted vault as the desktop app. Set up secrets in the GUI first — they work automatically in MCP and CLI modes.
 
-## Documentation
+## RawRequest Desktop
 
-- The landing page lives in [docs/index.html](./docs/index.html).
-- See [examples/http](./examples/examples.http) for a bigger request file.
+The desktop application provides a full GUI for working with `.http` files:
+
+- **Code editor** — CodeMirror 6 with syntax highlighting, folding, linting, and variable diagnostics
+- **Request execution** — Visual response viewer with timing breakdown
+- **Secret vault** — Encrypted secret management with usage tracking
+- **Request history** — Browse and re-run past requests
+- **Collection import** — Import from Postman and Bruno
+- **Request navigation** — Outline panel (<kbd>⌘ Shift O</kbd>) and command palette (<kbd>⌘ P</kbd>)
+- **Load testing** — Visual load test runner with live progress and result charts
+
+![Load test in progress](docs/LoadTestInProgress.png)
+
+![Load test results](docs/LoadTestResult.png)
 
 ## Development
 
@@ -220,15 +337,41 @@ The MCP server can resolve `{{secret:KEY}}` placeholders using the same encrypte
 - Node.js 20+
 - [Wails CLI](https://wails.io/docs/gettingstarted/installation)
 
-### Build from Source
+### Dev Workflow
 ```bash
-# Install dependencies
 cd frontend && npm install && cd ..
 
-# Development mode
-wails dev
+# Development mode with hot reload
+./scripts/dev-build.sh
+
+# Build only (no dev server)
+./scripts/dev-build.sh --build-only
 ```
+
+### Testing
+```bash
+# Backend
+go test ./...
+
+# Frontend
+cd frontend && npm test
+```
+
+### Building
+```bash
+./scripts/build.sh
+```
+
+## Architecture
+
+RawRequest is a single Go binary that operates in multiple modes:
+
+- **CLI mode** — `rawrequest run|load|list|envs` executes directly and exits
+- **MCP mode** — `rawrequest mcp` runs a long-lived stdio server for AI clients
+- **Desktop mode** — the GUI app runs an internal HTTP backend on localhost; the Angular frontend communicates with it
+
+All modes share the same request parsing, execution, scripting, and templating core.
 
 ## License
 
-PolyForm Noncommercial License 1.0.0 - see [LICENSE](./LICENSE)
+PolyForm Noncommercial License 1.0.0 — see [LICENSE](./LICENSE)

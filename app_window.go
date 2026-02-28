@@ -24,13 +24,9 @@ func (a *App) MigrateResponsesFromRunLocationToHttpFile(fileID string, httpFileP
 		return "", errors.New("no http file path provided")
 	}
 
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-
+	appDir := a.getAppDir()
 	safe := a.sanitizeFileID(fileID)
-	srcDir := filepath.Join(wd, safe+".responses")
+	srcDir := filepath.Join(appDir, "responses", safe+".responses")
 	if _, err := os.Stat(srcDir); err != nil {
 		// Nothing to migrate.
 		if os.IsNotExist(err) {
@@ -297,13 +293,9 @@ func (a *App) SaveResponseFileToRunLocation(fileID string, responseJson string) 
 	if fileID == "" {
 		return "", errors.New("no file id provided")
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
+	appDir := a.getAppDir()
 	safe := a.sanitizeFileID(fileID)
-	// Save to {fileId}.responses/ in working directory (same pattern as saved files)
-	responsesDir := filepath.Join(wd, safe+".responses")
+	responsesDir := filepath.Join(appDir, "responses", safe+".responses")
 	if err := os.MkdirAll(responsesDir, 0755); err != nil {
 		return "", err
 	}

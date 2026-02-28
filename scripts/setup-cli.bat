@@ -5,10 +5,12 @@ setlocal EnableDelayedExpansion
 :: Adds rawrequest to your PATH so you can use:
 ::   rawrequest run api.http -n login
 ::   rawrequest mcp
+::   rawrequest service
 
 set "INSTALL_DIR=%LOCALAPPDATA%\RawRequest"
 set "EXE_SRC=%~dp0RawRequest.exe"
 set "EXE_DST=%INSTALL_DIR%\rawrequest.exe"
+set "SERVICE_CMD=%INSTALL_DIR%\rawrequest-service.cmd"
 
 if not exist "%EXE_SRC%" (
     echo Error: RawRequest.exe not found next to this script.
@@ -30,6 +32,12 @@ if errorlevel 1 (
     pause
     exit /b 1
 )
+
+:: Create service launcher command
+(
+echo @echo off
+echo "%%~dp0rawrequest.exe" service %%*
+) > "%SERVICE_CMD%"
 
 :: Check if already on PATH
 echo %PATH% | findstr /I /C:"%INSTALL_DIR%" >nul 2>&1
@@ -58,5 +66,6 @@ echo.
 echo Open a NEW terminal and try:
 echo   rawrequest --help
 echo   rawrequest mcp
+echo   rawrequest-service
 echo.
 pause

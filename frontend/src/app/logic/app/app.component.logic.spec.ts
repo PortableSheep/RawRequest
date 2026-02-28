@@ -270,6 +270,32 @@ describe('app.component.logic', () => {
     ).toEqual({ action: 'saveAs', shouldPreventDefault: true, shouldStopPropagation: true });
   });
 
+  it('decideGlobalKeydownAction routes Cmd/Ctrl+Shift+H to toggleHistory', () => {
+    expect(
+      decideGlobalKeydownAction({
+        key: 'h',
+        metaKey: true,
+        ctrlKey: false,
+        shiftKey: true,
+        showHistoryModal: false,
+        showHistory: false,
+        isRequestRunning: false
+      })
+    ).toEqual({ action: 'toggleHistory', shouldPreventDefault: true, shouldStopPropagation: true });
+
+    expect(
+      decideGlobalKeydownAction({
+        key: 'H',
+        metaKey: false,
+        ctrlKey: true,
+        shiftKey: true,
+        showHistoryModal: true,
+        showHistory: true,
+        isRequestRunning: true
+      }).action
+    ).toBe('toggleHistory');
+  });
+
   it('findExistingOpenFileIndex finds by filePath or id', () => {
     const files: any[] = [
       { id: 'a', filePath: '' },

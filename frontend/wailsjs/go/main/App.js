@@ -6,10 +6,6 @@ export function AddEnvVariable(arg1, arg2) {
   return window['go']['main']['App']['AddEnvVariable'](arg1, arg2);
 }
 
-export function CancelRequest(arg1) {
-  return window['go']['main']['App']['CancelRequest'](arg1);
-}
-
 export function CheckForUpdates() {
   return window['go']['main']['App']['CheckForUpdates']();
 }
@@ -26,12 +22,8 @@ export function DeleteSecret(arg1, arg2) {
   return window['go']['main']['App']['DeleteSecret'](arg1, arg2);
 }
 
-export function ExecuteRequests(arg1) {
-  return window['go']['main']['App']['ExecuteRequests'](arg1);
-}
-
-export function ExecuteRequestsWithID(arg1, arg2) {
-  return window['go']['main']['App']['ExecuteRequestsWithID'](arg1, arg2);
+export function EnsureServiceRunning(arg1) {
+  return window['go']['main']['App']['EnsureServiceRunning'](arg1);
 }
 
 export function ExportSecrets() {
@@ -142,10 +134,6 @@ export function OpenReleaseURL(arg1) {
   return window['go']['main']['App']['OpenReleaseURL'](arg1);
 }
 
-export function ParseHttp(arg1, arg2, arg3) {
-  return window['go']['main']['App']['ParseHttp'](arg1, arg2, arg3);
-}
-
 export function ParseResponseForVariables(arg1) {
   return window['go']['main']['App']['ParseResponseForVariables'](arg1);
 }
@@ -198,18 +186,6 @@ export function SendNotification(arg1, arg2) {
   return window['go']['main']['App']['SendNotification'](arg1, arg2);
 }
 
-export function SendRequest(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['SendRequest'](arg1, arg2, arg3, arg4);
-}
-
-export function SendRequestWithID(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['SendRequestWithID'](arg1, arg2, arg3, arg4, arg5);
-}
-
-export function SendRequestWithTimeout(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['SendRequestWithTimeout'](arg1, arg2, arg3, arg4, arg5, arg6);
-}
-
 export function SetEnvVariable(arg1, arg2) {
   return window['go']['main']['App']['SetEnvVariable'](arg1, arg2);
 }
@@ -228,10 +204,6 @@ export function SetVariable(arg1, arg2) {
 
 export function ShowSaveDialog(arg1) {
   return window['go']['main']['App']['ShowSaveDialog'](arg1);
-}
-
-export function StartLoadTest(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['StartLoadTest'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function StartUpdateAndRestart(arg1) {

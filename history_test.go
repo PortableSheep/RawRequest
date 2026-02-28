@@ -113,17 +113,14 @@ func TestLoadFileHistoryFromDir(t *testing.T) {
 func TestLoadFileHistoryFromRunLocation(t *testing.T) {
 	app := NewApp()
 	tmp := t.TempDir()
-	oldwd, _ := os.Getwd()
-	defer os.Chdir(oldwd)
-	if err := os.Chdir(tmp); err != nil {
-		t.Fatalf("failed to chdir to temp: %v", err)
-	}
+	t.Setenv("HOME", tmp)
 
 	fileID := "unsaved:tab-runloc"
 	safe := app.sanitizeFileID(fileID)
 
-	// Create {sanitizedFileID}.responses/ folder (same pattern as saved files)
-	responsesDir := filepath.Join(tmp, safe+".responses")
+	// Create {appDir}/responses/{sanitizedFileID}.responses/ folder
+	appDir := app.getAppDir()
+	responsesDir := filepath.Join(appDir, "responses", safe+".responses")
 	if err := os.MkdirAll(responsesDir, 0755); err != nil {
 		t.Fatalf("failed to create responses dir: %v", err)
 	}

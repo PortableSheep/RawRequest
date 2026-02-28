@@ -22,8 +22,23 @@
             (onImportPostman)="importPostmanCollection()"
             (onImportBruno)="importBrunoCollection()"
             (onOutlineClick)="toggleOutlinePanel()"
-            (onSearchRequestsClick)="showCommandPalette = !showCommandPalette">>
+            (onSearchRequestsClick)="toggleCommandPalette()">
     </app-header>
+
+    @if (serviceStartupError) {
+        <div class="rr-service-blocking">
+            <div class="glass-panel rr-service-blocking__card">
+                <h2 class="rr-service-blocking__title">Service startup failed</h2>
+                <p class="rr-service-blocking__message">{{ serviceStartupError }}</p>
+                <p class="rr-service-blocking__hint">The UI requires the local service runtime. Fix the service and retry.</p>
+                <div class="rr-service-blocking__actions">
+                    <button type="button" class="rr-btn rr-btn--primary" (click)="retryServiceStartup()">
+                        Retry service startup
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
 
     <main class="rr-app__main">
         <div class="rr-shell">
@@ -201,6 +216,22 @@
         }
     </main>
 
+    @if (showHistoryEdgeTrigger()) {
+        <button
+            type="button"
+            class="rr-history-edge-trigger"
+            (click)="toggleHistory()"
+            title="Open history (⌘/Ctrl+Shift+H)"
+            aria-label="Open history"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 8l0 4l2 2" />
+                <path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" />
+            </svg>
+            <span class="rr-sr-only">Open history</span>
+        </button>
+    }
+
     <app-console-drawer
             [open]="consoleOpen()"
             [logs]="scriptLogs()"
@@ -209,13 +240,13 @@
             (onToggle)="toggleConsole()"
             (onClear)="clearConsole()">
     </app-console-drawer>
-   <app-history-sidebar
+    <app-history-sidebar
         [isOpen]="showHistory"
         [history]="history"
         [selectedItem]="selectedHistoryItem"
-        (onClose)="toggleHistory()"
+        (onClose)="showHistory = false"
         (onItemClick)="viewHistory($event)">
-   </app-history-sidebar>
+    </app-history-sidebar>
    <app-outline-panel
         [isOpen]="showOutlinePanel"
         [requests]="currentFile.requests"

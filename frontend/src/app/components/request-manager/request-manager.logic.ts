@@ -1,4 +1,4 @@
-import type { FileTab, HistoryItem, LoadTestMetrics, LoadTestResults, ResponseData } from '../../models/http.models';
+import type { FileTab, HistoryItem, LoadTestMetrics, LoadTestResults, RequestPreview, ResponseData } from '../../models/http.models';
 
 export function shouldSkipDuplicateExecution(params: {
   executingRequest: boolean;
@@ -85,13 +85,24 @@ export function buildLoadTestSummaryResponse(params: {
   metrics: LoadTestMetrics;
   results: Pick<LoadTestResults, 'startTime' | 'endTime'>;
   statusText: string;
+  method: string;
+  url: string;
+  name?: string;
 }): ResponseData {
+  const requestPreview: RequestPreview = {
+    name: params.name,
+    method: params.method + ' (Load Test)',
+    url: params.url,
+    headers: {}
+  };
   return {
     status: 200,
     statusText: params.statusText,
     headers: {},
     body: JSON.stringify(params.metrics, null, 2),
     loadTestMetrics: params.metrics,
-    responseTime: params.results.endTime - params.results.startTime
+    responseTime: params.results.endTime - params.results.startTime,
+    requestPreview,
+    processedUrl: params.url
   };
 }

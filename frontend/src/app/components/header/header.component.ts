@@ -1,4 +1,4 @@
-import { Component, HostListener, input, output, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, input, output, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { FileTab } from '../../models/http.models';
@@ -8,7 +8,8 @@ import { ThemeService } from '../../services/theme.service';
   selector: 'app-header',
   imports: [FormsModule],
   templateUrl: './header.component.html',
-  styleUrls: ['./header.component.scss']
+  styleUrls: ['./header.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class HeaderComponent {
   private readonly theme = inject(ThemeService);
@@ -179,6 +180,26 @@ export class HeaderComponent {
 
   handleToggleThemeClick(): void {
     this.toggleTheme();
+    this.closeMoreMenu();
+  }
+
+  handleSecretsClickFromMenu(): void {
+    this.onSecretsClick.emit();
+    this.closeMoreMenu();
+  }
+
+  handleOutlineClickFromMenu(): void {
+    this.onOutlineClick.emit();
+    this.closeMoreMenu();
+  }
+
+  handleSearchRequestsClickFromMenu(): void {
+    this.onSearchRequestsClick.emit();
+    this.closeMoreMenu();
+  }
+
+  handleHistoryClickFromMenu(): void {
+    this.onHistoryClick.emit();
     this.closeMoreMenu();
   }
 

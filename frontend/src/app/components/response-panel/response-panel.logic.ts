@@ -38,6 +38,19 @@ export function getChainItemsForResponsePanel(
   ];
 }
 
+export function getPreferredExpandedEntryId(
+  entries: ChainEntryPreview[],
+  currentExpandedId: string | null
+): string | null {
+  if (!entries.length) {
+    return null;
+  }
+  if (currentExpandedId && entries.some(entry => entry.id === currentExpandedId)) {
+    return currentExpandedId;
+  }
+  return entries[entries.length - 1]?.id ?? null;
+}
+
 export function getStatusClassForEntry(entry: ChainEntryPreview): string {
   if (!entry.response) {
     return 'rr-status rr-status--pending';

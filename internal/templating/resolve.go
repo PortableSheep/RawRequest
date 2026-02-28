@@ -7,12 +7,14 @@ import (
 	"strings"
 )
 
+var variableRegex = regexp.MustCompile(`\{\{([^}]+)\}\}`)
+
 func Resolve(input string, variables map[string]string, envVars map[string]string, responseStore map[string]map[string]interface{}) string {
 	if input == "" {
 		return input
 	}
 
-	variableRegex := regexp.MustCompile(`\{\{([^}]+)\}\}`)
+	jsonCache := map[string]map[string]interface{}{}
 	return variableRegex.ReplaceAllStringFunc(input, func(match string) string {
 		expr := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(match, "{{"), "}}"))
 		if expr == "" {
@@ -43,8 +45,12 @@ func Resolve(input string, variables map[string]string, envVars map[string]strin
 						return body
 					}
 					path := strings.Join(parts[3:], ".")
+					if cached, ok := jsonCache[requestKey]; ok {
+						return getJSONValue(cached, path)
+					}
 					var jsonData map[string]interface{}
 					if err := json.Unmarshal([]byte(body), &jsonData); err == nil {
+						jsonCache[requestKey] = jsonData
 						return getJSONValue(jsonData, path)
 					}
 				case "status":

@@ -3,6 +3,7 @@ package scriptexec
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	sh "rawrequest/internal/scripthelpers"
@@ -11,6 +12,12 @@ import (
 
 	"github.com/dop251/goja"
 )
+
+var vmPool = sync.Pool{
+	New: func() interface{} {
+		return goja.New()
+	},
+}
 
 type Dependencies struct {
 	VariablesSnapshot func() map[string]string
@@ -58,7 +65,11 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 		sleepFn = time.Sleep
 	}
 
-	vm := goja.New()
+	vm := vmPool.Get().(*goja.Runtime)
+	defer func() {
+		vm.ClearInterrupt()
+		vmPool.Put(vm)
+	}()
 	_ = vm.Set("context", ctx)
 
 	// Provide top-level aliases commonly used by scripts/examples.

@@ -13,10 +13,10 @@ import {
 } from '../models/http.models';
 import { cleanScriptContent } from '../utils/script-cleaner.generated';
 import { dirname, basename } from '../utils/path';
-import { BackendClientService } from './backend-client.service';
+import { BACKEND_CLIENT } from './backend-client.contract';
 import { ScriptConsoleService } from './script-console.service';
 import { SecretService } from './secret.service';
-import { EventsOn } from '@wailsjs/runtime/runtime';
+import { EventTransportService } from './event-transport.service';
 import { parseGoResponse as parseGoResponseHelper } from './http/go-response';
 import { calculateLoadTestMetrics as calculateLoadTestMetricsHelper } from './http/load-test-metrics';
 import { executeLoadTestViaBackend as executeLoadTestViaBackendHelper } from './http/load-test-backend';
@@ -52,9 +52,10 @@ export interface DownloadProgress {
   providedIn: 'root'
 })
 export class HttpService {
-  private readonly backend = inject(BackendClientService);
+  private readonly backend = inject(BACKEND_CLIENT);
   private readonly scriptConsole = inject(ScriptConsoleService);
   private readonly secretService = inject(SecretService);
+  private readonly events = inject(EventTransportService);
 
   private readonly FILES_KEY = 'rawrequest_files';
   private readonly CANCELLED_RESPONSE = '__CANCELLED__';
@@ -71,8 +72,7 @@ export class HttpService {
   }
 
   private initDownloadProgressListener(): void {
-    // Listen for download progress events from the backend
-    this.downloadProgressCleanup = EventsOn('request:download-progress', (data: any) => {
+    this.downloadProgressCleanup = this.events.on('request:download-progress', (data: any) => {
       if (data?.requestId) {
         this.downloadProgress$.next({
           requestId: data.requestId,
@@ -102,7 +102,7 @@ export class HttpService {
         startLoadTest: (id, method, url, headersJson, body, loadTestJson) =>
           this.backend.startLoadTest(id, method, url, headersJson, body, loadTestJson),
       },
-      eventsOn: EventsOn,
+      eventsOn: (event, callback) => this.events.on(event, callback),
       normalizeEnvName: (e) => this.normalizeEnvName(e),
       hydrateText: (text, vars, envName) => this.hydrateText(text, vars, envName),
       hydrateHeaders: (headers, vars, envName) => this.hydrateHeaders(headers, vars, envName),

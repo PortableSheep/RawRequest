@@ -1,8 +1,21 @@
-import { Component, OnInit, OnDestroy, inject, signal, computed, ViewChild, HostListener, ElementRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { EditorComponent } from './components/editor/editor.component';
-import { RequestManagerComponent } from './components/request-manager/request-manager.component';
+import {
+  Component,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  NgZone,
+  OnInit,
+  OnDestroy,
+  inject,
+  signal,
+  computed,
+  ViewChild,
+  HostListener,
+  ElementRef,
+} from "@angular/core";
+import { CommonModule } from "@angular/common";
+import { FormsModule } from "@angular/forms";
+import { EditorComponent } from "./components/editor/editor.component";
+import { RequestManagerComponent } from "./components/request-manager/request-manager.component";
 import {
   HeaderComponent,
   ResponsePanelComponent,
@@ -15,24 +28,39 @@ import {
   ConsoleDrawerComponent,
   UpdateNotificationComponent,
   ScriptSnippetModalComponent,
-} from './components';
-import { OutlinePanelComponent } from './components/outline-panel/outline-panel.component';
-import { CommandPaletteComponent } from './components/command-palette/command-palette.component';
-import { ToastContainerComponent } from './components/toast-container/toast-container.component';
-import { FileTab, ResponseData, HistoryItem, Request, ScriptLogEntry, ActiveRunProgress, ChainEntryPreview } from './models/http.models';
-import { HttpService } from './services/http.service';
-import { SecretService, SecretIndex, VaultInfo } from './services/secret.service';
-import { ScriptConsoleService } from './services/script-console.service';
-import { ToastService } from './services/toast.service';
-import { UpdateService } from './services/update.service';
-import { ScriptSnippet } from './services/script-snippet.service';
-import { ThemeService } from './services/theme.service';
-import { basename } from './utils/path';
-import { generateFileId, normalizeFileTab } from './utils/file-tab-utils';
-import { HistoryStoreService } from './services/history-store.service';
-import { WorkspaceFacadeService } from './services/workspace-facade.service';
-import { Subject, takeUntil } from 'rxjs';
-import { gsap } from 'gsap';
+} from "./components";
+import { OutlinePanelComponent } from "./components/outline-panel/outline-panel.component";
+import { CommandPaletteComponent } from "./components/command-palette/command-palette.component";
+import { ToastContainerComponent } from "./components/toast-container/toast-container.component";
+import {
+  FileTab,
+  ResponseData,
+  HistoryItem,
+  Request,
+  ScriptLogEntry,
+  ActiveRunProgress,
+  ChainEntryPreview,
+} from "./models/http.models";
+import { HttpService } from "./services/http.service";
+import {
+  SecretService,
+  SecretIndex,
+  VaultInfo,
+} from "./services/secret.service";
+import { ScriptConsoleService } from "./services/script-console.service";
+import { ToastService } from "./services/toast.service";
+import { UpdateService } from "./services/update.service";
+import { ScriptSnippet } from "./services/script-snippet.service";
+import { ThemeService } from "./services/theme.service";
+import { basename } from "./utils/path";
+import { generateFileId, normalizeFileTab } from "./utils/file-tab-utils";
+import { HistoryStoreService } from "./services/history-store.service";
+import { WorkspaceFacadeService } from "./services/workspace-facade.service";
+import {
+  resolveServiceBackendBaseUrl,
+} from "./services/backend-client-config";
+import { Subject, takeUntil } from "rxjs";
+import { gsap } from "gsap";
 import {
   buildActiveRequestMeta,
   buildActiveRequestPreview,
@@ -50,46 +78,61 @@ import {
   formatClockMmSs,
   getRequestTimeoutMs,
   normalizeEnvName,
-  parseSplitWidthPx
-} from './logic/app/app.component.logic';
+  parseSplitWidthPx,
+} from "./logic/app/app.component.logic";
 import {
   buildFileAfterSave,
   buildFirstSaveDefaultName,
   buildSaveAsDefaultName,
   decideFirstSaveHistoryMigration,
-  decideSaveAsHistoryMigration
-} from './logic/app/file-save.logic';
-import { deriveAppStateAfterWorkspaceUpdateWithEnvSync, deriveAppStateFromWorkspaceUpdate } from './logic/app/workspace-update.logic';
-import { decideHistorySyncForWorkspaceState } from './logic/app/history-sync.logic';
+  decideSaveAsHistoryMigration,
+} from "./logic/app/file-save.logic";
+import {
+  deriveAppStateAfterWorkspaceUpdateWithEnvSync,
+  deriveAppStateFromWorkspaceUpdate,
+} from "./logic/app/workspace-update.logic";
+import { decideHistorySyncForWorkspaceState } from "./logic/app/history-sync.logic";
 import {
   clampSplitWidthToContainerPx,
   computeDragSplitWidthPx,
   computeSplitGridTemplateColumns,
   DEFAULT_LEFT_PX,
-  SPLIT_LAYOUT_BREAKPOINT_PX
-} from './utils/split-layout';
-import { readSplitWidthPxFromStorage, writeSplitWidthPxToStorage } from './logic/layout/split-pane-persistence.logic';
-import { decideHistoryLoadForActiveFile } from './logic/history/history-load.logic';
-import { sampleAndApplyRpsUiState } from './logic/active-run/active-run-rps-ui.logic';
+  SPLIT_LAYOUT_BREAKPOINT_PX,
+} from "./utils/split-layout";
+import {
+  readSplitWidthPxFromStorage,
+  writeSplitWidthPxToStorage,
+} from "./logic/layout/split-pane-persistence.logic";
+import { decideHistoryLoadForActiveFile } from "./logic/history/history-load.logic";
+import { sampleAndApplyRpsUiState } from "./logic/active-run/active-run-rps-ui.logic";
 import {
   pushUsersSampleToQueue,
   smoothTowards,
   tickRpsSparklineUi,
-  tickUsersSparklineUi
-} from './logic/active-run/active-run-sparkline.logic';
-import { buildStopActiveRunTickPatch } from './logic/active-run/active-run-stop.logic';
-import { decideActiveRunTickActions } from './logic/active-run/active-run-tick.logic';
-import { buildActiveRequestInfo, buildInitialLoadRunUiState } from './logic/request/active-request.logic';
-import { getCombinedVariablesForFile, getActiveEnvNameForFile } from './components/request-manager/env-vars';
-import { hydrateText } from './services/http/hydration';
-import { consumeQueuedRequest } from './logic/request/request-queue.logic';
-import { buildPendingRequestResetPatch } from './logic/request/pending-request-reset.logic';
-import { buildCancelActiveRequestErrorPatch, decideCancelActiveRequest } from './logic/request/cancel-active-request.logic';
+  tickUsersSparklineUi,
+} from "./logic/active-run/active-run-sparkline.logic";
+import { buildStopActiveRunTickPatch } from "./logic/active-run/active-run-stop.logic";
+import { decideActiveRunTickActions } from "./logic/active-run/active-run-tick.logic";
+import {
+  buildActiveRequestInfo,
+  buildInitialLoadRunUiState,
+} from "./logic/request/active-request.logic";
+import {
+  getCombinedVariablesForFile,
+  getActiveEnvNameForFile,
+} from "./components/request-manager/env-vars";
+import { hydrateText } from "./services/http/hydration";
+import { consumeQueuedRequest } from "./logic/request/request-queue.logic";
+import { buildPendingRequestResetPatch } from "./logic/request/pending-request-reset.logic";
+import {
+  buildCancelActiveRequestErrorPatch,
+  decideCancelActiveRequest,
+} from "./logic/request/cancel-active-request.logic";
 
-type AlertType = 'info' | 'success' | 'warning' | 'danger';
+type AlertType = "info" | "success" | "warning" | "danger";
 
 @Component({
-  selector: 'app-root',
+  selector: "app-root",
   standalone: true,
   imports: [
     CommonModule,
@@ -109,13 +152,14 @@ type AlertType = 'info' | 'success' | 'warning' | 'danger';
     UpdateNotificationComponent,
     ScriptSnippetModalComponent,
     OutlinePanelComponent,
-    CommandPaletteComponent
+    CommandPaletteComponent,
   ],
-  templateUrl: './app.component.html',
-  styleUrls: ['./app.component.scss']
+  templateUrl: "./app.component.html",
+  styleUrls: ["./app.component.scss"],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AppComponent implements OnInit, OnDestroy {
-  title = 'RawRequest';
+  title = "RawRequest";
 
   private httpService = inject(HttpService);
   private secretService = inject(SecretService);
@@ -125,10 +169,12 @@ export class AppComponent implements OnInit, OnDestroy {
   private themeService = inject(ThemeService);
   private historyStore = inject(HistoryStoreService);
   private workspace = inject(WorkspaceFacadeService);
-  private readonly LAST_SESSION_KEY = 'rawrequest_last_session';
-  private readonly EDITOR_SPLIT_WIDTH_KEY = 'rawrequest_editor_pane_width_px';
+  private readonly ngZone = inject(NgZone);
+  private readonly cdr = inject(ChangeDetectorRef);
+  private readonly LAST_SESSION_KEY = "rawrequest_last_session";
+  private readonly EDITOR_SPLIT_WIDTH_KEY = "rawrequest_editor_pane_width_px";
 
-  @ViewChild('mainSplit') mainSplitEl?: ElementRef<HTMLElement>;
+  @ViewChild("mainSplit") mainSplitEl?: ElementRef<HTMLElement>;
 
   isSplitLayout = false;
   editorPaneWidthPx = 520;
@@ -139,27 +185,29 @@ export class AppComponent implements OnInit, OnDestroy {
   private splitDragStartWidth = 0;
 
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
-  @ViewChild('editorComponent') editorComponent!: EditorComponent;
+  @ViewChild("editorComponent") editorComponent!: EditorComponent;
 
   filesSignal = signal<FileTab[]>([]);
   currentFileIndexSignal = signal<number>(0);
-  currentEnvSignal = signal<string>('');
+  currentEnvSignal = signal<string>("");
 
   isRequestRunningSignal = signal<boolean>(false);
   pendingRequestIndexSignal = signal<number | null>(null);
   lastExecutedRequestIndexSignal = signal<number | null>(null);
-  downloadProgressSignal = signal<{ downloaded: number; total: number } | null>(null);
+  downloadProgressSignal = signal<{ downloaded: number; total: number } | null>(
+    null,
+  );
 
   private readonly emptyFile: FileTab = {
-    id: 'empty',
-    name: '',
-    content: '',
+    id: "empty",
+    name: "",
+    content: "",
     requests: [],
     environments: {},
     variables: {},
     responseData: {},
     groups: [],
-    selectedEnv: ''
+    selectedEnv: "",
   };
 
   currentFileView = computed<FileTab>(() => {
@@ -187,7 +235,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const files = this.filesSignal();
     const index = this.currentFileIndexSignal();
     if (files[index]?.requests) {
-      return files[index].requests.map(r => r.name || '');
+      return files[index].requests.map((r) => r.name || "");
     }
     return [];
   });
@@ -203,9 +251,9 @@ export class AppComponent implements OnInit, OnDestroy {
   private activeRunNowMs = Date.now();
   private activeRunProgress: ActiveRunProgress | null = null;
   private loadUsersSeries: number[] = [];
-	private readonly loadUsersSeriesMaxPoints = 160;
-	loadUsersSparklinePathDView = '';
-	loadUsersSparklineTransformView = '';
+  private readonly loadUsersSeriesMaxPoints = 160;
+  loadUsersSparklinePathDView = "";
+  loadUsersSparklineTransformView = "";
   private loadUsersQueue: number[] = [];
   private loadUsersScrollPhase = 0;
   private loadUsersNextValue: number | null = null;
@@ -217,14 +265,14 @@ export class AppComponent implements OnInit, OnDestroy {
   private sparklineLastRenderedAtMs: number | null = null;
 
   private loadRpsSeries: number[] = [];
-	private readonly loadRpsSeriesMaxPoints = 160;
-	loadRpsSparklinePathDView = '';
-  loadRpsSparklineTransformView = '';
+  private readonly loadRpsSeriesMaxPoints = 160;
+  loadRpsSparklinePathDView = "";
+  loadRpsSparklineTransformView = "";
   private loadRpsQueue: number[] = [];
   private loadRpsScrollPhase = 0;
   private loadRpsNextValue: number | null = null;
   private readonly loadRpsScrollMs = 80;
-  private readonly loadRpsRampSteps = 36;
+  private readonly loadRpsRampSteps = 8;
   private lastRpsSampleAtMs: number | null = null;
   private lastRpsTotalSent: number | null = null;
   private lastRpsSmoothed: number | null = null;
@@ -235,13 +283,13 @@ export class AppComponent implements OnInit, OnDestroy {
     label: string;
     requestIndex: number;
     canCancel: boolean;
-    type: 'single' | 'chain' | 'load';
+    type: "single" | "chain" | "load";
     startedAt: number;
     processedUrl?: string;
   } | null = null;
   isCancellingActiveRequest = false;
   downloadProgress: { downloaded: number; total: number } | null = null;
-  
+
   // UI state
   showHistory = false;
   showHistoryModal = false;
@@ -254,7 +302,8 @@ export class AppComponent implements OnInit, OnDestroy {
   showSecretsModal = false;
   showSnippetModal = false;
   showDeleteConfirmModal = false;
-  secretToDelete: { env: string, key: string } | null = null;
+  serviceStartupError: string | null = null;
+  secretToDelete: { env: string; key: string } | null = null;
   allSecrets: SecretIndex = {};
   vaultInfo: VaultInfo | null = null;
   // alertBanner: { message: string; type: AlertType } | null = null;
@@ -265,13 +314,14 @@ export class AppComponent implements OnInit, OnDestroy {
     return entries.length ? entries[entries.length - 1] : null;
   });
 
-  @ViewChild('snippetModal') snippetModal!: ScriptSnippetModalComponent;
-  @ViewChild('secretsModal') secretsModal!: SecretsModalComponent;
+  @ViewChild("snippetModal") snippetModal!: ScriptSnippetModalComponent;
+  @ViewChild("secretsModal") secretsModal!: SecretsModalComponent;
 
   private destroy$ = new Subject<void>();
   private alertTimeout: any;
   private parseDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly PARSE_DEBOUNCE_MS = 150;
+  private startupInitialized = false;
 
   constructor() {}
 
@@ -279,6 +329,18 @@ export class AppComponent implements OnInit, OnDestroy {
     this.themeService.init();
     this.restoreSplitState();
     this.refreshSplitLayoutState();
+    void this.bootstrapStartup();
+  }
+
+  private async bootstrapStartup(): Promise<void> {
+    if (this.startupInitialized) {
+      return;
+    }
+    const backendReady = await this.ensureServiceBackendReady();
+    if (!backendReady) {
+      return;
+    }
+    this.startupInitialized = true;
 
     this.loadFiles();
     this.refreshSecrets(true);
@@ -293,21 +355,55 @@ export class AppComponent implements OnInit, OnDestroy {
 
     this.httpService.downloadProgress$
       .pipe(takeUntil(this.destroy$))
-      .subscribe(progress => {
+      .subscribe((progress) => {
         if (this.activeRequestInfo?.id === progress.requestId) {
-          this.downloadProgress = { downloaded: progress.downloaded, total: progress.total };
+          this.downloadProgress = {
+            downloaded: progress.downloaded,
+            total: progress.total,
+          };
           this.downloadProgressSignal.set(this.downloadProgress);
         }
       });
   }
 
-  @HostListener('window:resize')
+  private safeStorage(): Pick<Storage, "getItem"> | null {
+    try {
+      return typeof localStorage !== "undefined" ? localStorage : null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async ensureServiceBackendReady(): Promise<boolean> {
+    const storage = this.safeStorage();
+    const baseUrl = resolveServiceBackendBaseUrl(globalThis as any, storage);
+    try {
+      const { EnsureServiceRunning } = await import("../../wailsjs/go/main/App");
+      await EnsureServiceRunning(baseUrl);
+      this.serviceStartupError = null;
+      return true;
+    } catch (error: any) {
+      const detail =
+        typeof error?.message === "string"
+          ? error.message
+          : String(error || "unknown error");
+      this.serviceStartupError = `Service startup failed (${baseUrl}): ${detail}`;
+      return false;
+    }
+  }
+
+  retryServiceStartup(): void {
+    this.serviceStartupError = null;
+    void this.bootstrapStartup();
+  }
+
+  @HostListener("window:resize")
   onWindowResize() {
     this.refreshSplitLayoutState();
     this.clampSplitWidthToContainer();
   }
 
-  @HostListener('document:mousemove', ['$event'])
+  @HostListener("document:mousemove", ["$event"])
   onDocumentMouseMove(event: MouseEvent) {
     if (!this.isSplitDragging) return;
     if (!this.isSplitLayout) return;
@@ -317,19 +413,27 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const rect = container.getBoundingClientRect();
     const dx = event.clientX - this.splitDragStartX;
-    this.editorPaneWidthPx = computeDragSplitWidthPx(rect.width, this.splitDragStartWidth, dx);
+    this.editorPaneWidthPx = computeDragSplitWidthPx(
+      rect.width,
+      this.splitDragStartWidth,
+      dx,
+    );
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
   }
 
-  @HostListener('document:mouseup')
+  @HostListener("document:mouseup")
   onDocumentMouseUp() {
     if (!this.isSplitDragging) return;
     this.isSplitDragging = false;
-    document.body.style.cursor = '';
-    document.body.style.userSelect = '';
-    writeSplitWidthPxToStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY, this.editorPaneWidthPx);
+    document.body.style.cursor = "";
+    document.body.style.userSelect = "";
+    writeSplitWidthPxToStorage(
+      localStorage,
+      this.EDITOR_SPLIT_WIDTH_KEY,
+      this.editorPaneWidthPx,
+    );
   }
 
   onSplitMouseDown(event: MouseEvent) {
@@ -343,11 +447,18 @@ export class AppComponent implements OnInit, OnDestroy {
   resetSplit() {
     this.editorPaneWidthPx = DEFAULT_LEFT_PX;
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
-    writeSplitWidthPxToStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY, this.editorPaneWidthPx);
+    writeSplitWidthPxToStorage(
+      localStorage,
+      this.EDITOR_SPLIT_WIDTH_KEY,
+      this.editorPaneWidthPx,
+    );
   }
 
   private restoreSplitState(): void {
-    const n = readSplitWidthPxFromStorage(localStorage, this.EDITOR_SPLIT_WIDTH_KEY);
+    const n = readSplitWidthPxFromStorage(
+      localStorage,
+      this.EDITOR_SPLIT_WIDTH_KEY,
+    );
     if (n !== null) {
       this.editorPaneWidthPx = n;
     }
@@ -355,7 +466,9 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private refreshSplitLayoutState(): void {
     // "lg" breakpoint is 1024px.
-    this.isSplitLayout = typeof window !== 'undefined' && window.innerWidth >= SPLIT_LAYOUT_BREAKPOINT_PX;
+    this.isSplitLayout =
+      typeof window !== "undefined" &&
+      window.innerWidth >= SPLIT_LAYOUT_BREAKPOINT_PX;
     this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
   }
 
@@ -372,7 +485,10 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!container) return;
     const rect = container.getBoundingClientRect();
 
-    const clamped = clampSplitWidthToContainerPx(rect.width, this.editorPaneWidthPx);
+    const clamped = clampSplitWidthToContainerPx(
+      rect.width,
+      this.editorPaneWidthPx,
+    );
     if (clamped !== this.editorPaneWidthPx) {
       this.editorPaneWidthPx = clamped;
       this.splitGridTemplateColumns = this.computeSplitGridTemplateColumns();
@@ -400,7 +516,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
       update: init,
-      syncCurrentEnvWithFile: (files, index) => this.workspace.syncCurrentEnvWithFile(files, index)
+      syncCurrentEnvWithFile: (files, index) =>
+        this.workspace.syncCurrentEnvWithFile(files, index),
     });
     this.applyWorkspaceDerivedState(next);
 
@@ -410,20 +527,38 @@ export class AppComponent implements OnInit, OnDestroy {
   private refreshSecrets(force = false): void {
     this.secretService
       .list(force)
-      .then(secrets => {
+      .then((secrets) => {
         this.allSecrets = secrets || {};
+        this.checkMasterPasswordNeeded();
       })
-      .catch(error => console.error('Failed to load secrets', error));
+      .catch((error) => console.error("Failed to load secrets", error));
     void this.loadVaultInfo(force);
   }
 
-  private loadVaultInfo(force = false): Promise<void> {
-    return this.secretService
-      .getVaultInfo(force)
-      .then(info => {
-        this.vaultInfo = info;
-      })
-      .catch(error => console.error('Failed to load vault info', error));
+  private async loadVaultInfo(force = false): Promise<void> {
+    try {
+      const info = await this.secretService.getVaultInfo(force);
+      this.vaultInfo = info;
+      this.checkMasterPasswordNeeded();
+    } catch (error) {
+      return console.error("Failed to load vault info", error);
+    }
+  }
+
+  private masterPasswordCheckDone = false;
+
+  private checkMasterPasswordNeeded(): void {
+    if (this.masterPasswordCheckDone) return;
+    const hasSecrets = Object.values(this.allSecrets).some(
+      (keys) => keys && keys.length > 0,
+    );
+    if (!hasSecrets) return;
+    if (!this.vaultInfo || this.vaultInfo.hasMasterPassword) return;
+    this.masterPasswordCheckDone = true;
+    this.toast.info(
+      "You have secrets but no master password. Open Secrets to set one.",
+      5000,
+    );
   }
 
   // File management
@@ -432,23 +567,30 @@ export class AppComponent implements OnInit, OnDestroy {
     this.files = normalized;
     this.filesSignal.set(normalized);
 
-    const synced = this.workspace.syncCurrentEnvWithFile(this.files, this.currentFileIndex);
+    const synced = this.workspace.syncCurrentEnvWithFile(
+      this.files,
+      this.currentFileIndex,
+    );
     if (synced.files !== this.files) {
       this.files = synced.files;
       this.filesSignal.set(synced.files);
     }
-    this.currentEnvSignal.set(synced.currentEnv || '');
+    this.currentEnvSignal.set(synced.currentEnv || "");
 
     const historyDecision = decideHistorySyncForWorkspaceState({
       files: this.files,
       currentFileIndex: this.currentFileIndex,
-      getCachedHistory: (fileId) => this.historyStore.get(fileId)
+      getCachedHistory: (fileId) => this.historyStore.get(fileId),
     });
     this.history = historyDecision.history;
     if (historyDecision.fileIdToLoad) {
       this.loadHistoryForFile(historyDecision.fileIdToLoad);
     }
-    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
+    this.workspace.persistSessionState(
+      this.LAST_SESSION_KEY,
+      this.files,
+      this.currentFileIndex,
+    );
   }
 
   onCurrentFileIndexChange(index: number) {
@@ -460,30 +602,42 @@ export class AppComponent implements OnInit, OnDestroy {
       this.files = synced.files;
       this.filesSignal.set(synced.files);
     }
-    this.currentEnvSignal.set(synced.currentEnv || '');
+    this.currentEnvSignal.set(synced.currentEnv || "");
 
     const historyDecision = decideHistorySyncForWorkspaceState({
       files: this.files,
       currentFileIndex: index,
-      getCachedHistory: (fileId) => this.historyStore.get(fileId)
+      getCachedHistory: (fileId) => this.historyStore.get(fileId),
     });
     this.history = historyDecision.history;
     if (historyDecision.fileIdToLoad) {
       this.loadHistoryForFile(historyDecision.fileIdToLoad);
     }
-    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
+    this.workspace.persistSessionState(
+      this.LAST_SESSION_KEY,
+      this.files,
+      this.currentFileIndex,
+    );
   }
 
   onCurrentEnvChange(env: string) {
     const file = this.files[this.currentFileIndex];
     if (file) {
-      const updatedFiles = this.workspace.replaceFileAtIndex(this.files, this.currentFileIndex, { ...file, selectedEnv: env });
+      const updatedFiles = this.workspace.replaceFileAtIndex(
+        this.files,
+        this.currentFileIndex,
+        { ...file, selectedEnv: env },
+      );
       this.files = updatedFiles;
       this.filesSignal.set(updatedFiles);
     }
     this.currentEnvSignal.set(env);
     this.httpService.saveFiles(this.files);
-    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files, this.currentFileIndex);
+    this.workspace.persistSessionState(
+      this.LAST_SESSION_KEY,
+      this.files,
+      this.currentFileIndex,
+    );
   }
 
   // Editor content change handler
@@ -508,10 +662,14 @@ export class AppComponent implements OnInit, OnDestroy {
     // Debounce the expensive parsing operation
     this.parseDebounceTimer = setTimeout(() => {
       this.parseDebounceTimer = null;
-      const updated = this.workspace.updateFileContent(this.files, this.currentFileIndex, content);
+      const updated = this.workspace.updateFileContent(
+        this.files,
+        this.currentFileIndex,
+        content,
+      );
       this.files = updated.files;
       this.filesSignal.set(updated.files);
-      this.currentEnvSignal.set(updated.currentEnv || '');
+      this.currentEnvSignal.set(updated.currentEnv || "");
     }, this.PARSE_DEBOUNCE_MS);
   }
 
@@ -544,29 +702,49 @@ export class AppComponent implements OnInit, OnDestroy {
     this.downloadProgressSignal.set(null);
     const request = activeFile.requests[requestIndex];
     const now = Date.now();
-    this.activeRequestInfo = buildActiveRequestInfo(activeFile.id, requestIndex, request, now);
+    this.activeRequestInfo = buildActiveRequestInfo(
+      activeFile.id,
+      requestIndex,
+      request,
+      now,
+    );
     this.isCancellingActiveRequest = false;
 
     // Eagerly hydrate the URL so the pending modal shows the resolved URL
-    const variables = getCombinedVariablesForFile(activeFile, this.currentEnvSignal());
-    const envName = getActiveEnvNameForFile(activeFile, this.currentEnvSignal());
+    const variables = getCombinedVariablesForFile(
+      activeFile,
+      this.currentEnvSignal(),
+    );
+    const envName = getActiveEnvNameForFile(
+      activeFile,
+      this.currentEnvSignal(),
+    );
     const capturedId = this.activeRequestInfo.id;
-    hydrateText(request.url, variables, envName, (text, env) => this.secretService.replaceSecrets(text, env))
-      .then(resolved => {
+    hydrateText(request.url, variables, envName, (text, env) =>
+      this.secretService.replaceSecrets(text, env),
+    )
+      .then((resolved) => {
         if (this.activeRequestInfo?.id === capturedId) {
-          this.activeRequestInfo = { ...this.activeRequestInfo!, processedUrl: resolved };
+          this.activeRequestInfo = {
+            ...this.activeRequestInfo!,
+            processedUrl: resolved,
+          };
         }
       })
       .catch(() => {});
 
-    const loadRun = buildInitialLoadRunUiState(this.loadUsersSeriesMaxPoints, this.loadRpsSeriesMaxPoints);
+    const loadRun = buildInitialLoadRunUiState(
+      this.loadUsersSeriesMaxPoints,
+      this.loadRpsSeriesMaxPoints,
+    );
     this.activeRunProgress = loadRun.activeRunProgress;
 
     this.loadUsersSeries = loadRun.loadUsersSeries;
     this.loadUsersQueue = loadRun.loadUsersQueue;
     this.loadUsersScrollPhase = loadRun.loadUsersScrollPhase;
     this.loadUsersNextValue = loadRun.loadUsersNextValue;
-    this.loadUsersSparklineTransformView = loadRun.loadUsersSparklineTransformView;
+    this.loadUsersSparklineTransformView =
+      loadRun.loadUsersSparklineTransformView;
     this.loadUsersSparklinePathDView = loadRun.loadUsersSparklinePathDView;
 
     this.loadRpsSeries = loadRun.loadRpsSeries;
@@ -583,9 +761,12 @@ export class AppComponent implements OnInit, OnDestroy {
     this.rpsRenderTarget = loadRun.rpsRenderTarget;
     this.startActiveRunTick();
 
-    const execution = this.requestManager.executeRequestByIndex(requestIndex, this.activeRequestInfo.id);
-    execution?.catch(error => {
-      console.error('Request execution failed', error);
+    const execution = this.requestManager.executeRequestByIndex(
+      requestIndex,
+      this.activeRequestInfo.id,
+    );
+    execution?.catch((error) => {
+      console.error("Request execution failed", error);
       this.resetPendingRequestState();
     });
   }
@@ -601,27 +782,35 @@ export class AppComponent implements OnInit, OnDestroy {
     // is a processed/expanded URL (e.g. variables resolved) while the editor contains the
     // templated URL.
     const lastIdx = this.lastExecutedRequestIndexSignal();
-    if (entry?.isPrimary && typeof lastIdx === 'number' && lastIdx >= 0 && lastIdx < activeFile.requests.length) {
+    if (
+      entry?.isPrimary &&
+      typeof lastIdx === "number" &&
+      lastIdx >= 0 &&
+      lastIdx < activeFile.requests.length
+    ) {
       this.onRequestExecute(lastIdx);
       return;
     }
 
-    const targetName = String(entry?.request?.name || '').trim();
+    const targetName = String(entry?.request?.name || "").trim();
     let idx = -1;
 
     if (targetName) {
-      idx = activeFile.requests.findIndex(r => String(r?.name || '').trim() === targetName);
+      idx = activeFile.requests.findIndex(
+        (r) => String(r?.name || "").trim() === targetName,
+      );
     }
 
     // Fallback if the request is unnamed.
     if (idx < 0) {
       idx = activeFile.requests.findIndex(
-        r => r?.method === entry.request.method && r?.url === entry.request.url
+        (r) =>
+          r?.method === entry.request.method && r?.url === entry.request.url,
       );
     }
 
     if (idx < 0) {
-      this.toast.info('Request not found in editor; cannot replay.');
+      this.toast.info("Request not found in editor; cannot replay.");
       return;
     }
 
@@ -648,8 +837,9 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     this.activeRunProgress = progress;
-    if (progress.type === 'load') {
-      const sample = typeof progress.activeUsers === 'number' ? progress.activeUsers : 0;
+    if (progress.type === "load") {
+      const sample =
+        typeof progress.activeUsers === "number" ? progress.activeUsers : 0;
       this.pushLoadUsersSample(sample);
     }
   }
@@ -664,11 +854,51 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // UI handlers
   toggleHistory() {
-    this.showHistory = !this.showHistory;
+    const shouldOpen = !this.showHistory;
+    this.closeSecondarySurfaces(shouldOpen ? "history" : undefined);
+    this.showHistory = shouldOpen;
   }
 
   toggleOutlinePanel() {
-    this.showOutlinePanel = !this.showOutlinePanel;
+    const shouldOpen = !this.showOutlinePanel;
+    this.closeSecondarySurfaces(shouldOpen ? "outline" : undefined);
+    this.showOutlinePanel = shouldOpen;
+  }
+
+  toggleCommandPalette() {
+    const shouldOpen = !this.showCommandPalette;
+    this.closeSecondarySurfaces(shouldOpen ? "commandPalette" : undefined);
+    this.showCommandPalette = shouldOpen;
+  }
+
+  showHistoryEdgeTrigger(): boolean {
+    return (
+      this.isSplitLayout &&
+      !this.showHistory &&
+      !this.showOutlinePanel &&
+      !this.showCommandPalette &&
+      !this.showSecretsModal
+    );
+  }
+
+  private closeSecondarySurfaces(
+    keepOpen?: "history" | "outline" | "commandPalette" | "console" | "secrets",
+  ): void {
+    if (keepOpen !== "history") {
+      this.showHistory = false;
+    }
+    if (keepOpen !== "outline") {
+      this.showOutlinePanel = false;
+    }
+    if (keepOpen !== "commandPalette") {
+      this.showCommandPalette = false;
+    }
+    if (keepOpen !== "console") {
+      this.consoleOpen.set(false);
+    }
+    if (keepOpen !== "secrets") {
+      this.showSecretsModal = false;
+    }
   }
 
   scrollEditorToRequest(requestIndex: number) {
@@ -685,7 +915,7 @@ export class AppComponent implements OnInit, OnDestroy {
     this.selectedHistoryItem = null;
   }
 
-  @HostListener('document:keydown', ['$event'])
+  @HostListener("document:keydown", ["$event"])
   onGlobalKeydown(event: KeyboardEvent): void {
     const decision = decideGlobalKeydownAction({
       key: event.key,
@@ -695,7 +925,7 @@ export class AppComponent implements OnInit, OnDestroy {
       showHistoryModal: this.showHistoryModal,
       showHistory: this.showHistory,
       showOutlinePanel: this.showOutlinePanel,
-      isRequestRunning: this.isRequestRunning
+      isRequestRunning: this.isRequestRunning,
     });
 
     if (decision.shouldPreventDefault) {
@@ -706,31 +936,31 @@ export class AppComponent implements OnInit, OnDestroy {
     }
 
     switch (decision.action) {
-      case 'saveAs':
+      case "saveAs":
         void this.saveCurrentFileAs();
         return;
-      case 'save':
+      case "save":
         void this.saveCurrentFile();
         return;
-      case 'closeHistoryModal':
+      case "closeHistoryModal":
         this.closeHistoryModal();
         return;
-      case 'toggleHistory':
+      case "toggleHistory":
         this.toggleHistory();
         return;
-      case 'toggleOutline':
+      case "toggleOutline":
         this.toggleOutlinePanel();
         return;
-      case 'closeOutline':
+      case "closeOutline":
         this.showOutlinePanel = false;
         return;
-      case 'toggleCommandPalette':
-        this.showCommandPalette = !this.showCommandPalette;
+      case "toggleCommandPalette":
+        this.toggleCommandPalette();
         return;
-      case 'cancelRequest':
+      case "cancelRequest":
         void this.cancelActiveRequest();
         return;
-      case 'none':
+      case "none":
       default:
         return;
     }
@@ -738,6 +968,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
   openSecretsModal() {
     void this.loadVaultInfo();
+    this.closeSecondarySurfaces("secrets");
     this.showSecretsModal = true;
   }
 
@@ -751,11 +982,17 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   closeTab(index: number) {
-    const updated = this.workspace.closeTab(this.LAST_SESSION_KEY, this.files, this.currentFileIndex, index);
+    const updated = this.workspace.closeTab(
+      this.LAST_SESSION_KEY,
+      this.files,
+      this.currentFileIndex,
+      index,
+    );
 
     const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
       update: updated,
-      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+      syncCurrentEnvWithFile: (files, idx) =>
+        this.workspace.syncCurrentEnvWithFile(files, idx),
     });
     this.applyWorkspaceDerivedState(next);
     this.loadHistoryForFile(next.activeFileId || undefined);
@@ -764,24 +1001,29 @@ export class AppComponent implements OnInit, OnDestroy {
   async revealInFinder(index: number) {
     const file = this.files[index];
     if (!file?.filePath) {
-      this.toast.info('This file has not been saved to disk yet.');
+      this.toast.info("This file has not been saved to disk yet.");
       return;
     }
 
     try {
-      const { RevealInFinder } = await import('../../wailsjs/go/main/App');
+      const { RevealInFinder } = await import("../../wailsjs/go/main/App");
       await RevealInFinder(file.filePath);
     } catch (error) {
-      console.error('Failed to reveal file:', error);
-      this.toast.error('Failed to reveal file in Finder.');
+      console.error("Failed to reveal file:", error);
+      this.toast.error("Failed to reveal file in Finder.");
     }
   }
 
   closeOtherTabs(keepIndex: number) {
-    const updated = this.workspace.closeOtherTabs(this.LAST_SESSION_KEY, this.files, keepIndex);
+    const updated = this.workspace.closeOtherTabs(
+      this.LAST_SESSION_KEY,
+      this.files,
+      keepIndex,
+    );
     const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
       update: updated,
-      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+      syncCurrentEnvWithFile: (files, idx) =>
+        this.workspace.syncCurrentEnvWithFile(files, idx),
     });
     this.applyWorkspaceDerivedState(next);
     this.loadHistoryForFile(next.activeFileId || undefined);
@@ -792,7 +1034,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const next = deriveAppStateAfterWorkspaceUpdateWithEnvSync({
       update: updated,
-      syncCurrentEnvWithFile: (files, idx) => this.workspace.syncCurrentEnvWithFile(files, idx)
+      syncCurrentEnvWithFile: (files, idx) =>
+        this.workspace.syncCurrentEnvWithFile(files, idx),
     });
     this.applyWorkspaceDerivedState(next);
 
@@ -802,9 +1045,10 @@ export class AppComponent implements OnInit, OnDestroy {
   async openFile() {
     try {
       // Use native file dialog via Wails for full file path support
-      const { OpenFileDialog, ReadFileContents } = await import('../../wailsjs/go/main/App');
+      const { OpenFileDialog, ReadFileContents } =
+        await import("../../wailsjs/go/main/App");
       const filePaths = await OpenFileDialog();
-      
+
       if (filePaths && filePaths.length > 0) {
         for (const filePath of filePaths) {
           const existingIndex = findExistingOpenFileIndex(this.files, filePath);
@@ -813,16 +1057,16 @@ export class AppComponent implements OnInit, OnDestroy {
             continue;
           }
           const content = await ReadFileContents(filePath);
-          const fileName = basename(filePath) || 'Untitled.http';
+          const fileName = basename(filePath) || "Untitled.http";
           this.addFileFromContent(fileName, content, filePath);
         }
       }
     } catch (error) {
-      console.error('Failed to open file dialog:', error);
+      console.error("Failed to open file dialog:", error);
       // Fallback to browser file input
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = '.http';
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".http";
       input.multiple = true;
       input.onchange = (event) => {
         const files = (event.target as HTMLInputElement).files;
@@ -849,7 +1093,7 @@ export class AppComponent implements OnInit, OnDestroy {
       this.files,
       this.currentFileIndex,
       event.fromIndex,
-      event.toIndex
+      event.toIndex,
     );
 
     const next = deriveAppStateFromWorkspaceUpdate(updated);
@@ -858,7 +1102,8 @@ export class AppComponent implements OnInit, OnDestroy {
 
   async importPostmanCollection() {
     try {
-      const { OpenImportFileDialog, ImportFromPath } = await import('../../wailsjs/go/main/App');
+      const { OpenImportFileDialog, ImportFromPath } =
+        await import("../../wailsjs/go/main/App");
       const filePath = await OpenImportFileDialog();
       if (!filePath) return;
 
@@ -867,17 +1112,20 @@ export class AppComponent implements OnInit, OnDestroy {
         for (const file of result.Files) {
           this.addFileFromContent(file.Name, file.Content);
         }
-        this.toast.success(`Imported ${result.Files.length} file(s) from Postman collection`);
+        this.toast.success(
+          `Imported ${result.Files.length} file(s) from Postman collection`,
+        );
       }
     } catch (err: any) {
-      console.error('Postman import failed:', err);
-      this.toast.error('Import failed: ' + (err?.message || err));
+      console.error("Postman import failed:", err);
+      this.toast.error("Import failed: " + (err?.message || err));
     }
   }
 
   async importBrunoCollection() {
     try {
-      const { OpenImportDirectoryDialog, ImportFromPath } = await import('../../wailsjs/go/main/App');
+      const { OpenImportDirectoryDialog, ImportFromPath } =
+        await import("../../wailsjs/go/main/App");
       const dirPath = await OpenImportDirectoryDialog();
       if (!dirPath) return;
 
@@ -886,21 +1134,27 @@ export class AppComponent implements OnInit, OnDestroy {
         for (const file of result.Files) {
           this.addFileFromContent(file.Name, file.Content);
         }
-        this.toast.success(`Imported ${result.Files.length} file(s) from Bruno collection`);
+        this.toast.success(
+          `Imported ${result.Files.length} file(s) from Bruno collection`,
+        );
       }
     } catch (err: any) {
-      console.error('Bruno import failed:', err);
-      this.toast.error('Import failed: ' + (err?.message || err));
+      console.error("Bruno import failed:", err);
+      this.toast.error("Import failed: " + (err?.message || err));
     }
   }
 
-  private addFileFromContent(fileName: string, content: string, filePath?: string) {
+  private addFileFromContent(
+    fileName: string,
+    content: string,
+    filePath?: string,
+  ) {
     const updated = this.workspace.addFileFromContent(
       this.LAST_SESSION_KEY,
       this.files,
       fileName,
       content,
-      filePath
+      filePath,
     );
 
     const next = deriveAppStateFromWorkspaceUpdate(updated);
@@ -916,7 +1170,19 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   get currentFile(): FileTab {
-    return this.files[this.currentFileIndex] || { id: generateFileId(), name: '', content: '', requests: [], environments: {}, variables: {}, responseData: {}, groups: [], selectedEnv: '' };
+    return (
+      this.files[this.currentFileIndex] || {
+        id: generateFileId(),
+        name: "",
+        content: "",
+        requests: [],
+        environments: {},
+        variables: {},
+        responseData: {},
+        groups: [],
+        selectedEnv: "",
+      }
+    );
   }
 
   getActiveRequestDetails(): Request | null {
@@ -931,8 +1197,8 @@ export class AppComponent implements OnInit, OnDestroy {
   getActiveRequestPreview(): string {
     const request = this.getActiveRequestDetails();
     const processedUrl = this.activeRequestInfo
-      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
-         ?? this.activeRequestInfo.processedUrl)
+      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]
+          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
       : undefined;
     return buildActiveRequestPreview(request, processedUrl);
   }
@@ -944,8 +1210,8 @@ export class AppComponent implements OnInit, OnDestroy {
   getActiveRequestMeta(): string {
     const request = this.getActiveRequestDetails();
     const processedUrl = this.activeRequestInfo
-      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]?.processedUrl
-         ?? this.activeRequestInfo.processedUrl)
+      ? (this.currentFile.responseData?.[this.activeRequestInfo.requestIndex]
+          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
       : undefined;
     return buildActiveRequestMeta({
       activeRequestInfo: this.activeRequestInfo,
@@ -955,26 +1221,37 @@ export class AppComponent implements OnInit, OnDestroy {
       activeRunProgress: this.activeRunProgress,
       activeRequestTimeoutMs: this.getActiveRequestTimeoutMs(),
       request,
-      processedUrl
+      processedUrl,
     });
   }
 
-  footerStatus(): { label: string; detail: string; tone: 'idle' | 'pending' | 'success' | 'warning' | 'error' } {
+  footerStatus(): {
+    label: string;
+    detail: string;
+    tone: "idle" | "pending" | "success" | "warning" | "error";
+  } {
     return decideFooterStatus({
       isRequestRunning: this.isRequestRunning,
       isCancellingActiveRequest: this.isCancellingActiveRequest,
       activeRequestMeta: this.getActiveRequestMeta(),
       lastResponseSummary: this.lastResponseSummary(),
-      activeEnv: this.currentEnv()
+      activeEnv: this.currentEnv(),
     });
   }
 
   toggleConsole(force?: boolean) {
-    if (typeof force === 'boolean') {
+    if (typeof force === "boolean") {
+      if (force) {
+        this.closeSecondarySurfaces("console");
+      }
       this.consoleOpen.set(force);
       return;
     }
-    this.consoleOpen.update(current => !current);
+    const shouldOpen = !this.consoleOpen();
+    if (shouldOpen) {
+      this.closeSecondarySurfaces("console");
+    }
+    this.consoleOpen.set(shouldOpen);
   }
 
   clearConsole() {
@@ -986,7 +1263,10 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   lastResponseSummary(): { status: string; time: string; code: number } | null {
-    return buildLastResponseSummary(this.currentFile, this.lastExecutedRequestIndex);
+    return buildLastResponseSummary(
+      this.currentFile,
+      this.lastExecutedRequestIndex,
+    );
   }
 
   private syncCurrentEnvWithFile(index: number): void {
@@ -995,10 +1275,14 @@ export class AppComponent implements OnInit, OnDestroy {
       this.files = synced.files;
       this.filesSignal.set(synced.files);
     }
-    this.currentEnvSignal.set(synced.currentEnv || '');
+    this.currentEnvSignal.set(synced.currentEnv || "");
   }
 
-  private applyWorkspaceDerivedState(next: { files: FileTab[]; currentFileIndex: number; currentEnv: string }): void {
+  private applyWorkspaceDerivedState(next: {
+    files: FileTab[];
+    currentFileIndex: number;
+    currentEnv: string;
+  }): void {
     this.files = next.files;
     this.filesSignal.set(next.files);
     this.currentFileIndex = next.currentFileIndex;
@@ -1007,7 +1291,11 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private replaceFileAtIndex(index: number, newFile: FileTab): void {
-    const updated = this.workspace.replaceFileAtIndex(this.files, index, newFile);
+    const updated = this.workspace.replaceFileAtIndex(
+      this.files,
+      index,
+      newFile,
+    );
     this.files = updated;
     this.filesSignal.set(updated);
   }
@@ -1036,7 +1324,7 @@ export class AppComponent implements OnInit, OnDestroy {
 
     const q = consumeQueuedRequest({
       isRequestRunning: this.isRequestRunning,
-      queuedRequestIndex: this.queuedRequestIndex
+      queuedRequestIndex: this.queuedRequestIndex,
     });
     this.queuedRequestIndex = q.queuedRequestIndexAfter;
     const nextIndexToExecute = q.nextRequestIndexToExecute;
@@ -1050,7 +1338,11 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!file) return;
 
     try {
-      const { SaveFileContents, ShowSaveDialog, MigrateResponsesFromRunLocationToHttpFile } = await import('../../wailsjs/go/main/App');
+      const {
+        SaveFileContents,
+        ShowSaveDialog,
+        MigrateResponsesFromRunLocationToHttpFile,
+      } = await import("../../wailsjs/go/main/App");
 
       if (file.filePath && file.filePath.length) {
         await SaveFileContents(file.filePath, file.content);
@@ -1067,14 +1359,20 @@ export class AppComponent implements OnInit, OnDestroy {
           try {
             priorHistory = await this.httpService.loadHistory(previousId);
           } catch (historyErr) {
-            console.warn('Failed to load prior history on first save:', historyErr);
+            console.warn(
+              "Failed to load prior history on first save:",
+              historyErr,
+            );
           }
 
           // Move {unsavedId}.responses/ from run location into {fileName}.responses/ beside the saved file.
           try {
             await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
           } catch (moveErr) {
-            console.warn('Failed to migrate response files on first save:', moveErr);
+            console.warn(
+              "Failed to migrate response files on first save:",
+              moveErr,
+            );
           }
 
           // Update file metadata to point to saved path
@@ -1089,7 +1387,7 @@ export class AppComponent implements OnInit, OnDestroy {
               previousId,
               newId: updated.id,
               priorHistory,
-              activeFileId: this.files[this.currentFileIndex]?.id
+              activeFileId: this.files[this.currentFileIndex]?.id,
             });
 
             if (decision.shouldMigrate) {
@@ -1100,12 +1398,15 @@ export class AppComponent implements OnInit, OnDestroy {
               }
             }
           } catch (historyErr) {
-            console.warn('Failed to migrate history on first save:', historyErr);
+            console.warn(
+              "Failed to migrate history on first save:",
+              historyErr,
+            );
           }
         }
       }
     } catch (err) {
-      console.error('Failed to save file:', err);
+      console.error("Failed to save file:", err);
     }
   }
 
@@ -1114,7 +1415,11 @@ export class AppComponent implements OnInit, OnDestroy {
     if (!file) return;
 
     try {
-      const { SaveFileContents, ShowSaveDialog, MigrateResponsesFromRunLocationToHttpFile } = await import('../../wailsjs/go/main/App');
+      const {
+        SaveFileContents,
+        ShowSaveDialog,
+        MigrateResponsesFromRunLocationToHttpFile,
+      } = await import("../../wailsjs/go/main/App");
 
       const previousId = file.id;
       const previousPath = file.filePath;
@@ -1132,13 +1437,19 @@ export class AppComponent implements OnInit, OnDestroy {
       this.httpService.saveFiles(this.files);
 
       try {
-        const priorHistory = await this.httpService.loadHistory(previousId, previousPath);
+        const priorHistory = await this.httpService.loadHistory(
+          previousId,
+          previousPath,
+        );
 
         if (!previousPath || !previousPath.length) {
           try {
             await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
           } catch (moveErr) {
-            console.warn('Failed to migrate response files on Save As:', moveErr);
+            console.warn(
+              "Failed to migrate response files on Save As:",
+              moveErr,
+            );
           }
         }
 
@@ -1146,7 +1457,7 @@ export class AppComponent implements OnInit, OnDestroy {
           previousId,
           newId: updated.id,
           priorHistory,
-          activeFileId: this.files[this.currentFileIndex]?.id
+          activeFileId: this.files[this.currentFileIndex]?.id,
         });
         this.historyStore.delete(decision.oldId);
         this.historyStore.set(decision.newId, decision.newHistory);
@@ -1154,21 +1465,26 @@ export class AppComponent implements OnInit, OnDestroy {
           this.history = decision.activeHistory;
         }
       } catch (historyErr) {
-        console.warn('Failed to migrate history on Save As:', historyErr);
+        console.warn("Failed to migrate history on Save As:", historyErr);
       }
     } catch (err) {
-      console.error('Failed to save file as:', err);
+      console.error("Failed to save file as:", err);
     }
   }
 
   async openExamplesFile(): Promise<void> {
     try {
-      const { GetExamplesFile } = await import('../../wailsjs/go/main/App');
+      const { GetExamplesFile } = await import("../../wailsjs/go/main/App");
       const result = await GetExamplesFile();
-      const content = result?.content || '';
-      const name = result?.filePath || 'Examples.http';
+      const content = result?.content || "";
+      const name = result?.filePath || "Examples.http";
 
-      const updated = this.workspace.upsertExamplesTab(this.LAST_SESSION_KEY, this.files, content, name);
+      const updated = this.workspace.upsertExamplesTab(
+        this.LAST_SESSION_KEY,
+        this.files,
+        content,
+        name,
+      );
 
       const next = deriveAppStateFromWorkspaceUpdate(updated);
       this.files = next.files;
@@ -1177,12 +1493,12 @@ export class AppComponent implements OnInit, OnDestroy {
       this.currentFileIndexSignal.set(next.currentFileIndex);
       this.currentEnvSignal.set(next.currentEnv);
 
-      if (next.activeFileId === '__examples__') {
+      if (next.activeFileId === "__examples__") {
         this.history = [];
       }
     } catch (error) {
-      console.error('Failed to open examples file:', error);
-      this.toast.error('Failed to open examples file.');
+      console.error("Failed to open examples file:", error);
+      this.toast.error("Failed to open examples file.");
     }
   }
 
@@ -1192,7 +1508,7 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const filePath = this.files.find(file => file.id === fileId)?.filePath;
+    const filePath = this.files.find((file) => file.id === fileId)?.filePath;
 
     const cached = this.historyStore.get(fileId);
     if (cached) {
@@ -1200,13 +1516,16 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
 
-    this.historyStore.ensureLoaded(fileId, filePath)
-      .then(history => {
+    this.historyStore
+      .ensureLoaded(fileId, filePath)
+      .then((history) => {
         if (this.files[this.currentFileIndex]?.id === fileId) {
           this.history = history;
         }
       })
-      .catch(error => console.error('Failed to load history for file', fileId, error));
+      .catch((error) =>
+        console.error("Failed to load history for file", fileId, error),
+      );
   }
 
   donate(amount: number) {
@@ -1216,13 +1535,19 @@ export class AppComponent implements OnInit, OnDestroy {
   async handleSecretSave(secret: { env: string; key: string; value: string }) {
     const normalizedEnv = normalizeEnvName(secret.env);
     try {
-      const snapshot = await this.secretService.save(normalizedEnv, secret.key, secret.value);
+      const snapshot = await this.secretService.save(
+        normalizedEnv,
+        secret.key,
+        secret.value,
+      );
       this.allSecrets = snapshot;
       await this.loadVaultInfo(true);
-      this.toast.success(buildSecretSavedToast({ key: secret.key, env: normalizedEnv }));
+      this.toast.success(
+        buildSecretSavedToast({ key: secret.key, env: normalizedEnv }),
+      );
     } catch (error) {
-      console.error('Failed to save secret', error);
-      this.toast.error('Failed to save secret');
+      console.error("Failed to save secret", error);
+      this.toast.error("Failed to save secret");
     }
   }
 
@@ -1236,13 +1561,16 @@ export class AppComponent implements OnInit, OnDestroy {
       return;
     }
     try {
-      const snapshot = await this.secretService.remove(this.secretToDelete.env, this.secretToDelete.key);
+      const snapshot = await this.secretService.remove(
+        this.secretToDelete.env,
+        this.secretToDelete.key,
+      );
       this.allSecrets = snapshot;
       await this.loadVaultInfo(true);
       this.toast.info(buildSecretDeletedToast(this.secretToDelete.key));
     } catch (error) {
-      console.error('Failed to delete secret', error);
-      this.toast.error('Failed to delete secret');
+      console.error("Failed to delete secret", error);
+      this.toast.error("Failed to delete secret");
     }
     this.showDeleteConfirmModal = false;
     this.secretToDelete = null;
@@ -1260,13 +1588,15 @@ export class AppComponent implements OnInit, OnDestroy {
       this.downloadSecretsFile(payload, fileName);
       this.toast.success(buildVaultExportedToast(fileName));
     } catch (error) {
-      console.error('Failed to export secrets', error);
-      this.toast.error('Failed to export secrets');
+      console.error("Failed to export secrets", error);
+      this.toast.error("Failed to export secrets");
     }
   }
 
   async handleVaultReset() {
-    const confirmed = confirm('Resetting the vault deletes all stored secrets on this device. Continue?');
+    const confirmed = confirm(
+      "Resetting the vault deletes all stored secrets on this device. Continue?",
+    );
     if (!confirmed) {
       return;
     }
@@ -1274,10 +1604,10 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.secretService.resetVault();
       this.allSecrets = {};
       await this.loadVaultInfo(true);
-      this.toast.info('Vault reset. Add new secrets to continue.');
+      this.toast.info("Vault reset. Add new secrets to continue.");
     } catch (error) {
-      console.error('Failed to reset vault', error);
-      this.toast.error('Failed to reset vault');
+      console.error("Failed to reset vault", error);
+      this.toast.error("Failed to reset vault");
     }
   }
 
@@ -1287,8 +1617,8 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.loadVaultInfo(true);
       this.secretsModal?.onMasterPasswordVerified();
     } catch (error) {
-      console.error('Failed to set master password', error);
-      this.secretsModal?.onMasterPasswordFailed('Failed to set password');
+      console.error("Failed to set master password", error);
+      this.secretsModal?.onMasterPasswordFailed("Failed to set password");
     }
   }
 
@@ -1298,11 +1628,11 @@ export class AppComponent implements OnInit, OnDestroy {
       if (valid) {
         this.secretsModal?.onMasterPasswordVerified();
       } else {
-        this.secretsModal?.onMasterPasswordFailed('Incorrect password');
+        this.secretsModal?.onMasterPasswordFailed("Incorrect password");
       }
     } catch (error) {
-      console.error('Failed to verify master password', error);
-      this.secretsModal?.onMasterPasswordFailed('Verification failed');
+      console.error("Failed to verify master password", error);
+      this.secretsModal?.onMasterPasswordFailed("Verification failed");
     }
   }
 
@@ -1311,8 +1641,8 @@ export class AppComponent implements OnInit, OnDestroy {
       const value = await this.secretService.getSecretValue(env, key);
       this.secretsModal?.setRevealedValue(env, key, value);
     } catch (error) {
-      console.error('Failed to get secret value', error);
-      this.secretsModal?.setRevealedValue(env, key, '(error)');
+      console.error("Failed to get secret value", error);
+      this.secretsModal?.setRevealedValue(env, key, "(error)");
     }
   }
 
@@ -1320,7 +1650,7 @@ export class AppComponent implements OnInit, OnDestroy {
     const decision = decideCancelActiveRequest({
       activeRequestId: this.activeRequestInfo?.id,
       isCancelling: this.isCancellingActiveRequest,
-      hasRequestManager: Boolean(this.requestManager)
+      hasRequestManager: Boolean(this.requestManager),
     });
     if (!decision.shouldCancel) {
       return;
@@ -1329,10 +1659,10 @@ export class AppComponent implements OnInit, OnDestroy {
     this.isCancellingActiveRequest = decision.isCancellingAfterStart;
     try {
       await this.requestManager.cancelActiveRequest();
-      this.toast.info('Request cancelled');
+      this.toast.info("Request cancelled");
     } catch (error) {
-      console.error('Failed to cancel request', error);
-      this.toast.error('Failed to cancel request');
+      console.error("Failed to cancel request", error);
+      this.toast.error("Failed to cancel request");
       const patch = buildCancelActiveRequestErrorPatch();
       this.isCancellingActiveRequest = patch.isCancellingActiveRequest;
     }
@@ -1341,30 +1671,32 @@ export class AppComponent implements OnInit, OnDestroy {
   private startActiveRunTick(): void {
     this.stopActiveRunTick();
     this.activeRunNowMs = Date.now();
-    this.activeRunTickHandle = setInterval(() => {
-      this.activeRunNowMs = Date.now();
-      const actions = decideActiveRunTickActions({
-        isRequestRunning: this.isRequestRunning,
-        activeRequestType: this.activeRequestInfo?.type,
-        activeUsers: this.activeRunProgress?.activeUsers
-      });
+    this.ngZone.runOutsideAngular(() => {
+      this.activeRunTickHandle = setInterval(() => {
+        this.activeRunNowMs = Date.now();
+        const actions = decideActiveRunTickActions({
+          isRequestRunning: this.isRequestRunning,
+          activeRequestType: this.activeRequestInfo?.type,
+          activeUsers: this.activeRunProgress?.activeUsers,
+        });
 
-      if (actions.usersSample !== null) {
-        this.pushLoadUsersSample(actions.usersSample);
-      }
-      if (actions.shouldSampleRps) {
-        this.sampleLoadRps();
-      }
-      if (actions.shouldEnsureSparkline) {
-        this.ensureSparklineAnimation();
-      }
-    }, 200);
+        if (actions.usersSample !== null) {
+          this.pushLoadUsersSample(actions.usersSample);
+        }
+        if (actions.shouldSampleRps) {
+          this.sampleLoadRps();
+        }
+        if (actions.shouldEnsureSparkline) {
+          this.ensureSparklineAnimation();
+        }
+      }, 200);
+    });
 
     // Only start rAF animation for load runs.
     const initialActions = decideActiveRunTickActions({
       isRequestRunning: this.isRequestRunning,
       activeRequestType: this.activeRequestInfo?.type,
-      activeUsers: this.activeRunProgress?.activeUsers
+      activeUsers: this.activeRunProgress?.activeUsers,
     });
     if (initialActions.shouldEnsureSparkline) {
       this.ensureSparklineAnimation();
@@ -1376,68 +1708,76 @@ export class AppComponent implements OnInit, OnDestroy {
     this.sparklineLastFrameAtMs = null;
     this.sparklineLastRenderedAtMs = null;
 
-    const step = (t: number) => {
+    this.ngZone.runOutsideAngular(() => {
+      const step = (t: number) => {
+        this.sparklineRafHandle = requestAnimationFrame(step);
+
+        // Only animate during an active load run.
+        if (!this.isRequestRunning || this.activeRequestInfo?.type !== "load") {
+          return;
+        }
+
+        // Use rAF's high-resolution timestamp for stable frame deltas.
+        const last = this.sparklineLastFrameAtMs;
+        this.sparklineLastFrameAtMs = t;
+        const dt = last === null ? 0 : Math.max(0, Math.min(50, t - last));
+
+        // Keep lastRenderedAt for debugging/telemetry (not throttling).
+        this.sparklineLastRenderedAtMs = t;
+
+        // Smooth the RPS readout every frame; the RPS sparkline also uses this value.
+        this.rpsRenderValue = smoothTowards(
+          this.rpsRenderValue,
+          this.rpsRenderTarget,
+          dt,
+        );
+
+        const usersTick = tickUsersSparklineUi({
+          state: {
+            series: this.loadUsersSeries,
+            queue: this.loadUsersQueue,
+            scrollPhase: this.loadUsersScrollPhase,
+            nextValue: this.loadUsersNextValue,
+          },
+          dtMs: dt,
+          maxPoints: this.loadUsersSeriesMaxPoints,
+          scrollMs: this.loadUsersScrollMs,
+          maxUsers: this.activeRunProgress?.maxUsers,
+          currentPathDView: this.loadUsersSparklinePathDView,
+        });
+
+        this.loadUsersSeries = usersTick.state.series;
+        this.loadUsersQueue = usersTick.state.queue;
+        this.loadUsersScrollPhase = usersTick.state.scrollPhase;
+        this.loadUsersNextValue = usersTick.state.nextValue;
+        this.loadUsersSparklineTransformView = usersTick.transformView;
+        this.loadUsersSparklinePathDView = usersTick.pathDView;
+
+        const rpsTick = tickRpsSparklineUi({
+          state: {
+            series: this.loadRpsSeries,
+            queue: this.loadRpsQueue,
+            scrollPhase: this.loadRpsScrollPhase,
+            nextValue: this.loadRpsNextValue,
+          },
+          dtMs: dt,
+          maxPoints: this.loadRpsSeriesMaxPoints,
+          scrollMs: this.loadRpsScrollMs,
+          currentPathDView: this.loadRpsSparklinePathDView,
+        });
+
+        this.loadRpsSeries = rpsTick.state.series;
+        this.loadRpsQueue = rpsTick.state.queue;
+        this.loadRpsScrollPhase = rpsTick.state.scrollPhase;
+        this.loadRpsNextValue = rpsTick.state.nextValue;
+        this.loadRpsSparklineTransformView = rpsTick.transformView;
+        this.loadRpsSparklinePathDView = rpsTick.pathDView;
+
+        this.cdr.detectChanges();
+      };
+
       this.sparklineRafHandle = requestAnimationFrame(step);
-
-      // Only animate during an active load run.
-      if (!this.isRequestRunning || this.activeRequestInfo?.type !== 'load') {
-        return;
-      }
-
-      // Use rAF's high-resolution timestamp for stable frame deltas.
-      const last = this.sparklineLastFrameAtMs;
-      this.sparklineLastFrameAtMs = t;
-      const dt = last === null ? 0 : Math.max(0, Math.min(50, t - last));
-
-      // Keep lastRenderedAt for debugging/telemetry (not throttling).
-      this.sparklineLastRenderedAtMs = t;
-
-      // Smooth the RPS readout every frame; the RPS sparkline also uses this value.
-      this.rpsRenderValue = smoothTowards(this.rpsRenderValue, this.rpsRenderTarget, dt);
-
-      const usersTick = tickUsersSparklineUi({
-        state: {
-          series: this.loadUsersSeries,
-          queue: this.loadUsersQueue,
-          scrollPhase: this.loadUsersScrollPhase,
-          nextValue: this.loadUsersNextValue
-        },
-        dtMs: dt,
-        maxPoints: this.loadUsersSeriesMaxPoints,
-        scrollMs: this.loadUsersScrollMs,
-        maxUsers: this.activeRunProgress?.maxUsers,
-        currentPathDView: this.loadUsersSparklinePathDView
-      });
-
-      this.loadUsersSeries = usersTick.state.series;
-      this.loadUsersQueue = usersTick.state.queue;
-      this.loadUsersScrollPhase = usersTick.state.scrollPhase;
-      this.loadUsersNextValue = usersTick.state.nextValue;
-      this.loadUsersSparklineTransformView = usersTick.transformView;
-      this.loadUsersSparklinePathDView = usersTick.pathDView;
-
-      const rpsTick = tickRpsSparklineUi({
-        state: {
-          series: this.loadRpsSeries,
-          queue: this.loadRpsQueue,
-          scrollPhase: this.loadRpsScrollPhase,
-          nextValue: this.loadRpsNextValue
-        },
-        dtMs: dt,
-        maxPoints: this.loadRpsSeriesMaxPoints,
-        scrollMs: this.loadRpsScrollMs,
-        currentPathDView: this.loadRpsSparklinePathDView
-      });
-
-      this.loadRpsSeries = rpsTick.state.series;
-      this.loadRpsQueue = rpsTick.state.queue;
-      this.loadRpsScrollPhase = rpsTick.state.scrollPhase;
-      this.loadRpsNextValue = rpsTick.state.nextValue;
-      this.loadRpsSparklineTransformView = rpsTick.transformView;
-      this.loadRpsSparklinePathDView = rpsTick.pathDView;
-    };
-
-    this.sparklineRafHandle = requestAnimationFrame(step);
+    });
   }
 
   private pushLoadUsersSample(value: number): void {
@@ -1447,18 +1787,17 @@ export class AppComponent implements OnInit, OnDestroy {
       this.loadUsersNextValue,
       this.loadUsersSeriesMaxPoints,
       this.loadUsersRampSteps,
-      value
+      value,
     );
     this.loadUsersQueue = r.queue;
   }
-
 
   private sampleLoadRps(): void {
     const r = sampleAndApplyRpsUiState({
       samplingState: {
         lastSampleAtMs: this.lastRpsSampleAtMs,
         lastTotalSent: this.lastRpsTotalSent,
-        lastSmoothed: this.lastRpsSmoothed
+        lastSmoothed: this.lastRpsSmoothed,
       },
       nowMs: this.activeRunNowMs,
       totalSent: this.activeRunProgress?.totalSent,
@@ -1468,7 +1807,7 @@ export class AppComponent implements OnInit, OnDestroy {
       maxPoints: this.loadRpsSeriesMaxPoints,
       rampSteps: this.loadRpsRampSteps,
       rpsRenderTarget: this.rpsRenderTarget,
-      rpsRenderValue: this.rpsRenderValue
+      rpsRenderValue: this.rpsRenderValue,
     });
 
     this.lastRpsSampleAtMs = r.samplingState.lastSampleAtMs;
@@ -1479,11 +1818,13 @@ export class AppComponent implements OnInit, OnDestroy {
     this.rpsRenderValue = r.rpsRenderValue;
   }
 
-
   get currentLoadRpsView(): number {
+    if (typeof this.rpsRenderValue === "number" && Number.isFinite(this.rpsRenderValue)) {
+      return Math.max(0, this.rpsRenderValue);
+    }
     const series = this.loadRpsSeries;
     if (!series.length) return 0;
-    return series[series.length - 1] ?? 0;
+    return Math.max(0, series[series.length - 1] ?? 0);
   }
 
   private stopActiveRunTick(): void {
@@ -1501,7 +1842,8 @@ export class AppComponent implements OnInit, OnDestroy {
     this.loadUsersQueue = patch.loadUsersQueue;
     this.loadUsersScrollPhase = patch.loadUsersScrollPhase;
     this.loadUsersNextValue = patch.loadUsersNextValue;
-    this.loadUsersSparklineTransformView = patch.loadUsersSparklineTransformView;
+    this.loadUsersSparklineTransformView =
+      patch.loadUsersSparklineTransformView;
     this.loadUsersSparklinePathDView = patch.loadUsersSparklinePathDView;
     this.loadRpsQueue = patch.loadRpsQueue;
     this.loadRpsScrollPhase = patch.loadRpsScrollPhase;
@@ -1518,9 +1860,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private downloadSecretsFile(content: string, fileName: string) {
-    const blob = new Blob([content], { type: 'application/json' });
+    const blob = new Blob([content], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
+    const anchor = document.createElement("a");
     anchor.href = url;
     anchor.download = fileName;
     anchor.click();
@@ -1532,31 +1874,33 @@ export class AppComponent implements OnInit, OnDestroy {
       await this.updateService.checkForUpdates();
     } catch (error) {
       // Silently fail - update check is non-critical
-      console.warn('Update check failed:', error);
+      console.warn("Update check failed:", error);
     }
   }
 
   private async checkFirstRun() {
     try {
-      const { GetExamplesForFirstRun } = await import('../../wailsjs/go/main/App');
+      const { GetExamplesForFirstRun } =
+        await import("../../wailsjs/go/main/App");
       const resp = await GetExamplesForFirstRun();
-      const content = resp?.content || '';
-      const filePath = resp?.filePath || 'examples.http';
+      const content = resp?.content || "";
+      const filePath = resp?.filePath || "examples.http";
       const isFirstRun = !!resp?.isFirstRun;
 
       if (isFirstRun && content) {
         // Open the examples file
-        const fileName = 'examples.http';
+        const fileName = "examples.http";
         this.addFileFromContent(fileName, content, filePath);
         try {
-          const { MarkFirstRunComplete } = await import('../../wailsjs/go/main/App');
+          const { MarkFirstRunComplete } =
+            await import("../../wailsjs/go/main/App");
           await MarkFirstRunComplete();
         } catch (err) {
-          console.warn('Failed to mark first run complete:', err);
+          console.warn("Failed to mark first run complete:", err);
         }
       }
     } catch (error) {
-      console.warn('Failed to check for first run:', error);
+      console.warn("Failed to check for first run:", error);
     }
   }
 
@@ -1566,14 +1910,16 @@ export class AppComponent implements OnInit, OnDestroy {
     setTimeout(() => this.snippetModal?.open(), 0);
   }
 
-  onSnippetSelected(event: { snippet: ScriptSnippet; type: 'pre' | 'post' }): void {
+  onSnippetSelected(event: {
+    snippet: ScriptSnippet;
+    type: "pre" | "post";
+  }): void {
     const { snippet, type } = event;
-    const code = type === 'pre' ? snippet.preScript : snippet.postScript;
+    const code = type === "pre" ? snippet.preScript : snippet.postScript;
     if (!code) return;
 
-    const scriptBlock = type === 'pre' 
-      ? `\n< {\n${code}\n}\n` 
-      : `\n> {\n${code}\n}\n`;
+    const scriptBlock =
+      type === "pre" ? `\n< {\n${code}\n}\n` : `\n> {\n${code}\n}\n`;
 
     // Insert at cursor position using the editor component
     if (this.editorComponent) {
@@ -1586,7 +1932,7 @@ export class AppComponent implements OnInit, OnDestroy {
         this.onEditorContentChange(newContent);
       }
     }
-    
+
     this.toast.success(`Inserted "${snippet.name}" snippet`);
     this.showSnippetModal = false;
   }

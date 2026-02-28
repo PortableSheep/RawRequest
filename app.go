@@ -42,19 +42,22 @@ type WindowState struct {
 }
 
 type App struct {
-	ctx             context.Context
-	variables       map[string]string
-	variablesMu     sync.RWMutex
-	environments    map[string]map[string]string
-	currentEnv      string
-	envMu           sync.RWMutex
-	requestCancels  map[string]context.CancelFunc
-	cancelMutex     sync.Mutex
-	scriptLogs      *rb.Buffer[ScriptLogEntry]
-	scriptLogMutex  sync.Mutex
-	secretVault     *SecretVault
-	secretVaultOnce sync.Once
-	secretVaultErr  error
+	ctx               context.Context
+	variables         map[string]string
+	variablesMu       sync.RWMutex
+	environments      map[string]map[string]string
+	currentEnv        string
+	envMu             sync.RWMutex
+	requestCancels    map[string]context.CancelFunc
+	cancelMutex       sync.Mutex
+	scriptLogs        *rb.Buffer[ScriptLogEntry]
+	scriptLogMutex    sync.Mutex
+	eventBroker       *appEventBroker
+	secretVault       *SecretVault
+	secretVaultOnce   sync.Once
+	secretVaultErr    error
+	managedServicePID int
+	managedServiceMu  sync.Mutex
 }
 
 const (
@@ -77,6 +80,7 @@ func NewApp() *App {
 		currentEnv:     "default",
 		requestCancels: make(map[string]context.CancelFunc),
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
+		eventBroker:    newAppEventBroker(),
 	}
 }
 
@@ -93,15 +97,16 @@ func (a *App) onDomReady(ctx context.Context) {
 }
 
 func (a *App) onBeforeClose(ctx context.Context) bool {
+	_ = a.stopManagedService()
 	_ = a.SaveWindowState()
 	return false
 }
 
-func (a *App) ExecuteRequests(requests []map[string]interface{}) string {
+func (a *App) executeRequests(requests []map[string]interface{}) string {
 	return a.executeRequestsWithContext(context.Background(), requests)
 }
 
-func (a *App) ExecuteRequestsWithID(requestID string, requests []map[string]interface{}) string {
+func (a *App) executeRequestsWithID(requestID string, requests []map[string]interface{}) string {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	a.registerCancel(requestID, cancel)

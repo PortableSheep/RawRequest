@@ -137,15 +137,14 @@ func (a *App) LoadFileHistoryFromHttpFile(httpFilePath string) string {
 	return a.loadHistoryFromResponsesDir(responsesDir)
 }
 
-// LoadFileHistoryFromRunLocation loads history from response files in the working directory.
+// LoadFileHistoryFromRunLocation loads history from response files in the app directory.
 func (a *App) LoadFileHistoryFromRunLocation(fileID string) string {
-	wd, err := os.Getwd()
-	if err != nil {
+	if fileID == "" {
 		return "[]"
 	}
+	appDir := a.getAppDir()
 	safe := a.sanitizeFileID(fileID)
-	// Same pattern as saved files: {fileId}.responses/
-	responsesDir := filepath.Join(wd, safe+".responses")
+	responsesDir := filepath.Join(appDir, "responses", safe+".responses")
 	return a.loadHistoryFromResponsesDir(responsesDir)
 }
 

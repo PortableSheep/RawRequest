@@ -53,6 +53,14 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           wails build -platform darwin/universal -ldflags "-X main.Version=${VERSION}"
 
+      - name: Smoke check CLI commands (macOS)
+        run: |
+          APP_CLI="./build/bin/RawRequest.app/Contents/MacOS/RawRequest"
+          "$APP_CLI" version
+          HELP_OUTPUT="$("$APP_CLI" help)"
+          echo "$HELP_OUTPUT" | grep -q "rawrequest mcp"
+          echo "$HELP_OUTPUT" | grep -q "rawrequest service"
+
       - name: Package for Homebrew
         run: |
           VERSION=${{ steps.version.outputs.version }}
@@ -124,6 +132,14 @@ jobs:
           VERSION=${{ steps.version.outputs.version }}
           wails build -platform windows/amd64 -ldflags "-X main.Version=${VERSION}"
 
+      - name: Smoke check CLI commands (Windows)
+        shell: powershell
+        run: |
+          & ".\build\bin\RawRequest.exe" version
+          $helpText = ((& ".\build\bin\RawRequest.exe" help) -join "`n")
+          if ($helpText -notmatch "rawrequest mcp") { throw "CLI help missing mcp command" }
+          if ($helpText -notmatch "rawrequest service") { throw "CLI help missing service command" }
+
       - name: Create portable ZIP
         shell: powershell
         run: |
@@ -131,7 +147,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path "dist/releases"
           New-Item -ItemType Directory -Force -Path "dist/portable"
           Copy-Item "build/bin/RawRequest.exe" "dist/portable/"
-          Set-Content -Path "dist/portable/README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed."
+          Copy-Item "scripts/setup-cli.bat" "dist/portable/"
+          Copy-Item "scripts/install.ps1" "dist/portable/"
+          Set-Content -Path "dist/portable/rawrequest-service.cmd" -Value "@echo off`r`n`"%~dp0RawRequest.exe`" service %*"
+          $env:CGO_ENABLED = "0"
+          go build -o "dist/portable/rawrequest-updater.exe" ./cmd/rawrequest-updater
+          Set-Content -Path "dist/portable/README.txt" -Value "RawRequest - Portable Edition`nVersion: $VERSION`n`nSimply run RawRequest.exe to start the application.`n`nCLI/Service setup:`n  Run setup-cli.bat to add rawrequest to PATH.`n  Or run install.ps1 for automated setup.`n  Then you can run:`n    rawrequest mcp`n    rawrequest service`n    rawrequest run api.http -n login`n`nNote: On first run, Windows SmartScreen may show a warning.`nClick 'More info' then 'Run anyway' to proceed."
+          $required = @("RawRequest.exe","setup-cli.bat","install.ps1","rawrequest-service.cmd","rawrequest-updater.exe")
+          foreach ($file in $required) {
+            if (-not (Test-Path "dist/portable/$file")) { throw "Missing required file in portable package: $file" }
+          }
           Compress-Archive -Path "dist/portable/*" -DestinationPath "dist/releases/RawRequest-$VERSION-windows-portable.zip"
 
       - name: Upload Windows artifact
@@ -208,6 +233,13 @@ jobs:
 
       - name: List artifacts
         run: find artifacts -type f
+
+      - name: Generate SHA256 checksums
+        run: |
+          cd artifacts
+          sha256sum * > SHA256SUMS.txt
+          echo "--- SHA256 Checksums ---"
+          cat SHA256SUMS.txt
 
       - name: Calculate SHA256 and update cask
         run: |

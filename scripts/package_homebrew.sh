@@ -38,10 +38,19 @@ rm -rf "$TARGET_DIR"/*
 # Copy the app bundle
 cp -R "$BUILD_DIR/RawRequest.app" "$TARGET_DIR/"
 
-# Copy CLI binary if it exists (for CLI usage)
-if [[ -x "$BUILD_DIR/RawRequest" ]]; then
-  cp "$BUILD_DIR/RawRequest" "$TARGET_DIR/rawrequest"
+# Copy CLI binary + service launcher (required for split-architecture tooling)
+if [[ ! -x "$BUILD_DIR/RawRequest" ]]; then
+  echo "Missing CLI binary at $BUILD_DIR/RawRequest. Build step must produce rawrequest CLI." >&2
+  exit 1
 fi
+cp "$BUILD_DIR/RawRequest" "$TARGET_DIR/rawrequest"
+cat > "$TARGET_DIR/rawrequest-service" << 'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/rawrequest" service "$@"
+EOF
+chmod +x "$TARGET_DIR/rawrequest-service"
 
 mkdir -p "$DIST_DIR"
 rm -f "$ARCHIVE_PATH"

@@ -1,12 +1,12 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
-import { EventsOn } from '../../../wailsjs/runtime/runtime';
 import {
   decideUpdateReadyState,
   normalizeUpdateProgressPercent,
   shouldShowUpdateNotification,
   shouldUseCachedUpdateInfo
 } from './update/update-logic';
+import { EventTransportService } from './event-transport.service';
 
 export interface UpdateInfo {
   available: boolean;
@@ -27,6 +27,7 @@ const CHECK_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
   providedIn: 'root'
 })
 export class UpdateService {
+  private readonly events = inject(EventTransportService);
   private _updateInfo = signal<UpdateInfo | null>(null);
   private _isChecking = signal<boolean>(false);
   private _error = signal<string | null>(null);
@@ -90,15 +91,16 @@ export class UpdateService {
       }
     }
 
+    // Updater execution is desktop-runtime-only today, so keep updater event wiring on Wails transport.
     this.unsubscribers.push(
-      EventsOn('update:status', (payload: any) => {
+      this.events.on('update:status', (payload: any) => {
         const msg = payload?.message;
         if (typeof msg === 'string') this._updateStatus.set(msg);
-      }),
-      EventsOn('update:progress', (payload: any) => {
+      }, 'wails'),
+      this.events.on('update:progress', (payload: any) => {
         this._updateProgress.set(normalizeUpdateProgressPercent(payload?.percent));
-      }),
-      EventsOn('update:ready', (payload: any) => {
+      }, 'wails'),
+      this.events.on('update:ready', (payload: any) => {
         const version = payload?.version;
         if (typeof version === 'string' && version.trim()) {
           localStorage.setItem(UPDATE_READY_VERSION_KEY, version);
@@ -109,12 +111,12 @@ export class UpdateService {
         }
         this._isUpdating.set(false);
         this._updateProgress.set(1);
-      }),
-      EventsOn('update:error', (payload: any) => {
+      }, 'wails'),
+      this.events.on('update:error', (payload: any) => {
         const msg = payload?.message;
         this._error.set(typeof msg === 'string' ? msg : 'Update failed');
         this._isUpdating.set(false);
-      })
+      }, 'wails')
     );
   }
 
