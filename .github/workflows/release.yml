@@ -178,10 +178,11 @@ jobs:
         shell: powershell
         run: |
           $VERSION = "${{ steps.version.outputs.version }}"
+          $ROOT = (Get-Location).Path
           New-Item -ItemType Directory -Force -Path "dist\releases\installer-staging"
           Copy-Item "build\bin\RawRequest.exe" "dist\releases\installer-staging\"
           Copy-Item "dist\portable\rawrequest-updater.exe" "dist\releases\installer-staging\"
-          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION "build\windows\installer.nsi"
+          & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION /DSTAGING_DIR="$ROOT\dist\releases\installer-staging" /DOUT_DIR="$ROOT\dist\releases" "build\windows\installer.nsi"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
