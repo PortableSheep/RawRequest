@@ -136,7 +136,17 @@ jobs:
         shell: powershell
         run: |
           & ".\build\bin\RawRequest.exe" version
-          $helpText = ((& ".\build\bin\RawRequest.exe" help) -join "`n")
+          # Use .NET Process class for reliable stdout capture from GUI-subsystem exe
+          $psi = New-Object System.Diagnostics.ProcessStartInfo
+          $psi.FileName = (Resolve-Path ".\build\bin\RawRequest.exe").Path
+          $psi.Arguments = "help"
+          $psi.UseShellExecute = $false
+          $psi.RedirectStandardOutput = $true
+          $psi.CreateNoWindow = $true
+          $proc = [System.Diagnostics.Process]::Start($psi)
+          $helpText = $proc.StandardOutput.ReadToEnd()
+          $proc.WaitForExit()
+          Write-Host "Help output length: $($helpText.Length)"
           if ($helpText -notmatch "rawrequest mcp") { throw "CLI help missing mcp command" }
           if ($helpText -notmatch "rawrequest service") { throw "CLI help missing service command" }
 
