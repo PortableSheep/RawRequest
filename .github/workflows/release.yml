@@ -293,10 +293,27 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git clone --depth 1 https://x-access-token:${TOKEN}@github.com/${TAP_REPO}.git taprepo
           cd taprepo
-          # Update version and sha256 in the formula
-          sed -i "s/version \".*\"/version \"${VERSION}\"/" ${CASKS_PATH}
           SHA256=$(sha256sum ../artifacts/RawRequest-v${VERSION}-macos-universal.tar.gz | cut -d' ' -f1)
-          sed -i "s|sha256 \".*\"|sha256 \"${SHA256}\"|" ${CASKS_PATH}
+          mkdir -p Casks
+          cat > ${CASKS_PATH} << CASK
+          cask "rawrequest" do
+            version "${VERSION}"
+            sha256 "${SHA256}"
+
+            url "https://github.com/portablesheep/RawRequest/releases/download/v#{version}/RawRequest-v#{version}-macos-universal.tar.gz"
+            name "RawRequest"
+            desc "Code-first HTTP client for developers"
+            homepage "https://rawrequest.dev"
+
+            app "RawRequest-v#{version}/RawRequest.app"
+            binary "RawRequest-v#{version}/rawrequest"
+
+            zap trash: [
+              "~/Library/Application Support/RawRequest",
+              "~/Library/Preferences/dev.rawrequest.plist",
+            ]
+          end
+          CASK
           git add ${CASKS_PATH}
           git commit -m "Update RawRequest cask for v${VERSION}"
           git push origin HEAD:main || echo "Cask update skipped (no changes or push failed)"
