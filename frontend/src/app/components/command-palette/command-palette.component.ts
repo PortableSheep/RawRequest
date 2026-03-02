@@ -1,7 +1,9 @@
-import { Component, input, output, signal, computed, ElementRef, viewChild, effect } from '@angular/core';
+import { Component, output, signal, computed, ElementRef, viewChild, effect, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { buildPaletteItems, searchPaletteItems, FuzzyMatch } from './command-palette.logic';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { PanelVisibilityService } from '../../services/panel-visibility.service';
 
 @Component({
   selector: 'app-command-palette',
@@ -11,22 +13,21 @@ import { buildPaletteItems, searchPaletteItems, FuzzyMatch } from './command-pal
   styleUrls: ['./command-palette.component.scss']
 })
 export class CommandPaletteComponent {
-  isOpen = input.required<boolean>();
-  requests = input.required<{ method: string; url: string; name?: string; group?: string }[]>();
+  readonly ws = inject(WorkspaceStateService);
+  readonly panels = inject(PanelVisibilityService);
 
-  onClose = output<void>();
   onRequestSelect = output<number>();
 
   query = signal('');
   selectedIndex = signal(0);
   searchInput = viewChild<ElementRef>('searchInput');
 
-  private items = computed(() => buildPaletteItems(this.requests()));
+  private items = computed(() => buildPaletteItems(this.ws.currentFileView().requests));
   results = computed(() => searchPaletteItems(this.items(), this.query()));
 
   constructor() {
     effect(() => {
-      if (this.isOpen()) {
+      if (this.panels.showCommandPalette()) {
         this.query.set('');
         this.selectedIndex.set(0);
         setTimeout(() => this.searchInput()?.nativeElement.focus(), 0);
@@ -58,14 +59,14 @@ export class CommandPaletteComponent {
         break;
       case 'Escape':
         event.preventDefault();
-        this.onClose.emit();
+        this.panels.showCommandPalette.set(false);
         break;
     }
   }
 
   selectItem(match: FuzzyMatch) {
     this.onRequestSelect.emit(match.item.requestIndex);
-    this.onClose.emit();
+    this.panels.showCommandPalette.set(false);
   }
 
   getMethodClass(method: string): string {

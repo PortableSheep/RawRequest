@@ -1,7 +1,9 @@
-import { Component, ChangeDetectionStrategy, OnDestroy, effect, input, signal, untracked, HostListener, output } from '@angular/core';
+import { Component, ChangeDetectionStrategy, OnDestroy, effect, inject, signal, computed, untracked, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { RequestExecutionService } from '../../services/request-execution.service';
 
 import {
   formatBytesForResponsePanel,
@@ -27,11 +29,24 @@ export interface DownloadProgress {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ResponsePanelComponent implements OnDestroy {
-  responseData = input<ResponseData | null>(null);
-  request = input<Request | null>(null);
-  isLoading = input<boolean>(false);
-  isCancelling = input<boolean>(false);
-  downloadProgress = input<DownloadProgress | null>(null);
+  private readonly ws = inject(WorkspaceStateService);
+  private readonly reqExec = inject(RequestExecutionService);
+
+  readonly responseData = computed(() => {
+    const idx = this.reqExec.lastExecutedRequestIndexSignal();
+    if (idx === null) return null;
+    return this.ws.currentFileView().responseData[idx] ?? null;
+  });
+
+  readonly request = computed(() => {
+    const idx = this.reqExec.lastExecutedRequestIndexSignal();
+    if (idx === null) return null;
+    return this.ws.currentFileView().requests[idx] ?? null;
+  });
+
+  readonly isLoading = this.reqExec.isRequestRunningSignal;
+  readonly isCancelling = computed(() => this.reqExec.isCancellingActiveRequest);
+  readonly downloadProgress = this.reqExec.downloadProgressSignal;
 
   replayRequest = output<ChainEntryPreview>();
 

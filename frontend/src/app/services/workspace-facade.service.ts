@@ -15,6 +15,13 @@ import {
   readLastSessionFromStorage,
   writeLastSessionToStorage
 } from '../utils/last-session';
+import {
+  deriveAppStateAfterWorkspaceUpdateWithEnvSync,
+  deriveAppStateFromWorkspaceUpdate,
+  type DerivedAppStateFromWorkspaceUpdate
+} from '../logic/app/workspace-update.logic';
+import { findExistingOpenFileIndex } from '../logic/app/app.component.logic';
+import { basename } from '../utils/path';
 
 export type WorkspaceStateUpdate = {
   files: FileTab[];
@@ -25,6 +32,16 @@ export type WorkspaceStateUpdate = {
 
 export type WorkspaceInitUpdate = WorkspaceStateUpdate & {
   shouldAddNewTab: boolean;
+};
+
+export type OpenFileResult = {
+  state: DerivedAppStateFromWorkspaceUpdate;
+  isNewFile: boolean;
+};
+
+export type ImportCollectionResult = {
+  state: DerivedAppStateFromWorkspaceUpdate;
+  count: number;
 };
 
 @Injectable({ providedIn: 'root' })
@@ -272,5 +289,96 @@ export class WorkspaceFacadeService {
       activeFileId: examplesId,
       currentEnv: examplesTab.selectedEnv || ''
     };
+  }
+
+  // --- Higher-level methods that combine workspace operations with env sync / derive ---
+
+  deriveWithEnvSync(update: WorkspaceStateUpdate): DerivedAppStateFromWorkspaceUpdate {
+    return deriveAppStateAfterWorkspaceUpdateWithEnvSync({
+      update,
+      syncCurrentEnvWithFile: (files, idx) => this.syncCurrentEnvWithFile(files, idx),
+    });
+  }
+
+  closeTabDerived(lastSessionKey: string, files: FileTab[], currentFileIndex: number, index: number): DerivedAppStateFromWorkspaceUpdate {
+    return this.deriveWithEnvSync(this.closeTab(lastSessionKey, files, currentFileIndex, index));
+  }
+
+  closeOtherTabsDerived(lastSessionKey: string, files: FileTab[], keepIndex: number): DerivedAppStateFromWorkspaceUpdate {
+    return this.deriveWithEnvSync(this.closeOtherTabs(lastSessionKey, files, keepIndex));
+  }
+
+  addNewTabDerived(lastSessionKey: string, files: FileTab[]): DerivedAppStateFromWorkspaceUpdate {
+    return this.deriveWithEnvSync(this.addNewTab(lastSessionKey, files));
+  }
+
+  addFileFromContentDerived(lastSessionKey: string, files: FileTab[], fileName: string, content: string, filePath?: string): DerivedAppStateFromWorkspaceUpdate {
+    return deriveAppStateFromWorkspaceUpdate(this.addFileFromContent(lastSessionKey, files, fileName, content, filePath));
+  }
+
+  reorderTabsDerived(lastSessionKey: string, files: FileTab[], currentFileIndex: number, fromIndex: number, toIndex: number): DerivedAppStateFromWorkspaceUpdate {
+    return deriveAppStateFromWorkspaceUpdate(this.reorderTabs(lastSessionKey, files, currentFileIndex, fromIndex, toIndex));
+  }
+
+  switchToFileDerived(files: FileTab[], index: number): DerivedAppStateFromWorkspaceUpdate {
+    return deriveAppStateFromWorkspaceUpdate(this.syncCurrentEnvWithFile(files, index));
+  }
+
+  // --- Async I/O methods for file/import dialogs ---
+
+  async openFilesFromDisk(lastSessionKey: string, files: FileTab[]): Promise<OpenFileResult[]> {
+    const { OpenFileDialog, ReadFileContents } = await import('@wailsjs/go/main/App');
+    const filePaths = await OpenFileDialog();
+    if (!filePaths?.length) return [];
+
+    let currentFiles = files;
+    const results: OpenFileResult[] = [];
+
+    for (const filePath of filePaths) {
+      const existingIndex = findExistingOpenFileIndex(currentFiles, filePath);
+      if (existingIndex >= 0) {
+        const state = this.switchToFileDerived(currentFiles, existingIndex);
+        results.push({ state, isNewFile: false });
+        currentFiles = state.files;
+        continue;
+      }
+      const content = await ReadFileContents(filePath);
+      const fileName = basename(filePath) || 'Untitled.http';
+      const state = this.addFileFromContentDerived(lastSessionKey, currentFiles, fileName, content, filePath);
+      results.push({ state, isNewFile: true });
+      currentFiles = state.files;
+    }
+
+    return results;
+  }
+
+  async importCollectionFromDisk(
+    lastSessionKey: string,
+    files: FileTab[],
+    type: 'postman' | 'bruno'
+  ): Promise<ImportCollectionResult | null> {
+    let importPath: string;
+    if (type === 'postman') {
+      const { OpenImportFileDialog } = await import('@wailsjs/go/main/App');
+      importPath = await OpenImportFileDialog();
+    } else {
+      const { OpenImportDirectoryDialog } = await import('@wailsjs/go/main/App');
+      importPath = await OpenImportDirectoryDialog();
+    }
+    if (!importPath) return null;
+
+    const { ImportFromPath } = await import('@wailsjs/go/main/App');
+    const result = await ImportFromPath(importPath);
+    if (!result?.Files?.length) return null;
+
+    let currentFiles = files;
+    let latestState: DerivedAppStateFromWorkspaceUpdate | null = null;
+
+    for (const file of result.Files) {
+      latestState = this.addFileFromContentDerived(lastSessionKey, currentFiles, file.Name, file.Content);
+      currentFiles = latestState.files;
+    }
+
+    return latestState ? { state: latestState, count: result.Files.length } : null;
   }
 }

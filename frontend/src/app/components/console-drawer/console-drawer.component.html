@@ -39,7 +39,7 @@
             </svg>
             <span>Hide console</span>
             <span class="console-panel__count rr-color-primary">
-              {{ logs().length }}
+              {{ scriptConsole.logs().length }}
             </span>
           </button>
         </div>
@@ -57,7 +57,7 @@
               type="button"
               class="rr-btn rr-btn--ghost console-panel__clear-btn"
               (click)="handleClear()"
-              [disabled]="!logs().length"
+              [disabled]="!scriptConsole.logs().length"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -83,9 +83,9 @@
             [style.height.px]="panelHeight()"
             [class.select-none]="isResizing()"
           >
-            @if (logs().length) {
+            @if (scriptConsole.logs().length) {
               <div class="console-panel__scroll" aria-live="polite">
-                @for (log of logs(); track trackLogEntry($index, log)) {
+                @for (log of scriptConsole.logs(); track trackLogEntry($index, log)) {
                   <article
                     class="log-entry"
                     [class.log-entry--error]="log.level === 'error'"
@@ -147,7 +147,7 @@
     </svg>
     <span>Console</span>
     <span class="console-bubble__count rr-color-primary">
-      {{ logs().length }}
+      {{ scriptConsole.logs().length }}
     </span>
   </button>
 }

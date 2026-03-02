@@ -1,8 +1,12 @@
-import { Component, ChangeDetectionStrategy, HostListener, input, output, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { FileTab } from '../../models/http.models';
 import { ThemeService } from '../../services/theme.service';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { PanelVisibilityService } from '../../services/panel-visibility.service';
+import { FileSaveService } from '../../services/file-save.service';
+import { ToastService } from '../../services/toast.service';
+import { StartupService } from '../../services/startup.service';
 
 @Component({
   selector: 'app-header',
@@ -13,33 +17,11 @@ import { ThemeService } from '../../services/theme.service';
 })
 export class HeaderComponent {
   private readonly theme = inject(ThemeService);
-
-  // Signal inputs
-  files = input<FileTab[]>([]);
-  currentFileIndex = input<number>(0);
-  environments = input<string[]>([]);
-  selectedEnv = input<string>('');
-  appVersion = input<string>('');
-
-  // Signal outputs
-  onFileSelect = output<number>();
-  onNewFile = output<void>();
-  onOpenFile = output<void>();
-  onSaveFile = output<void>();
-  onSaveFileAs = output<void>();
-  onOpenExamples = output<void>();
-  onEnvChange = output<string>();
-  onSecretsClick = output<void>();
-  onDonateClick = output<void>();
-  onHistoryClick = output<void>();
-  onCloseFile = output<number>();
-  onReorderTabs = output<{ fromIndex: number; toIndex: number }>();
-  onRevealInFinder = output<number>();
-  onCloseOtherTabs = output<number>();
-  onImportPostman = output<void>();
-  onImportBruno = output<void>();
-  onOutlineClick = output<void>();
-  onSearchRequestsClick = output<void>();
+  readonly ws = inject(WorkspaceStateService);
+  readonly panels = inject(PanelVisibilityService);
+  private readonly fileSave = inject(FileSaveService);
+  private readonly toast = inject(ToastService);
+  readonly startup = inject(StartupService);
 
   draggingIndex: number | null = null;
   dragOverIndex: number | null = null;
@@ -123,8 +105,13 @@ export class HeaderComponent {
     this.saveMenu.show = false;
   }
 
+  handleSaveClick(): void {
+    void this.fileSave.saveCurrentFile();
+    this.closeSaveMenu();
+  }
+
   handleSaveAsClick(): void {
-    this.onSaveFileAs.emit();
+    void this.fileSave.saveCurrentFileAs();
     this.closeSaveMenu();
   }
 
@@ -159,22 +146,22 @@ export class HeaderComponent {
   }
 
   handleOpenExamplesClick(): void {
-    this.onOpenExamples.emit();
+    void this.openExamplesFile();
     this.closeMoreMenu();
   }
 
   handleDonateClick(): void {
-    this.onDonateClick.emit();
+    this.panels.showDonationModal.set(true);
     this.closeMoreMenu();
   }
 
   handleImportPostmanClick(): void {
-    this.onImportPostman.emit();
+    void this.importPostmanCollection();
     this.closeMoreMenu();
   }
 
   handleImportBrunoClick(): void {
-    this.onImportBruno.emit();
+    void this.importBrunoCollection();
     this.closeMoreMenu();
   }
 
@@ -184,22 +171,22 @@ export class HeaderComponent {
   }
 
   handleSecretsClickFromMenu(): void {
-    this.onSecretsClick.emit();
+    this.panels.openSecretsModal();
     this.closeMoreMenu();
   }
 
   handleOutlineClickFromMenu(): void {
-    this.onOutlineClick.emit();
+    this.panels.toggleOutlinePanel();
     this.closeMoreMenu();
   }
 
   handleSearchRequestsClickFromMenu(): void {
-    this.onSearchRequestsClick.emit();
+    this.panels.toggleCommandPalette();
     this.closeMoreMenu();
   }
 
   handleHistoryClickFromMenu(): void {
-    this.onHistoryClick.emit();
+    this.panels.toggleHistory();
     this.closeMoreMenu();
   }
 
@@ -207,7 +194,7 @@ export class HeaderComponent {
     event.preventDefault();
     event.stopPropagation();
     
-    const file = this.files()[index];
+    const file = this.ws.files()[index];
     this.contextMenu = {
       show: true,
       x: event.clientX,
@@ -221,23 +208,23 @@ export class HeaderComponent {
     this.contextMenu.show = false;
   }
 
-  revealInFinder() {
+  handleRevealInFinder() {
     if (this.contextMenu.tabIndex >= 0) {
-      this.onRevealInFinder.emit(this.contextMenu.tabIndex);
+      void this.revealInFinder(this.contextMenu.tabIndex);
     }
     this.closeContextMenu();
   }
 
   closeTab() {
     if (this.contextMenu.tabIndex >= 0) {
-      this.onCloseFile.emit(this.contextMenu.tabIndex);
+      this.ws.closeTab(this.contextMenu.tabIndex);
     }
     this.closeContextMenu();
   }
 
   closeOtherTabs() {
     if (this.contextMenu.tabIndex >= 0) {
-      this.onCloseOtherTabs.emit(this.contextMenu.tabIndex);
+      this.ws.closeOtherTabs(this.contextMenu.tabIndex);
     }
     this.closeContextMenu();
   }
@@ -275,7 +262,7 @@ export class HeaderComponent {
     if (fromIndex === index) {
       return;
     }
-    this.onReorderTabs.emit({ fromIndex, toIndex: index });
+    this.ws.reorderTabs(fromIndex, index);
   }
 
   handleTabStripDragOver(event: DragEvent) {
@@ -293,7 +280,7 @@ export class HeaderComponent {
       return;
     }
     event.preventDefault();
-    const filesCount = this.files().length;
+    const filesCount = this.ws.files().length;
     if (!filesCount) {
       this.resetDragState();
       return;
@@ -304,7 +291,7 @@ export class HeaderComponent {
     if (fromIndex === toIndex) {
       return;
     }
-    this.onReorderTabs.emit({ fromIndex, toIndex });
+    this.ws.reorderTabs(fromIndex, toIndex);
   }
 
   handleTabDragEnd() {
@@ -317,6 +304,78 @@ export class HeaderComponent {
 
   isDarkTheme(): boolean {
     return this.theme.resolvedTheme() === 'dark';
+  }
+
+  async openFile(): Promise<void> {
+    try {
+      await this.ws.openFilesFromDisk();
+    } catch (error) {
+      console.error("Failed to open file dialog:", error);
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".http";
+      input.multiple = true;
+      input.onchange = (event) => {
+        const files = (event.target as HTMLInputElement).files;
+        if (files) {
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              this.ws.addFileFromContent(file.name, e.target?.result as string);
+            };
+            reader.readAsText(file);
+          }
+        }
+      };
+      input.click();
+    }
+  }
+
+  async revealInFinder(index: number): Promise<void> {
+    try {
+      await this.ws.revealInFinder(index);
+    } catch (error: any) {
+      if (error?.message?.includes('not been saved')) {
+        this.toast.info("This file has not been saved to disk yet.");
+      } else {
+        console.error("Failed to reveal file:", error);
+        this.toast.error("Failed to reveal file in Finder.");
+      }
+    }
+  }
+
+  async importPostmanCollection(): Promise<void> {
+    try {
+      const count = await this.ws.importCollection('postman');
+      if (count) {
+        this.toast.success(`Imported ${count} file(s) from Postman collection`);
+      }
+    } catch (err: any) {
+      console.error("Postman import failed:", err);
+      this.toast.error("Import failed: " + (err?.message || err));
+    }
+  }
+
+  async importBrunoCollection(): Promise<void> {
+    try {
+      const count = await this.ws.importCollection('bruno');
+      if (count) {
+        this.toast.success(`Imported ${count} file(s) from Bruno collection`);
+      }
+    } catch (err: any) {
+      console.error("Bruno import failed:", err);
+      this.toast.error("Import failed: " + (err?.message || err));
+    }
+  }
+
+  async openExamplesFile(): Promise<void> {
+    try {
+      await this.ws.openExamplesFile();
+    } catch (error) {
+      console.error("Failed to open examples file:", error);
+      this.toast.error("Failed to open examples file.");
+    }
   }
 
   private resetDragState() {

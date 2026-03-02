@@ -1,29 +1,5 @@
 <div class="rr-app">
-    <app-header
-            [files]="filesSignal()"
-            [currentFileIndex]="currentFileIndexSignal()"
-            [environments]="getEnvironments()"
-            [selectedEnv]="currentEnv()"
-            [appVersion]="updateService.appVersion()"
-            (onFileSelect)="switchToFile($event)"
-            (onNewFile)="addNewTab()"
-            (onOpenFile)="openFile()"
-            (onSaveFile)="saveCurrentFile()"
-            (onSaveFileAs)="saveCurrentFileAs()"
-            (onOpenExamples)="openExamplesFile()"
-            (onCloseFile)="closeTab($event)"
-            (onEnvChange)="onCurrentEnvChange($event)"
-            (onSecretsClick)="openSecretsModal()"
-            (onDonateClick)="showDonationModal = true"
-            (onHistoryClick)="toggleHistory()"
-            (onReorderTabs)="onTabsReordered($event)"
-            (onRevealInFinder)="revealInFinder($event)"
-            (onCloseOtherTabs)="closeOtherTabs($event)"
-            (onImportPostman)="importPostmanCollection()"
-            (onImportBruno)="importBrunoCollection()"
-            (onOutlineClick)="toggleOutlinePanel()"
-            (onSearchRequestsClick)="toggleCommandPalette()">
-    </app-header>
+    <app-header></app-header>
 
     @if (serviceStartupError) {
         <div class="rr-service-blocking">
@@ -57,7 +33,7 @@
             <div
                 #mainSplit
                 class="rr-split"
-                [style.gridTemplateColumns]="splitGridTemplateColumns"
+                [style.gridTemplateColumns]="splitPane.splitGridTemplateColumns"
             >
                 <div class="glass-panel glass-panel--static rr-panel rr-panel--accent-blue rr-main-pane rr-main-pane--left">
                     <div class="rr-panel__header">
@@ -89,7 +65,7 @@
                     </app-editor>
                 </div>
 
-                @if (isSplitLayout) {
+                @if (splitPane.isSplitLayout) {
                     <div
                         class="rr-split__separator"
                         (mousedown)="onSplitMouseDown($event)"
@@ -97,7 +73,7 @@
                         title="Drag to resize (double-click to reset)"
                         role="separator"
                         aria-orientation="vertical"
-                        [attr.aria-valuenow]="editorPaneWidthPx"
+                        [attr.aria-valuenow]="splitPane.editorPaneWidthPx"
                     >
                         <div class="rr-split__separator-handle">
                             <div class="rr-split__separator-line"></div>
@@ -108,11 +84,6 @@
                 <div class="glass-panel glass-panel--static rr-panel rr-panel--accent-emerald rr-main-pane rr-main-pane--right">
                     <app-response-panel
                         class="rr-panel__body"
-                        [responseData]="lastExecutedRequestIndexSignal() !== null ? currentFileView().responseData[lastExecutedRequestIndexSignal()!] : null"
-                        [request]="lastExecutedRequestIndexSignal() !== null ? currentFileView().requests[lastExecutedRequestIndexSignal()!] : null"
-                        [isLoading]="isRequestRunningSignal()"
-                        [isCancelling]="isCancellingActiveRequest"
-                        [downloadProgress]="downloadProgressSignal()"
                         (replayRequest)="onReplayRequest($event)">
                     </app-response-panel>
                 </div>
@@ -120,99 +91,7 @@
         </div>
 
         @if (activeRequestInfo; as active) {
-            @let activeRequest = getActiveRequestDetails();
-            <div class="rr-active-overlay" style="bottom: calc(var(--rr-console-offset, 0px) + 5rem);">
-                <div class="glass-panel floating-overlay rr-active-card">
-                    <div class="rr-active-card__top">
-                        <div class="rr-active-card__title">
-                            <span
-                                class="rr-active-dot"
-                                [class.rr-active-dot--cancelling]="isCancellingActiveRequest"
-                            ></span>
-                            <div>
-                                <p class="rr-active-card__label">{{ active?.label }}</p>
-                                <small class="rr-active-card__meta">{{ getActiveRequestMeta() }}</small>
-                            </div>
-                        </div>
-                        <button
-                            type="button"
-                            class="rr-btn rr-btn--pill rr-btn--danger btn-ambient"
-                            (click)="cancelActiveRequest()"
-                            [disabled]="!active.canCancel || isCancellingActiveRequest"
-                        >
-                            {{ isCancellingActiveRequest ? 'Canceling...' : 'Cancel request' }}
-                        </button>
-                    </div>
-
-                    <div class="rr-active-card__details">
-                        <div class="rr-active-card__details-top">
-                            <span class="rr-pill rr-pill--method">
-                                {{ activeRequest?.method || '—' }}
-                            </span>
-                            <span class="rr-active-card__status">
-                                {{ active.type === 'load' ? 'Load test running' : active.type === 'chain' ? 'Chained request running' : 'Request running' }}
-                            </span>
-                        </div>
-
-                        @if (active.type === 'load') {
-                            <div class="rr-active-row">
-                                <div class="rr-active-row__label">Users</div>
-                                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
-                                                            <defs>
-                                                                <clipPath id="usersSparklineClip">
-                                                                    <rect x="0" y="0" width="100" height="20"></rect>
-                                                                </clipPath>
-                                                            </defs>
-                                                            <g [attr.transform]="loadUsersSparklineTransformView || null" [attr.clip-path]="'url(#usersSparklineClip)'">
-                                                                <path
-                                                                    [attr.d]="loadUsersSparklinePathDView"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    stroke-width="1.5"
-                                                                    stroke-linecap="round"
-                                                                    stroke-linejoin="round"
-                                                                    class="rr-color-primary"
-                                                                ></path>
-                                                            </g>
-                                                        </svg>
-                                <div class="rr-active-row__value">
-                                    {{ activeRunProgressView?.activeUsers ?? 0 }}/{{ activeRunProgressView?.maxUsers ?? '—' }}
-                                </div>
-                            </div>
-
-                            <div class="rr-active-row">
-                                <div class="rr-active-row__label">RPS</div>
-                                <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
-                                                            <defs>
-                                                                <clipPath id="rpsSparklineClip">
-                                                                    <rect x="0" y="0" width="100" height="20"></rect>
-                                                                </clipPath>
-                                                            </defs>
-                                                            <g [attr.transform]="loadRpsSparklineTransformView || null" [attr.clip-path]="'url(#rpsSparklineClip)'">
-                                                                <path
-                                                                    [attr.d]="loadRpsSparklinePathDView"
-                                                                    fill="none"
-                                                                    stroke="currentColor"
-                                                                    stroke-width="1.5"
-                                                                    stroke-linecap="round"
-                                                                    stroke-linejoin="round"
-                                                                    class="rr-color-accent"
-                                                                ></path>
-                                                            </g>
-                                                        </svg>
-                                <div class="rr-active-row__value">
-                                    {{ currentLoadRpsView | number:'1.0-0' }}
-                                </div>
-                            </div>
-                        }
-
-                        <div class="rr-active-card__name">
-                            {{ activeRequest?.name || 'Waiting for request selection' }}
-                        </div>
-                        <pre class="rr-active-card__preview"><code>{{ getActiveRequestPreview() }}</code></pre>
-                    </div>
-                </div>
-            </div>
+            <app-active-request-overlay></app-active-request-overlay>
         }
     </main>
 
@@ -220,7 +99,7 @@
         <button
             type="button"
             class="rr-history-edge-trigger"
-            (click)="toggleHistory()"
+            (click)="panels.toggleHistory()"
             title="Open history (⌘/Ctrl+Shift+H)"
             aria-label="Open history"
         >
@@ -233,73 +112,31 @@
     }
 
     <app-console-drawer
-            [open]="consoleOpen()"
-            [logs]="scriptLogs()"
-            [latestLog]="latestConsoleEntry()"
-            [status]="footerStatus()"
-            (onToggle)="toggleConsole()"
-            (onClear)="clearConsole()">
+            [status]="footerStatus()">
     </app-console-drawer>
-    <app-history-sidebar
-        [isOpen]="showHistory"
-        [history]="history"
-        [selectedItem]="selectedHistoryItem"
-        (onClose)="showHistory = false"
-        (onItemClick)="viewHistory($event)">
-    </app-history-sidebar>
+    <app-history-sidebar></app-history-sidebar>
    <app-outline-panel
-        [isOpen]="showOutlinePanel"
-        [requests]="currentFile.requests"
-        [activeRequestIndex]="pendingRequestIndex"
-        (onClose)="showOutlinePanel = false"
         (onRequestSelect)="scrollEditorToRequest($event)">
    </app-outline-panel>
    <app-command-palette
-        [isOpen]="showCommandPalette"
-        [requests]="currentFile.requests"
-        (onClose)="showCommandPalette = false"
         (onRequestSelect)="scrollEditorToRequest($event)">
    </app-command-palette>
    <app-history-detail-modal
-        [isOpen]="showHistoryModal"
-        [item]="selectedHistoryItem"
+        [isOpen]="panels.showHistoryModal()"
+        [item]="ws.selectedHistoryItem()"
         (onClose)="closeHistoryModal()">
     </app-history-detail-modal>
     <app-load-test-results-modal
-        [isOpen]="showLoadTestResults"
-        [metrics]="loadTestMetrics"
-        (onClose)="closeLoadTestResults()">
+        [isOpen]="panels.showLoadTestResults()"
+        [metrics]="loadTestViz.loadTestMetrics"
+        (onClose)="panels.closeLoadTestResults()">
     </app-load-test-results-modal>
     <app-donation-modal
-        [isOpen]="showDonationModal"
-        (onClose)="showDonationModal = false"
+        [isOpen]="panels.showDonationModal()"
+        (onClose)="panels.showDonationModal.set(false)"
         (onDonate)="donate($event)">
     </app-donation-modal>
-    <app-secrets-modal
-        #secretsModal
-        [isOpen]="showSecretsModal"
-        [selectedEnv]="currentEnv()"
-        [environments]="getEnvironments()"
-        [allSecrets]="allSecrets"
-        [vaultInfo]="vaultInfo"
-        [fileContent]="currentFileView().content"
-        (onClose)="showSecretsModal = false"
-        (onSave)="handleSecretSave($event)"
-        (onDeleteClick)="confirmDeleteSecret($event.env, $event.key)"
-        (onExport)="handleVaultExport()"
-        (onResetVault)="handleVaultReset()"
-        (onSetMasterPassword)="handleSetMasterPassword($event)"
-        (onVerifyMasterPassword)="handleVerifyMasterPassword($event)"
-        (onGetSecretValue)="handleGetSecretValue($event.env, $event.key)">
-    </app-secrets-modal>
-
-    <!-- Delete Confirm Modal Component -->
-    <app-delete-confirm-modal
-        [isOpen]="showDeleteConfirmModal"
-        [secretInfo]="secretToDelete"
-        (onConfirm)="deleteSecret()"
-        (onCancel)="cancelDeleteSecret()">
-    </app-delete-confirm-modal>
+    <app-secrets-modal></app-secrets-modal>
 
     <!-- Toast Container -->
     <app-toast-container></app-toast-container>
@@ -311,6 +148,6 @@
     <app-script-snippet-modal
         #snippetModal
         (snippetSelected)="onSnippetSelected($event)"
-        (closed)="showSnippetModal = false">
+        (closed)="panels.showSnippetModal.set(false)">
     </app-script-snippet-modal>
 </div>

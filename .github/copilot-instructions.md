@@ -131,8 +131,10 @@ Variables set via `setVar()` do NOT need to be pre-declared with `@varName =` di
 - **Generated code**: `script_cleaner_generated.go` is generated via `go generate ./...` (directive in `app.go`)
 
 ### Frontend Code Organization
+- **Small, testable components**: Always aim for creating smaller components that are fully testable. Extract distinct responsibilities into dedicated services or sub-components rather than building monolithic components. A component over ~200 lines likely has multiple concerns that should be separated.
 - **Testable logic**: Extract to `*.logic.ts` with pure functions, test with Jest
 - **Component tests**: Focus on user interaction, not business logic
+- **Service extraction**: When a component manages state or orchestrates complex behavior (layout, keyboard shortcuts, panel visibility, request execution), extract that logic into an `@Injectable` service with its own tests
 - **Wails bindings**: Import from `@wailsjs/go/main/App`, never commit changes to `wailsjs/` (auto-generated)
 
 ### Secret Management

@@ -11,3 +11,4 @@ export { UpdateNotificationComponent } from './update-notification/update-notifi
 export { ScriptSnippetModalComponent } from './script-snippet-modal/script-snippet-modal.component';
 export { OutlinePanelComponent } from './outline-panel/outline-panel.component';
 export { CommandPaletteComponent } from './command-palette/command-palette.component';
+export { ActiveRequestOverlayComponent } from './active-request-overlay/active-request-overlay.component';

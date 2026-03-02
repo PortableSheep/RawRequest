@@ -1,5 +1,5 @@
-@if (isOpen()) {
-  <div class="rr-palette-overlay" (click)="onClose.emit()">
+@if (panels.showCommandPalette()) {
+  <div class="rr-palette-overlay" (click)="panels.showCommandPalette.set(false)">
     <div class="rr-palette-dialog" (click)="$event.stopPropagation()" (keydown)="onKeydown($event)">
       <input
         #searchInput

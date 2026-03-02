@@ -1,15 +1,15 @@
-<div class="history-drawer" [class.history-drawer--open]="isOpen()" [class.history-drawer--closed]="!isOpen()" tabindex="-1">
+<div class="history-drawer" [class.history-drawer--open]="panels.showHistory()" [class.history-drawer--closed]="!panels.showHistory()" tabindex="-1">
 
   <div class="history-drawer__header">
     <div class="history-drawer__title">
       <h5 class="history-drawer__title-text">History</h5>
-      @if (history().length > 0) {
-        <div class="history-drawer__subtitle">{{ history().length }} entr{{ history().length === 1 ? 'y' : 'ies' }}</div>
+      @if (ws.history().length > 0) {
+        <div class="history-drawer__subtitle">{{ ws.history().length }} entr{{ ws.history().length === 1 ? 'y' : 'ies' }}</div>
       } @else {
         <div class="history-drawer__subtitle history-drawer__subtitle--empty">No entries yet</div>
       }
     </div>
-    <button type="button" class="rr-icon-btn history-drawer__close" (click)="onClose.emit()" aria-label="Close history">
+    <button type="button" class="rr-icon-btn history-drawer__close" (click)="panels.showHistory.set(false)" aria-label="Close history">
       <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M18 6L6 18M6 6l12 12"></path>
       </svg>
@@ -17,13 +17,13 @@
   </div>
 
   <div class="history-drawer__body rr-no-scrollbar">
-    @if (history().length > 0) {
+    @if (ws.history().length > 0) {
       <div class="history-list">
-        @for (item of history(); track item.timestamp) {
+        @for (item of ws.history(); track item.timestamp) {
           <div
             class="history-item"
-            [class.history-item--selected]="selectedItem() === item"
-            (click)="onItemClick.emit(item)"
+            [class.history-item--selected]="ws.selectedHistoryItem() === item"
+            (click)="viewHistory(item)"
           >
             <div class="history-item__top">
               <div class="history-item__tags">
@@ -57,6 +57,6 @@
   </div>
 </div>
 
-@if (isOpen()) {
-  <div class="history-drawer__backdrop" (click)="onClose.emit()"></div>
+@if (panels.showHistory()) {
+  <div class="history-drawer__backdrop" (click)="panels.showHistory.set(false)"></div>
 }

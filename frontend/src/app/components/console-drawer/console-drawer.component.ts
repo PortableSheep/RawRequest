@@ -1,6 +1,8 @@
 import { CommonModule } from '@angular/common';
-import { Component, input, output, signal, HostListener, ElementRef, inject, ViewChild, AfterViewInit, effect } from '@angular/core';
+import { Component, input, signal, computed, HostListener, ElementRef, inject, ViewChild, AfterViewInit, effect } from '@angular/core';
 import { ScriptLogEntry } from '../../models/http.models';
+import { PanelVisibilityService } from '../../services/panel-visibility.service';
+import { ScriptConsoleService } from '../../services/script-console.service';
 import { gsap } from 'gsap';
 
 type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
@@ -14,18 +16,19 @@ type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';
 })
 export class ConsoleDrawerComponent {
   private el = inject(ElementRef);
+  private readonly panels = inject(PanelVisibilityService);
+  readonly scriptConsole = inject(ScriptConsoleService);
 
   @ViewChild('drawerShell') drawerShell?: ElementRef<HTMLElement>;
   @ViewChild('bubbleButton') bubbleButton?: ElementRef<HTMLButtonElement>;
   
-  open = input<boolean>(false);
-  logs = input<ScriptLogEntry[]>([]);
-  latestLog = input<ScriptLogEntry | null>(null);
   status = input<{ label: string; detail: string; tone: FooterTone } | null>(null);
   version = input<string>('Raw Request v1');
 
-  onToggle = output<void>();
-  onClear = output<void>();
+  readonly latestLog = computed(() => {
+    const entries = this.scriptConsole.logs();
+    return entries.length ? entries[entries.length - 1] : null;
+  });
 
   // Render state: keep the drawer in DOM long enough to animate out.
   isDrawerVisible = signal<boolean>(false);
@@ -47,7 +50,7 @@ export class ConsoleDrawerComponent {
 
   constructor() {
     effect(() => {
-      const isOpen = this.open();
+      const isOpen = this.panels.consoleOpen();
       if (!this.hasView) {
         // Defer animations until ViewChild refs are available.
         this.isDrawerVisible.set(isOpen);
@@ -85,24 +88,22 @@ export class ConsoleDrawerComponent {
   ngAfterViewInit(): void {
     this.hasView = true;
     // Apply initial state.
-    this.syncAnimatedState(this.open(), true);
+    this.syncAnimatedState(this.panels.consoleOpen(), true);
   }
 
   handleToggle() {
-    // Parent owns the actual open/close state.
-    this.onToggle.emit();
+    this.panels.toggleConsole();
   }
 
   requestClose() {
-    // Animate out first; only then tell parent to close.
-    if (!this.open()) {
+    if (!this.panels.consoleOpen()) {
       return;
     }
-    this.animateClose(() => this.onToggle.emit());
+    this.animateClose(() => this.panels.toggleConsole());
   }
 
   handleClear() {
-    this.onClear.emit();
+    this.scriptConsole.clear();
   }
 
   private syncAnimatedState(open: boolean, immediate = false): void {
@@ -127,7 +128,7 @@ export class ConsoleDrawerComponent {
         this.pendingOpenAnimation = true;
         requestAnimationFrame(() => {
           this.pendingOpenAnimation = false;
-          if (this.open()) {
+          if (this.panels.consoleOpen()) {
             this.animateOpen(immediate);
           }
         });

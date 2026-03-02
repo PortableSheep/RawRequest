@@ -16,7 +16,21 @@ export class SecretService {
   private missingSecretSubject = new Subject<{ env: string; key: string }>();
   private missingSecret$ = this.missingSecretSubject.asObservable();
 
+  /** Vault management state exposed for UI binding. */
+  allSecrets: SecretIndex = {};
+  vaultInfo: VaultInfo | null = null;
+  secretToDelete: { env: string; key: string } | null = null;
+  private masterPasswordCheckDone = false;
+  private masterPasswordWarningCallback: (() => void) | null = null;
+
   constructor(@Inject(BACKEND_CLIENT) private readonly backend: BackendClientContract) {}
+
+  /**
+   * Register a callback invoked once when secrets exist but no master password is set.
+   */
+  onMasterPasswordWarning(cb: () => void): void {
+    this.masterPasswordWarningCallback = cb;
+  }
 
   async list(refresh = false): Promise<SecretIndex> {
     if (!refresh && Object.keys(this.lastSnapshot).length) {
@@ -175,5 +189,85 @@ export class SecretService {
 
   async verifyMasterPassword(password: string): Promise<boolean> {
     return this.backend.verifyMasterPassword(password);
+  }
+
+  // --- Vault management operations ---
+
+  refreshSecrets(force = false): void {
+    this.list(force)
+      .then((secrets) => {
+        this.allSecrets = secrets || {};
+        this.checkMasterPasswordNeeded();
+      })
+      .catch((error) => console.error('Failed to load secrets', error));
+    void this.loadVaultInfo(force);
+  }
+
+  async loadVaultInfo(force = false): Promise<void> {
+    try {
+      const info = await this.getVaultInfo(force);
+      this.vaultInfo = info;
+      this.checkMasterPasswordNeeded();
+    } catch (error) {
+      return console.error('Failed to load vault info', error);
+    }
+  }
+
+  private checkMasterPasswordNeeded(): void {
+    if (this.masterPasswordCheckDone) return;
+    const hasSecrets = Object.values(this.allSecrets).some(
+      (keys) => keys && keys.length > 0,
+    );
+    if (!hasSecrets) return;
+    if (!this.vaultInfo || this.vaultInfo.hasMasterPassword) return;
+    this.masterPasswordCheckDone = true;
+    this.masterPasswordWarningCallback?.();
+  }
+
+  async saveSecret(env: string, key: string, value: string): Promise<SecretIndex> {
+    const snapshot = await this.save(env, key, value);
+    this.allSecrets = snapshot;
+    await this.loadVaultInfo(true);
+    return snapshot;
+  }
+
+  async removeSecret(env: string, key: string): Promise<SecretIndex> {
+    const snapshot = await this.remove(env, key);
+    this.allSecrets = snapshot;
+    await this.loadVaultInfo(true);
+    return snapshot;
+  }
+
+  confirmDeleteSecret(env: string, key: string): void {
+    this.secretToDelete = { env, key };
+  }
+
+  cancelDeleteSecret(): void {
+    this.secretToDelete = null;
+  }
+
+  async deleteConfirmedSecret(): Promise<string | null> {
+    if (!this.secretToDelete) {
+      return null;
+    }
+    const key = this.secretToDelete.key;
+    await this.removeSecret(this.secretToDelete.env, this.secretToDelete.key);
+    this.secretToDelete = null;
+    return key;
+  }
+
+  async exportVault(): Promise<string> {
+    return this.export();
+  }
+
+  async resetVaultAndClear(): Promise<void> {
+    await this.resetVault();
+    this.allSecrets = {};
+    await this.loadVaultInfo(true);
+  }
+
+  async setMasterPasswordAndRefresh(password: string): Promise<void> {
+    await this.setMasterPassword(password);
+    await this.loadVaultInfo(true);
   }
 }

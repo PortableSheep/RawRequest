@@ -6,19 +6,11 @@ import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, Tooltip, keymap } fr
 import { oneDark } from '@codemirror/theme-one-dark';
 import { foldKeymap, foldService, syntaxTree, LRLanguage, LanguageSupport } from '@codemirror/language';
 import {
-  SearchQuery,
-  findNext,
-  findPrevious,
-  getSearchQuery,
   highlightSelectionMatches,
-  openSearchPanel,
-  closeSearchPanel,
-  replaceAll,
-  replaceNext,
-  search,
-  selectMatches,
-  setSearchQuery
+  search
 } from '@codemirror/search';
+import { EditorSearchService } from './editor-search.service';
+import { EditorSearchPanelComponent } from './editor-search-panel/editor-search-panel.component';
 
 import { createEditorKeymap } from './editor-keymap';
 import { createRequestGutter } from './editor-request-gutter';
@@ -32,6 +24,13 @@ import {
   shouldCollapseAccidentalSelection
 } from './editor.component.logic';
 import { getJsDecorationsForSegment, getNonScriptLineDecorations } from './editor.highlighter.logic';
+import {
+  computeRequestBlockIndex,
+  findRequestIndexByPos,
+  computeRequestIndexAtPosFallback,
+  RequestBlock
+} from './editor-request-indexer.logic';
+import { writeClipboardText, readClipboardText } from './editor-clipboard.utils';
 
 import type { SecretIndex } from '../../services/secret.service';
 import { ThemeService } from '../../services/theme.service';
@@ -51,16 +50,15 @@ const rawRequestHttpSupport = new LanguageSupport(rawRequestHttpLanguage);
 @Component({
   selector: 'app-editor',
   standalone: true,
-  imports: [],
+  imports: [EditorSearchPanelComponent],
   templateUrl: './editor.component.html',
   styleUrls: ['./editor.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  providers: [EditorSearchService]
 })
 export class EditorComponent implements AfterViewInit, OnDestroy {
   @ViewChild('wrapper', { static: true }) wrapperContainer!: ElementRef<HTMLElement>;
   @ViewChild('editor', { static: true }) editorContainer!: ElementRef;
-  @ViewChild('findInput') findInput?: ElementRef<HTMLInputElement>;
-  @ViewChild('replaceInput') replaceInput?: ElementRef<HTMLInputElement>;
 
   content = input.required<string>();
   requests = input.required<any[]>();
@@ -81,22 +79,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private readOnlyCompartment = new Compartment();
   private themeCompartment = new Compartment();
   private readonly themeService = inject(ThemeService);
+  private readonly searchService = inject(EditorSearchService);
 
-  private requestBlockIndex: Array<{ from: number; to: number; index: number }> = [];
-
-  searchUi = {
-    open: false,
-    showReplace: false,
-    query: '',
-    replace: '',
-    caseSensitive: false,
-    regexp: false,
-    wholeWord: false
-  };
-
-  searchUiStatsText = '';
-  private searchStatsTimer: number | undefined;
-  private searchFlashTimer: number | undefined;
+  private requestBlockIndex: RequestBlock[] = [];
 
   editorContextMenu = {
     show: false,
@@ -160,12 +145,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    if (this.searchStatsTimer !== undefined) {
-      clearTimeout(this.searchStatsTimer);
-    }
-    if (this.searchFlashTimer !== undefined) {
-      clearTimeout(this.searchFlashTimer);
-    }
     if (this.editorView) {
       this.editorView.destroy();
     }
@@ -199,14 +178,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
 
     try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Best-effort fallback for restricted clipboard environments
-      try {
-        document.execCommand('copy');
-      } catch {
-        // ignore
-      }
+      await writeClipboardText(text);
     } finally {
       this.closeEditorContextMenu();
     }
@@ -220,11 +192,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       return;
     }
     const text = this.editorView.state.sliceDoc(from, to);
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // ignore
-    }
+    await writeClipboardText(text);
     this.editorView.dispatch({
       changes: { from, to, insert: '' },
       selection: { anchor: from }
@@ -234,13 +202,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   async pasteFromClipboard(): Promise<void> {
     if (!this.editorView) return;
-    let text = '';
-    try {
-      text = await navigator.clipboard.readText();
-    } catch {
-      this.closeEditorContextMenu();
-      return;
-    }
+    const text = await readClipboardText();
     if (!text) {
       this.closeEditorContextMenu();
       return;
@@ -297,8 +259,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             {
               key: 'Escape',
               run: () => {
-                if (this.searchUi.open) {
-                  this.closeSearchUi();
+                if (this.searchService.searchUi.open) {
+                  this.searchService.closeSearchUi();
                   return true;
                 }
                 return false;
@@ -307,16 +269,16 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             {
               key: 'F3',
               run: () => {
-                if (!this.searchUi.open) this.openSearchUi(false);
-                this.searchNext();
+                if (!this.searchService.searchUi.open) this.openSearchUi(false);
+                this.searchService.searchNext();
                 return true;
               }
             },
             {
               key: 'Shift-F3',
               run: () => {
-                if (!this.searchUi.open) this.openSearchUi(false);
-                this.searchPrev();
+                if (!this.searchService.searchUi.open) this.openSearchUi(false);
+                this.searchService.searchPrev();
                 return true;
               }
             }
@@ -480,267 +442,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     });
 
     this.editorView.dom.style.height = '100%';
+
+    this.searchService.init(this.editorView, this.wrapperContainer.nativeElement);
   }
 
   openSearchUi(showReplace: boolean) {
-    if (!this.editorView) return;
-
-    // Keep CodeMirror's search panel logically open so it can provide match
-    // highlighting, but hide it via CSS. We'll render our own UI.
-    openSearchPanel(this.editorView);
-
-    const current = getSearchQuery(this.editorView.state);
-    this.searchUi = {
-      open: true,
-      showReplace,
-      query: current.search ?? '',
-      replace: current.replace ?? '',
-      caseSensitive: !!current.caseSensitive,
-      regexp: !!current.regexp,
-      wholeWord: !!current.wholeWord
-    };
-
-    this.scheduleSearchStatsUpdate();
-
-    // Focus after Angular renders the template.
-    setTimeout(() => {
-      const el = this.findInput?.nativeElement;
-      if (el) {
-        el.focus();
-        el.select();
-      }
-    }, 0);
-  }
-
-  closeSearchUi() {
-    this.searchUi = { ...this.searchUi, open: false, showReplace: false };
-    this.searchUiStatsText = '';
-    if (this.editorView) {
-      closeSearchPanel(this.editorView);
-    }
-    this.editorView?.focus();
-  }
-
-  toggleReplaceUi() {
-    if (!this.searchUi.open) {
-      this.openSearchUi(true);
-      return;
-    }
-    const next = !this.searchUi.showReplace;
-    this.searchUi = { ...this.searchUi, showReplace: next };
-
-    if (next) {
-      setTimeout(() => {
-        this.replaceInput?.nativeElement?.focus();
-        this.replaceInput?.nativeElement?.select();
-      }, 0);
-    }
-  }
-
-  private commitSearchQuery() {
-    if (!this.editorView) return;
-
-    const query = new SearchQuery({
-      search: this.searchUi.query,
-      replace: this.searchUi.replace,
-      caseSensitive: this.searchUi.caseSensitive,
-      regexp: this.searchUi.regexp,
-      wholeWord: this.searchUi.wholeWord
-    });
-
-    this.editorView.dispatch({ effects: setSearchQuery.of(query) });
-    this.scheduleSearchStatsUpdate();
-  }
-
-  private scheduleSearchStatsUpdate() {
-    if (this.searchStatsTimer) {
-      window.clearTimeout(this.searchStatsTimer);
-    }
-    this.searchStatsTimer = window.setTimeout(() => {
-      this.updateSearchStatsText();
-    }, 75);
-  }
-
-  private updateSearchStatsText() {
-    if (!this.editorView) return;
-
-    const queryText = this.searchUi.query;
-    if (!queryText) {
-      this.searchUiStatsText = '';
-      return;
-    }
-
-    const query = new SearchQuery({
-      search: this.searchUi.query,
-      replace: this.searchUi.replace,
-      caseSensitive: this.searchUi.caseSensitive,
-      regexp: this.searchUi.regexp,
-      wholeWord: this.searchUi.wholeWord
-    });
-
-    if (!query.valid) {
-      this.searchUiStatsText = 'Invalid';
-      return;
-    }
-
-    const state = this.editorView.state;
-    const selection = state.selection.main;
-    const limit = 2000;
-    let total = 0;
-    let currentIndex = 0;
-    let tooMany = false;
-
-    const cursor = query.getCursor(state);
-    for (let next = cursor.next(); !next.done; next = cursor.next()) {
-      total++;
-      const { from, to } = next.value;
-      if (from === selection.from && to === selection.to) {
-        currentIndex = total;
-      }
-      if (total >= limit) {
-        tooMany = true;
-        break;
-      }
-    }
-
-    if (total === 0) {
-      this.searchUiStatsText = '0 results';
-      return;
-    }
-
-    const totalText = tooMany ? `${total}+` : `${total}`;
-    this.searchUiStatsText = `${currentIndex} of ${totalText}`;
-  }
-
-  private flashCurrentMatch() {
-    if (this.editorView) {
-      const from = this.editorView.state.selection.main.from;
-      this.editorView.dispatch({
-        effects: EditorView.scrollIntoView(from, { y: 'center' })
-      });
-    }
-
-    const el = this.wrapperContainer?.nativeElement;
-    if (!el) return;
-
-    if (this.searchFlashTimer) {
-      window.clearTimeout(this.searchFlashTimer);
-    }
-
-    // Toggle a class to retrigger CSS animation.
-    el.classList.remove('rr-search-flash');
-    // Force reflow so the animation restarts reliably.
-    void el.offsetWidth;
-    el.classList.add('rr-search-flash');
-    this.searchFlashTimer = window.setTimeout(() => {
-      el.classList.remove('rr-search-flash');
-    }, 650);
-  }
-
-  onFindInput(event: Event) {
-    this.searchUi = { ...this.searchUi, query: (event.target as HTMLInputElement).value };
-    this.commitSearchQuery();
-  }
-
-  onReplaceInput(event: Event) {
-    this.searchUi = { ...this.searchUi, replace: (event.target as HTMLInputElement).value };
-    this.commitSearchQuery();
-  }
-
-  toggleCaseSensitive() {
-    this.searchUi = { ...this.searchUi, caseSensitive: !this.searchUi.caseSensitive };
-    this.commitSearchQuery();
-  }
-
-  toggleRegexp() {
-    this.searchUi = { ...this.searchUi, regexp: !this.searchUi.regexp };
-    this.commitSearchQuery();
-  }
-
-  toggleWholeWord() {
-    this.searchUi = { ...this.searchUi, wholeWord: !this.searchUi.wholeWord };
-    this.commitSearchQuery();
-  }
-
-  searchNext() {
-    if (!this.editorView) return;
-    this.commitSearchQuery();
-    findNext(this.editorView);
-    this.scheduleSearchStatsUpdate();
-    this.flashCurrentMatch();
-
-    setTimeout(() => {
-      this.findInput?.nativeElement?.focus();
-    }, 0);
-  }
-
-  searchPrev() {
-    if (!this.editorView) return;
-    this.commitSearchQuery();
-    findPrevious(this.editorView);
-    this.scheduleSearchStatsUpdate();
-    this.flashCurrentMatch();
-
-    setTimeout(() => {
-      this.findInput?.nativeElement?.focus();
-    }, 0);
-  }
-
-  selectAllMatches() {
-    if (!this.editorView) return;
-    this.commitSearchQuery();
-    selectMatches(this.editorView);
-    this.scheduleSearchStatsUpdate();
-  }
-
-  replaceOne() {
-    if (!this.editorView) return;
-    this.commitSearchQuery();
-    replaceNext(this.editorView);
-    this.scheduleSearchStatsUpdate();
-    this.flashCurrentMatch();
-  }
-
-  replaceEverything() {
-    if (!this.editorView) return;
-    this.commitSearchQuery();
-    replaceAll(this.editorView);
-    this.scheduleSearchStatsUpdate();
-    this.flashCurrentMatch();
-  }
-
-  onFindKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      this.closeSearchUi();
-      return;
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (event.shiftKey) {
-        this.searchPrev();
-      } else {
-        this.searchNext();
-      }
-      return;
-    }
-  }
-
-  onReplaceKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      this.closeSearchUi();
-      return;
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      if (event.shiftKey) {
-        this.replaceEverything();
-      } else {
-        this.replaceOne();
-      }
-      return;
-    }
+    this.searchService.openSearchUi(showReplace);
   }
 
   private buildEditorThemeExtension(theme: 'dark' | 'light') {
@@ -1237,41 +944,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private computeRequestBlockIndexFromTree(state: EditorState): Array<{ from: number; to: number; index: number }> {
-    const blocks: Array<{ from: number; to: number; index: number }> = [];
-
-    let inRequest = false;
-    let currentFrom: number | null = null;
-    let index = 0;
-
-    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
-      const line = state.doc.line(lineNo);
-      const text = line.text;
-
-      if (isSeparatorLine(text)) {
-        if (inRequest && currentFrom !== null) {
-          const end = line.from - 1;
-          if (end > currentFrom) {
-            blocks.push({ from: currentFrom, to: end, index });
-            index++;
-          }
-        }
-        inRequest = false;
-        currentFrom = null;
-        continue;
-      }
-
-      if (isMethodLine(text) && !inRequest) {
-        inRequest = true;
-        currentFrom = line.from;
-      }
-    }
-
-    if (inRequest && currentFrom !== null) {
-      blocks.push({ from: currentFrom, to: state.doc.length, index });
-    }
-
-    return blocks;
+  private computeRequestBlockIndexFromTree(state: EditorState): RequestBlock[] {
+    return computeRequestBlockIndex(state.doc);
   }
 
   private createLintExtensions() {
@@ -1287,47 +961,12 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   private getRequestIndexAtPos(state: EditorState, pos: number): number | null {
     // Fast path: if Lezer parsed this position into a RequestBlock, use the cached range index.
-    if (this.requestBlockIndex.length) {
-      let lo = 0;
-      let hi = this.requestBlockIndex.length - 1;
-      while (lo <= hi) {
-        const mid = (lo + hi) >> 1;
-        const block = this.requestBlockIndex[mid];
-        if (pos < block.from) {
-          hi = mid - 1;
-        } else if (pos > block.to) {
-          lo = mid + 1;
-        } else {
-          return block.index;
-        }
-      }
-    }
+    const fastResult = findRequestIndexByPos(this.requestBlockIndex, pos);
+    if (fastResult !== null) return fastResult;
 
     // Fallback: compute request index by counting method lines up to `pos`.
     // This is slower (O(lines)) but robust when Lezer doesn't produce RequestBlock ranges
     // (e.g., when top-level annotations confuse the parser).
-    let idx = -1;
-    let inRequest = false;
-    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
-      const line = state.doc.line(lineNo);
-      const text = line.text;
-
-      if (isSeparatorLine(text)) {
-        inRequest = false;
-      } else if (isMethodLine(text)) {
-        if (!inRequest) {
-          idx++;
-          inRequest = true;
-        }
-      }
-
-      if (pos <= line.to) {
-        break;
-      }
-    }
-
-    if (idx < 0) return null;
-    if (idx >= this.requests().length) return null;
-    return idx;
+    return computeRequestIndexAtPosFallback(state.doc, pos, this.requests().length);
   }
 }

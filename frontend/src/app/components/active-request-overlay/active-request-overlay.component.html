@@ -1,0 +1,94 @@
+<div class="rr-active-overlay" style="bottom: calc(var(--rr-console-offset, 0px) + 5rem);">
+  @if (activeRequestInfo; as info) {
+    <div class="glass-panel floating-overlay rr-active-card">
+        <div class="rr-active-card__top">
+            <div class="rr-active-card__title">
+                <span
+                    class="rr-active-dot"
+                    [class.rr-active-dot--cancelling]="isCancelling"
+                ></span>
+                <div>
+                    <p class="rr-active-card__label">{{ info.label }}</p>
+                    <small class="rr-active-card__meta">{{ meta }}</small>
+                </div>
+            </div>
+            <button
+                type="button"
+                class="rr-btn rr-btn--pill rr-btn--danger btn-ambient"
+                (click)="cancelRequest()"
+                [disabled]="!info.canCancel || isCancelling"
+            >
+                {{ isCancelling ? 'Canceling...' : 'Cancel request' }}
+            </button>
+        </div>
+
+        <div class="rr-active-card__details">
+            <div class="rr-active-card__details-top">
+                <span class="rr-pill rr-pill--method">
+                    {{ activeRequest?.method || '—' }}
+                </span>
+                <span class="rr-active-card__status">
+                    {{ info.type === 'load' ? 'Load test running' : info.type === 'chain' ? 'Chained request running' : 'Request running' }}
+                </span>
+            </div>
+
+            @if (info.type === 'load') {
+                <div class="rr-active-row">
+                    <div class="rr-active-row__label">Users</div>
+                    <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
+                        <defs>
+                            <clipPath id="usersSparklineClip">
+                                <rect x="0" y="0" width="100" height="20"></rect>
+                            </clipPath>
+                        </defs>
+                        <g [attr.transform]="loadTestViz.loadUsersSparklineTransformView || null" [attr.clip-path]="'url(#usersSparklineClip)'">
+                            <path
+                                [attr.d]="loadTestViz.loadUsersSparklinePathDView"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="rr-color-primary"
+                            ></path>
+                        </g>
+                    </svg>
+                    <div class="rr-active-row__value">
+                        {{ activeRunProgress?.activeUsers ?? 0 }}/{{ activeRunProgress?.maxUsers ?? '—' }}
+                    </div>
+                </div>
+
+                <div class="rr-active-row">
+                    <div class="rr-active-row__label">RPS</div>
+                    <svg viewBox="0 0 100 20" preserveAspectRatio="none" class="rr-active-row__spark">
+                        <defs>
+                            <clipPath id="rpsSparklineClip">
+                                <rect x="0" y="0" width="100" height="20"></rect>
+                            </clipPath>
+                        </defs>
+                        <g [attr.transform]="loadTestViz.loadRpsSparklineTransformView || null" [attr.clip-path]="'url(#rpsSparklineClip)'">
+                            <path
+                                [attr.d]="loadTestViz.loadRpsSparklinePathDView"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="1.5"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                class="rr-color-accent"
+                            ></path>
+                        </g>
+                    </svg>
+                    <div class="rr-active-row__value">
+                        {{ loadTestViz.currentLoadRpsView | number:'1.0-0' }}
+                    </div>
+                </div>
+            }
+
+            <div class="rr-active-card__name">
+                {{ activeRequest?.name || 'Waiting for request selection' }}
+            </div>
+            <pre class="rr-active-card__preview"><code>{{ preview }}</code></pre>
+        </div>
+    </div>
+  }
+</div>

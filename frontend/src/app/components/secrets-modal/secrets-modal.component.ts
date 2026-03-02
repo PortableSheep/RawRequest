@@ -1,11 +1,21 @@
-import { Component, effect, HostListener, input, output } from '@angular/core';
+import { Component, computed, effect, HostListener, inject } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
-import { SecretIndex, VaultInfo } from '../../services/secret.service';
+import { SecretService } from '../../services/secret.service';
+import { ToastService } from '../../services/toast.service';
+import { PanelVisibilityService } from '../../services/panel-visibility.service';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
 import {
   SecretRow, SortColumn, SortDirection,
   buildSecretRows, sortSecretRows, filterSecretRows, countSecretUsage, toggleSort
 } from './secrets-modal.logic';
+import {
+  normalizeEnvName,
+  buildSecretSavedToast,
+  buildSecretDeletedToast,
+  buildVaultExportedToast,
+  buildVaultFileName,
+} from '../../logic/app/app.component.logic';
 
 @Component({
   selector: 'app-secrets-modal',
@@ -15,12 +25,16 @@ import {
   styleUrls: ['./secrets-modal.component.scss']
 })
 export class SecretsModalComponent {
-  isOpen = input<boolean>(false);
-  selectedEnv = input<string>('');
-  environments = input<string[]>([]);
-  allSecrets = input<SecretIndex>({});
-  vaultInfo = input<VaultInfo | null>(null);
-  fileContent = input<string>('');
+  private readonly secretService = inject(SecretService);
+  private readonly toast = inject(ToastService);
+  readonly panels = inject(PanelVisibilityService);
+  private readonly ws = inject(WorkspaceStateService);
+
+  readonly isOpen = this.panels.showSecretsModal;
+  readonly environments = this.ws.currentFileEnvironments;
+  readonly allSecrets = computed(() => this.secretService.allSecrets);
+  readonly vaultInfo = computed(() => this.secretService.vaultInfo);
+  readonly fileContent = computed(() => this.ws.currentFileView().content);
 
   // Internal form state
   targetEnv = '';
@@ -34,6 +48,10 @@ export class SecretsModalComponent {
   sortColumn: SortColumn = 'key';
   sortDirection: SortDirection = 'asc';
   filterQuery = '';
+
+  // Delete confirmation state
+  showDeleteConfirm = false;
+  secretToDelete: { env: string; key: string } | null = null;
 
   private wasOpen = false;
 
@@ -50,19 +68,13 @@ export class SecretsModalComponent {
         this.showMasterPasswordPrompt = false;
         this.masterPasswordInput = '';
         this.masterPasswordError = '';
+        this.showDeleteConfirm = false;
+        this.secretToDelete = null;
+        void this.secretService.loadVaultInfo();
       }
       this.wasOpen = open;
     });
   }
-
-  onClose = output<void>();
-  onSave = output<{env: string, key: string, value: string}>();
-  onDeleteClick = output<{env: string, key: string}>();
-  onExport = output<void>();
-  onResetVault = output<void>();
-  onSetMasterPassword = output<string>();
-  onVerifyMasterPassword = output<string>();
-  onGetSecretValue = output<{env: string, key: string}>();
 
   Object = Object;
 
@@ -77,6 +89,10 @@ export class SecretsModalComponent {
   @HostListener('document:keydown.escape')
   handleEscape(): void {
     if (!this.isOpen()) return;
+    if (this.showDeleteConfirm) {
+      this.cancelDelete();
+      return;
+    }
     if (this.showMasterPasswordPrompt) {
       this.showMasterPasswordPrompt = false;
       return;
@@ -85,12 +101,16 @@ export class SecretsModalComponent {
       this.cancelReset();
       return;
     }
-    this.onClose.emit();
+    this.close();
+  }
+
+  close(): void {
+    this.panels.showSecretsModal.set(false);
   }
 
   handleShellClick(event: MouseEvent): void {
     if (event.target === event.currentTarget) {
-      this.onClose.emit();
+      this.close();
     }
   }
 
@@ -98,7 +118,6 @@ export class SecretsModalComponent {
     this.showValue = !this.showValue;
   }
 
-  /** Build sorted, filtered rows for the table */
   getDisplayRows(): SecretRow[] {
     const usageCounts = countSecretUsage(this.fileContent());
     const rows = buildSecretRows(this.allSecrets(), usageCounts);
@@ -117,21 +136,59 @@ export class SecretsModalComponent {
     return this.sortDirection === 'asc' ? ' ▲' : ' ▼';
   }
 
-  handleSave() {
-    if (!this.newKey || !this.newValue) {
-      return;
+  async handleSave() {
+    if (!this.newKey || !this.newValue) return;
+    const normalizedEnv = normalizeEnvName(this.targetEnv);
+    try {
+      await this.secretService.saveSecret(normalizedEnv, this.newKey, this.newValue);
+      this.toast.success(buildSecretSavedToast({ key: this.newKey, env: normalizedEnv }));
+      this.newKey = '';
+      this.newValue = '';
+    } catch (error) {
+      console.error('Failed to save secret', error);
+      this.toast.error('Failed to save secret');
     }
-    this.onSave.emit({
-      env: this.targetEnv,
-      key: this.newKey,
-      value: this.newValue
-    });
-    this.newKey = '';
-    this.newValue = '';
   }
 
-  triggerExport() {
-    this.onExport.emit();
+  // --- Delete flow ---
+
+  confirmDeleteSecret(env: string, key: string): void {
+    this.secretToDelete = { env, key };
+    this.showDeleteConfirm = true;
+  }
+
+  async deleteSecret(): Promise<void> {
+    try {
+      const deletedKey = await this.secretService.deleteConfirmedSecret();
+      if (deletedKey) {
+        this.toast.info(buildSecretDeletedToast(deletedKey));
+      }
+    } catch (error) {
+      console.error('Failed to delete secret', error);
+      this.toast.error('Failed to delete secret');
+    }
+    this.showDeleteConfirm = false;
+    this.secretToDelete = null;
+  }
+
+  cancelDelete(): void {
+    this.showDeleteConfirm = false;
+    this.secretToDelete = null;
+    this.secretService.cancelDeleteSecret();
+  }
+
+  // --- Export / Reset ---
+
+  async triggerExport(): Promise<void> {
+    try {
+      const payload = await this.secretService.exportVault();
+      const fileName = buildVaultFileName(new Date());
+      this.downloadSecretsFile(payload, fileName);
+      this.toast.success(buildVaultExportedToast(fileName));
+    } catch (error) {
+      console.error('Failed to export secrets', error);
+      this.toast.error('Failed to export secrets');
+    }
   }
 
   confirmReset() {
@@ -144,9 +201,15 @@ export class SecretsModalComponent {
     this.resetConfirmText = '';
   }
 
-  executeReset() {
+  async executeReset(): Promise<void> {
     if (!this.isResetEnabled) return;
-    this.onResetVault.emit();
+    try {
+      await this.secretService.resetVaultAndClear();
+      this.toast.info('Vault reset. Add new secrets to continue.');
+    } catch (error) {
+      console.error('Failed to reset vault', error);
+      this.toast.error('Failed to reset vault');
+    }
     this.showResetConfirm = false;
     this.resetConfirmText = '';
   }
@@ -177,32 +240,51 @@ export class SecretsModalComponent {
     this.revealedValues = {};
   }
 
-  /** Called by parent when master password is verified or set successfully */
-  onMasterPasswordVerified() {
-    this.showMasterPasswordPrompt = false;
-    this.isValuesRevealed = true;
-  }
-
-  /** Called by parent when master password verification fails */
-  onMasterPasswordFailed(message: string) {
-    this.masterPasswordError = message;
-  }
-
-  /** Called by parent to provide a revealed value */
-  setRevealedValue(env: string, key: string, value: string) {
-    this.revealedValues[`${env}:${key}`] = value;
-  }
-
   getRevealedValue(env: string, key: string): string | undefined {
     return this.revealedValues[`${env}:${key}`];
   }
 
-  submitMasterPassword() {
-    if (!this.masterPasswordInput) return;
-    if (this.masterPasswordMode === 'set') {
-      this.onSetMasterPassword.emit(this.masterPasswordInput);
-    } else {
-      this.onVerifyMasterPassword.emit(this.masterPasswordInput);
+  async loadSecretValue(env: string, key: string): Promise<void> {
+    try {
+      const value = await this.secretService.getSecretValue(env, key);
+      this.revealedValues[`${env}:${key}`] = value;
+    } catch (error) {
+      console.error('Failed to get secret value', error);
+      this.revealedValues[`${env}:${key}`] = '(error)';
     }
+  }
+
+  async submitMasterPassword(): Promise<void> {
+    if (!this.masterPasswordInput) return;
+    try {
+      if (this.masterPasswordMode === 'set') {
+        await this.secretService.setMasterPasswordAndRefresh(this.masterPasswordInput);
+        this.showMasterPasswordPrompt = false;
+        this.isValuesRevealed = true;
+      } else {
+        const valid = await this.secretService.verifyMasterPassword(this.masterPasswordInput);
+        if (valid) {
+          this.showMasterPasswordPrompt = false;
+          this.isValuesRevealed = true;
+        } else {
+          this.masterPasswordError = 'Incorrect password';
+        }
+      }
+    } catch (error) {
+      console.error('Master password operation failed', error);
+      this.masterPasswordError = this.masterPasswordMode === 'set'
+        ? 'Failed to set password'
+        : 'Verification failed';
+    }
+  }
+
+  private downloadSecretsFile(content: string, fileName: string): void {
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = fileName;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 }

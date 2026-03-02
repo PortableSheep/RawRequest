@@ -1,5 +1,7 @@
-import { Component, input, output } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import type { HistoryItem } from '../../models/http.models';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { PanelVisibilityService } from '../../services/panel-visibility.service';
 
 @Component({
   selector: 'app-history-sidebar',
@@ -9,14 +11,15 @@ import type { HistoryItem } from '../../models/http.models';
   styleUrls: ['./history-sidebar.component.scss']
 })
 export class HistorySidebarComponent {
-  isOpen = input<boolean>(false);
-  history = input<HistoryItem[]>([]);
-  selectedItem = input<HistoryItem | null>(null);
-
-  onClose = output<void>();
-  onItemClick = output<HistoryItem>();
+  readonly ws = inject(WorkspaceStateService);
+  readonly panels = inject(PanelVisibilityService);
 
   constructor() {}
+
+  viewHistory(item: HistoryItem): void {
+    this.ws.selectedHistoryItem.set(item);
+    this.panels.showHistoryModal.set(true);
+  }
 
   formatTime(date: Date): string {
     const now = new Date();

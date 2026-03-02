@@ -1,5 +1,5 @@
 <div class="outline-drawer"
-     [class.outline-drawer--open]="isOpen()"
+     [class.outline-drawer--open]="panels.showOutlinePanel()"
      tabindex="-1">
   <div class="outline-drawer__header">
     <div class="outline-drawer__title">
@@ -10,7 +10,7 @@
     </div>
     <button type="button"
             class="rr-icon-btn outline-drawer__close"
-            (click)="onClose.emit()"
+            (click)="panels.showOutlinePanel.set(false)"
             aria-label="Close outline">
       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
            fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -40,7 +40,7 @@
       }
       @for (entry of group.entries; track entry.requestIndex) {
         <button class="outline-entry"
-                [class.outline-entry--active]="activeRequestIndex() === entry.requestIndex"
+                [class.outline-entry--active]="reqExec.pendingRequestIndex === entry.requestIndex"
                 [class.outline-entry--grouped]="!!group.name"
                 (click)="selectRequest(entry.requestIndex)"
                 type="button">
@@ -60,6 +60,6 @@
   </div>
 </div>
 
-@if (isOpen()) {
-  <div class="outline-drawer__backdrop" (click)="onClose.emit()"></div>
+@if (panels.showOutlinePanel()) {
+  <div class="outline-drawer__backdrop" (click)="panels.showOutlinePanel.set(false)"></div>
 }

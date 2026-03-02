@@ -1,0 +1,82 @@
+@if (searchUi.open) {
+	<div class="editor-search" (mousedown)="$event.stopPropagation()">
+		<div class="editor-search__row">
+			<input
+				#findInput
+				type="text"
+				class="editor-search__input"
+				placeholder="Find"
+				[value]="searchUi.query"
+				(input)="searchService.onFindInput($event)"
+				(keydown)="searchService.onFindKeydown($event)"
+			/>
+			<button type="button" class="editor-search__btn" (click)="searchService.searchPrev()" title="Previous (Shift+Enter)">
+				Prev
+			</button>
+			<button type="button" class="editor-search__btn" (click)="searchService.searchNext()" title="Next (Enter)">
+				Next
+			</button>
+			<button type="button" class="editor-search__btn" (click)="searchService.selectAllMatches()" title="Select all matches">
+				All
+			</button>
+			<div class="editor-search__toggles">
+				<button
+					type="button"
+					class="editor-search__toggle"
+					[class.is-active]="searchUi.caseSensitive"
+					(click)="searchService.toggleCaseSensitive()"
+					title="Match case"
+				>
+					Aa
+				</button>
+				<button
+					type="button"
+					class="editor-search__toggle"
+					[class.is-active]="searchUi.regexp"
+					(click)="searchService.toggleRegexp()"
+					title="Use regular expression"
+				>
+					.*
+				</button>
+				<button
+					type="button"
+					class="editor-search__toggle"
+					[class.is-active]="searchUi.wholeWord"
+					(click)="searchService.toggleWholeWord()"
+					title="Match whole word"
+				>
+					W
+				</button>
+			</div>
+			@if (searchUiStatsText) {
+				<div class="editor-search__meta" [title]="searchUiStatsText">{{ searchUiStatsText }}</div>
+			}
+			<button type="button" class="editor-search__btn" (click)="searchService.toggleReplaceUi()" title="Toggle replace (Cmd/Ctrl+H)">
+				Replace
+			</button>
+			<button type="button" class="editor-search__close" (click)="searchService.closeSearchUi()" aria-label="Close">
+				×
+			</button>
+		</div>
+
+		@if (searchUi.showReplace) {
+			<div class="editor-search__row">
+				<input
+					#replaceInput
+					type="text"
+					class="editor-search__input"
+					placeholder="Replace"
+					[value]="searchUi.replace"
+					(input)="searchService.onReplaceInput($event)"
+					(keydown)="searchService.onReplaceKeydown($event)"
+				/>
+				<button type="button" class="editor-search__btn" (click)="searchService.replaceOne()" [disabled]="isBusy()">
+					Replace
+				</button>
+				<button type="button" class="editor-search__btn" (click)="searchService.replaceEverything()" [disabled]="isBusy()">
+					All
+				</button>
+			</div>
+		}
+	</div>
+}

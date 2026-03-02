@@ -5,10 +5,10 @@
             (dragover)="handleTabStripDragOver($event)"
             (drop)="handleTabStripDrop($event)"
         >
-            @for (file of files(); track file.id; let i = $index) {
+            @for (file of ws.files(); track file.id; let i = $index) {
                 <li class="rr-tab"
                     draggable="true"
-                    [class.rr-tab--active]="currentFileIndex() === i"
+                    [class.rr-tab--active]="ws.currentFileIndex() === i"
                     [class.rr-tab--dragging]="draggingIndex === i"
                     [class.rr-tab--dragover]="dragOverIndex === i"
                     (dragstart)="handleTabDragStart($event, i)"
@@ -21,7 +21,7 @@
                         class="rr-tab__link"
                         aria-current="page"
                         href="#"
-                        (click)="$event.preventDefault(); onFileSelect.emit(i)"
+                        (click)="$event.preventDefault(); ws.onCurrentFileIndexChange(i)"
                     >
                         <span class="rr-tab__title" [title]="file.displayName || file.name">
                           {{file.displayName || file.name}}
@@ -31,7 +31,7 @@
                             type="button"
                             class="rr-icon-btn rr-icon-btn--danger"
                             draggable="false"
-                            (click)="$event.stopPropagation(); $event.preventDefault(); onCloseFile.emit(i)"
+                            (click)="$event.stopPropagation(); $event.preventDefault(); ws.closeTab(i)"
                             title="Close File"
                         >
                             <span class="rr-sr-only">Close file</span>
@@ -51,7 +51,7 @@
             @if (contextMenu.filePath) {
                 <button type="button"
                         class="rr-menu__item"
-                        (click)="revealInFinder()">
+                        (click)="handleRevealInFinder()">
                     <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z"/><path d="M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2" /></svg>
                     <span>Reveal in Finder</span>
                 </button>
@@ -77,18 +77,18 @@
     }
 
     <div class="rr-topbar__right">
-        @if (appVersion()) {
+        @if (startup.updateService.appVersion()) {
             <span class="rr-badge">
-                v{{ appVersion() }}
+                v{{ startup.updateService.appVersion() }}
             </span>
         }
         <div class="rr-select-wrap">
-            @if(environments().length > 0) {
+            @if(ws.currentFileEnvironments().length > 0) {
                 <select class="rr-select"
-                    [ngModel]="selectedEnv()"
-                    (ngModelChange)="onEnvChange.emit($event)"
+                    [ngModel]="ws.currentEnv()"
+                    (ngModelChange)="ws.onCurrentEnvChange($event)"
                 >
-                    @for (env of environments(); track env) {
+                    @for (env of ws.currentFileEnvironments(); track env) {
                         <option [value]="env">{{env}}</option>
                     }
                 </select>
@@ -107,7 +107,7 @@
         <button
             type="button"
             class="rr-btn btn-ambient"
-            (click)="onNewFile.emit()"
+            (click)="ws.addNewTab()"
             title="New File"
             aria-label="Create new file"
         >
@@ -118,7 +118,7 @@
         <button
                 type="button"
                 class="rr-btn btn-ambient"
-                (click)="onOpenFile.emit()"
+                (click)="openFile()"
                 title="Open File"
                 aria-label="Open existing file"
         >
@@ -131,7 +131,7 @@
             <button
                     type="button"
                     class="rr-btn btn-ambient rr-split-btn__main"
-                    (click)="onSaveFile.emit(); closeSaveMenu()"
+                    (click)="handleSaveClick()"
                     title="Save File"
                     aria-label="Save file"
             >
