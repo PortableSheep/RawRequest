@@ -6,7 +6,7 @@ import {
 describe('backend-client-config', () => {
   it('resolves service backend base url with precedence and normalization', () => {
     const storage = {
-      getItem: jest.fn().mockReturnValue('http://localhost:9000///'),
+      getItem: vi.fn().mockReturnValue('http://localhost:9000///'),
     };
 
     expect(resolveServiceBackendBaseUrl({ __RAWREQUEST_BACKEND_BASE_URL: 'http://127.0.0.1:7777/' }, storage as any)).toBe('http://127.0.0.1:7777');

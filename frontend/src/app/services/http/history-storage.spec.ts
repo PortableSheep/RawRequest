@@ -47,7 +47,7 @@ describe('history-storage', () => {
         const base = p.split('/').pop() || '';
         return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
       },
-      log: { error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
+      log: { error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
     };
 
     return { deps, store };

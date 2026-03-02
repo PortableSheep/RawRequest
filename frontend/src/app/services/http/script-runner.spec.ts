@@ -2,7 +2,7 @@ import { runScript } from './script-runner';
 
 describe('script-runner', () => {
   it('no-ops on empty script', async () => {
-    const recordConsole = jest.fn();
+    const recordConsole = vi.fn();
     const assertions = await runScript('', {}, 'custom', {
       cleanScript: (s) => s,
       recordConsole,

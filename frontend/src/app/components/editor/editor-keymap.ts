@@ -1,8 +1,6 @@
 import { keymap } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
 import type { EditorState } from '@codemirror/state';
-import { foldKeymap } from '@codemirror/language';
-import { searchKeymap } from '@codemirror/search';
 
 function toggleLineCommentAndAdvance(view: { state: EditorState; dispatch: (tr: any) => void }): boolean {
   const { state } = view;
@@ -125,10 +123,10 @@ export function createEditorKeymap(opts: EditorKeymapOptions): Extension {
           let indentToRemove = '';
           if (lineText.startsWith('\t')) {
             indentToRemove = '\t';
-          } else if (lineText.startsWith('  ')) {
-            indentToRemove = '  ';
           } else if (lineText.startsWith('    ')) {
             indentToRemove = '    ';
+          } else if (lineText.startsWith('  ')) {
+            indentToRemove = '  ';
           }
 
           if (indentToRemove) {
@@ -177,7 +175,5 @@ export function createEditorKeymap(opts: EditorKeymapOptions): Extension {
         return true;
       }
     },
-    ...searchKeymap,
-    ...foldKeymap
   ]);
 }

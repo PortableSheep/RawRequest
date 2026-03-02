@@ -24,10 +24,10 @@ describe('load-test-backend', () => {
 
   it('wires events, forwards progress, and resolves on done', async () => {
     const ev = createEventsOn();
-    const startLoadTest = jest.fn().mockResolvedValue(undefined);
-    const hydrateText = jest.fn(async (text: string) => text.replace('SECRET', 's3cr3t'));
-    const hydrateHeaders = jest.fn(async (headers?: Record<string, string>) => ({ ...(headers || {}), X: '1' }));
-    const normalizeEnvName = jest.fn((env?: string) => env || 'default');
+    const startLoadTest = vi.fn().mockResolvedValue(undefined);
+    const hydrateText = vi.fn(async (text: string) => text.replace('SECRET', 's3cr3t'));
+    const hydrateHeaders = vi.fn(async (headers?: Record<string, string>) => ({ ...(headers || {}), X: '1' }));
+    const normalizeEnvName = vi.fn((env?: string) => env || 'default');
 
     const progress: any[] = [];
 
@@ -119,7 +119,7 @@ describe('load-test-backend', () => {
 
   it('rejects on loadtest:error and cleans up', async () => {
     const ev = createEventsOn();
-    const startLoadTest = jest.fn().mockResolvedValue(undefined);
+    const startLoadTest = vi.fn().mockResolvedValue(undefined);
 
     const promise = executeLoadTestViaBackend(
       {
