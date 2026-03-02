@@ -18,7 +18,7 @@ describe('editor-clipboard.utils', () => {
   describe('writeClipboardText', () => {
     it('returns true when Clipboard API succeeds', async () => {
       Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText: jest.fn().mockResolvedValue(undefined) },
+        value: { writeText: vi.fn().mockResolvedValue(undefined) },
         writable: true,
         configurable: true
       });
@@ -28,11 +28,11 @@ describe('editor-clipboard.utils', () => {
 
     it('falls back to execCommand when Clipboard API fails', async () => {
       Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+        value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
         writable: true,
         configurable: true
       });
-      (document as any).execCommand = jest.fn().mockReturnValue(true);
+      (document as any).execCommand = vi.fn().mockReturnValue(true);
       expect(await writeClipboardText('test')).toBe(true);
       expect(document.execCommand).toHaveBeenCalledWith('copy');
       delete (document as any).execCommand;
@@ -40,11 +40,11 @@ describe('editor-clipboard.utils', () => {
 
     it('returns false when both methods fail', async () => {
       Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText: jest.fn().mockRejectedValue(new Error('denied')) },
+        value: { writeText: vi.fn().mockRejectedValue(new Error('denied')) },
         writable: true,
         configurable: true
       });
-      (document as any).execCommand = jest.fn().mockImplementation(() => {
+      (document as any).execCommand = vi.fn().mockImplementation(() => {
         throw new Error('blocked');
       });
       expect(await writeClipboardText('test')).toBe(false);
@@ -55,7 +55,7 @@ describe('editor-clipboard.utils', () => {
   describe('readClipboardText', () => {
     it('returns text when Clipboard API succeeds', async () => {
       Object.defineProperty(navigator, 'clipboard', {
-        value: { readText: jest.fn().mockResolvedValue('pasted') },
+        value: { readText: vi.fn().mockResolvedValue('pasted') },
         writable: true,
         configurable: true
       });
@@ -64,7 +64,7 @@ describe('editor-clipboard.utils', () => {
 
     it('returns null when Clipboard API fails', async () => {
       Object.defineProperty(navigator, 'clipboard', {
-        value: { readText: jest.fn().mockRejectedValue(new Error('denied')) },
+        value: { readText: vi.fn().mockRejectedValue(new Error('denied')) },
         writable: true,
         configurable: true
       });

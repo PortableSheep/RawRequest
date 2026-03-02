@@ -8,54 +8,54 @@ import type { Request, ResponseData, HistoryItem, LoadTestResults, FileTab } fro
 
 // ── Mocks ──────────────────────────────────────────────────────
 
-function createBackendMock(): jest.Mocked<BackendClientContract> {
+function createBackendMock(): vi.Mocked<BackendClientContract> {
   return {
-    sendRequest: jest.fn().mockResolvedValue(''),
-    sendRequestWithID: jest.fn().mockResolvedValue(''),
-    sendRequestWithTimeout: jest.fn().mockResolvedValue(''),
-    executeRequests: jest.fn().mockResolvedValue(''),
-    executeRequestsWithID: jest.fn().mockResolvedValue(''),
-    cancelRequest: jest.fn().mockResolvedValue(undefined),
-    startLoadTest: jest.fn().mockResolvedValue(undefined),
-    setVariable: jest.fn().mockResolvedValue(undefined),
-    getVariable: jest.fn().mockResolvedValue(''),
-    loadFileHistoryFromDir: jest.fn().mockResolvedValue('[]'),
-    loadFileHistoryFromRunLocation: jest.fn().mockResolvedValue('[]'),
-    saveResponseFile: jest.fn().mockResolvedValue(''),
-    saveResponseFileToRunLocation: jest.fn().mockResolvedValue(''),
-    getScriptLogs: jest.fn().mockResolvedValue([]),
-    clearScriptLogs: jest.fn().mockResolvedValue(undefined),
-    recordScriptLog: jest.fn().mockResolvedValue(undefined),
-    listSecrets: jest.fn().mockResolvedValue({}),
-    saveSecret: jest.fn().mockResolvedValue({}),
-    deleteSecret: jest.fn().mockResolvedValue({}),
-    getSecretValue: jest.fn().mockResolvedValue(''),
-    getVaultInfo: jest.fn().mockResolvedValue(null),
-    hasMasterPassword: jest.fn().mockResolvedValue(false),
-    setMasterPassword: jest.fn().mockResolvedValue(undefined),
-    verifyMasterPassword: jest.fn().mockResolvedValue(false),
-    resetVault: jest.fn().mockResolvedValue({}),
-    exportSecrets: jest.fn().mockResolvedValue({}),
+    sendRequest: vi.fn().mockResolvedValue(''),
+    sendRequestWithID: vi.fn().mockResolvedValue(''),
+    sendRequestWithTimeout: vi.fn().mockResolvedValue(''),
+    executeRequests: vi.fn().mockResolvedValue(''),
+    executeRequestsWithID: vi.fn().mockResolvedValue(''),
+    cancelRequest: vi.fn().mockResolvedValue(undefined),
+    startLoadTest: vi.fn().mockResolvedValue(undefined),
+    setVariable: vi.fn().mockResolvedValue(undefined),
+    getVariable: vi.fn().mockResolvedValue(''),
+    loadFileHistoryFromDir: vi.fn().mockResolvedValue('[]'),
+    loadFileHistoryFromRunLocation: vi.fn().mockResolvedValue('[]'),
+    saveResponseFile: vi.fn().mockResolvedValue(''),
+    saveResponseFileToRunLocation: vi.fn().mockResolvedValue(''),
+    getScriptLogs: vi.fn().mockResolvedValue([]),
+    clearScriptLogs: vi.fn().mockResolvedValue(undefined),
+    recordScriptLog: vi.fn().mockResolvedValue(undefined),
+    listSecrets: vi.fn().mockResolvedValue({}),
+    saveSecret: vi.fn().mockResolvedValue({}),
+    deleteSecret: vi.fn().mockResolvedValue({}),
+    getSecretValue: vi.fn().mockResolvedValue(''),
+    getVaultInfo: vi.fn().mockResolvedValue(null),
+    hasMasterPassword: vi.fn().mockResolvedValue(false),
+    setMasterPassword: vi.fn().mockResolvedValue(undefined),
+    verifyMasterPassword: vi.fn().mockResolvedValue(false),
+    resetVault: vi.fn().mockResolvedValue({}),
+    exportSecrets: vi.fn().mockResolvedValue({}),
   };
 }
 
-function createScriptConsoleMock(): jest.Mocked<Pick<ScriptConsoleService, 'init' | 'record'>> {
+function createScriptConsoleMock(): vi.Mocked<Pick<ScriptConsoleService, 'init' | 'record'>> {
   return {
-    init: jest.fn().mockResolvedValue(undefined),
-    record: jest.fn().mockResolvedValue(undefined),
+    init: vi.fn().mockResolvedValue(undefined),
+    record: vi.fn().mockResolvedValue(undefined),
   };
 }
 
-function createSecretServiceMock(): jest.Mocked<Pick<SecretService, 'replaceSecrets'>> {
+function createSecretServiceMock(): vi.Mocked<Pick<SecretService, 'replaceSecrets'>> {
   return {
-    replaceSecrets: jest.fn().mockImplementation((input: string) => Promise.resolve(input)),
+    replaceSecrets: vi.fn().mockImplementation((input: string) => Promise.resolve(input)),
   };
 }
 
-function createEventTransportMock(): { mock: jest.Mocked<Pick<EventTransportService, 'on'>>; triggerEvent: (event: string, data: any) => void } {
+function createEventTransportMock(): { mock: vi.Mocked<Pick<EventTransportService, 'on'>>; triggerEvent: (event: string, data: any) => void } {
   const listeners = new Map<string, Set<(data: any) => void>>();
-  const mock: jest.Mocked<Pick<EventTransportService, 'on'>> = {
-    on: jest.fn().mockImplementation((event: string, callback: (data: any) => void) => {
+  const mock: vi.Mocked<Pick<EventTransportService, 'on'>> = {
+    on: vi.fn().mockImplementation((event: string, callback: (data: any) => void) => {
       let set = listeners.get(event);
       if (!set) {
         set = new Set();

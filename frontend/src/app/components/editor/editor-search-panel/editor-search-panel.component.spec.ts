@@ -17,21 +17,21 @@ function createMockSearchService(): Partial<EditorSearchService> {
   return {
     searchUi: { ...defaultState },
     searchUiStatsText: '',
-    registerPanelCallbacks: jest.fn(),
-    onFindInput: jest.fn(),
-    onFindKeydown: jest.fn(),
-    onReplaceInput: jest.fn(),
-    onReplaceKeydown: jest.fn(),
-    searchNext: jest.fn(),
-    searchPrev: jest.fn(),
-    selectAllMatches: jest.fn(),
-    replaceOne: jest.fn(),
-    replaceEverything: jest.fn(),
-    toggleCaseSensitive: jest.fn(),
-    toggleRegexp: jest.fn(),
-    toggleWholeWord: jest.fn(),
-    toggleReplaceUi: jest.fn(),
-    closeSearchUi: jest.fn()
+    registerPanelCallbacks: vi.fn(),
+    onFindInput: vi.fn(),
+    onFindKeydown: vi.fn(),
+    onReplaceInput: vi.fn(),
+    onReplaceKeydown: vi.fn(),
+    searchNext: vi.fn(),
+    searchPrev: vi.fn(),
+    selectAllMatches: vi.fn(),
+    replaceOne: vi.fn(),
+    replaceEverything: vi.fn(),
+    toggleCaseSensitive: vi.fn(),
+    toggleRegexp: vi.fn(),
+    toggleWholeWord: vi.fn(),
+    toggleReplaceUi: vi.fn(),
+    closeSearchUi: vi.fn()
   };
 }
 
@@ -56,6 +56,7 @@ describe('EditorSearchPanelComponent', () => {
 
     fixture = TestBed.createComponent(EditorSearchPanelComponent);
     component = fixture.componentInstance;
+    fixture.componentRef.setInput('isBusy', false);
     fixture.detectChanges();
   });
 
@@ -75,6 +76,7 @@ describe('EditorSearchPanelComponent', () => {
 
   it('should not render anything when search is closed', () => {
     mockSearchService.searchUi = { ...mockSearchService.searchUi!, open: false };
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.editor-search')).toBeNull();
@@ -100,6 +102,7 @@ describe('EditorSearchPanelComponent', () => {
 
   it('should show replace row when showReplace is true', () => {
     mockSearchService.searchUi = { ...mockSearchService.searchUi!, showReplace: true };
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const rows = fixture.nativeElement.querySelectorAll('.editor-search__row');
     expect(rows.length).toBe(2);
@@ -107,6 +110,7 @@ describe('EditorSearchPanelComponent', () => {
 
   it('should display stats text when available', () => {
     (mockSearchService as any).searchUiStatsText = '3 of 10';
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const meta: HTMLElement = fixture.nativeElement.querySelector('.editor-search__meta');
     expect(meta?.textContent?.trim()).toBe('3 of 10');
@@ -114,6 +118,7 @@ describe('EditorSearchPanelComponent', () => {
 
   it('should mark case-sensitive toggle as active', () => {
     mockSearchService.searchUi = { ...mockSearchService.searchUi!, caseSensitive: true };
+    fixture.changeDetectorRef.markForCheck();
     fixture.detectChanges();
     const toggles = fixture.nativeElement.querySelectorAll('.editor-search__toggle');
     expect(toggles[0].classList.contains('is-active')).toBe(true);

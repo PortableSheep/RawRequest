@@ -7,11 +7,11 @@ import { ToastService } from './toast.service';
 import { UpdateService } from './update.service';
 import { RequestExecutionService } from './request-execution.service';
 
-const mockEnsureServiceRunning = jest.fn();
-const mockGetExamplesForFirstRun = jest.fn();
-const mockMarkFirstRunComplete = jest.fn();
+const mockEnsureServiceRunning = vi.fn();
+const mockGetExamplesForFirstRun = vi.fn();
+const mockMarkFirstRunComplete = vi.fn();
 
-jest.mock('@wailsjs/go/main/App', () => ({
+vi.mock('@wailsjs/go/main/App', () => ({
   EnsureServiceRunning: (...args: any[]) => mockEnsureServiceRunning(...args),
   GetExamplesForFirstRun: (...args: any[]) => mockGetExamplesForFirstRun(...args),
   MarkFirstRunComplete: (...args: any[]) => mockMarkFirstRunComplete(...args),
@@ -28,24 +28,24 @@ describe('StartupService', () => {
 
   beforeEach(() => {
     mockState = {
-      loadFiles: jest.fn(),
-      addFileFromContent: jest.fn(),
+      loadFiles: vi.fn(),
+      addFileFromContent: vi.fn(),
     };
     mockSecretService = {
-      onMasterPasswordWarning: jest.fn(),
-      refreshSecrets: jest.fn(),
-      onMissingSecret: jest.fn().mockReturnValue(new Subject()),
+      onMasterPasswordWarning: vi.fn(),
+      refreshSecrets: vi.fn(),
+      onMissingSecret: vi.fn().mockReturnValue(new Subject()),
     };
     mockToast = {
-      info: jest.fn(),
+      info: vi.fn(),
     };
     mockUpdate = {
-      init: jest.fn(),
-      checkForUpdates: jest.fn().mockResolvedValue(undefined),
-      appVersion: jest.fn().mockReturnValue('1.0.0'),
+      init: vi.fn(),
+      checkForUpdates: vi.fn().mockResolvedValue(undefined),
+      appVersion: vi.fn().mockReturnValue('1.0.0'),
     };
     mockReqExec = {
-      subscribeToDownloadProgress: jest.fn(),
+      subscribeToDownloadProgress: vi.fn(),
       queuedExecutionRequested: new Subject(),
     };
 
@@ -62,7 +62,7 @@ describe('StartupService', () => {
     service = TestBed.inject(StartupService);
     destroy$ = new Subject<void>();
 
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -75,7 +75,7 @@ describe('StartupService', () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       expect(mockState.loadFiles).toHaveBeenCalled();
       expect(mockSecretService.refreshSecrets).toHaveBeenCalledWith(true);
@@ -85,7 +85,7 @@ describe('StartupService', () => {
     it('should not initialize if backend fails', async () => {
       mockEnsureServiceRunning.mockRejectedValue(new Error('connection refused'));
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       expect(service.serviceStartupError).toContain('connection refused');
       expect(mockState.loadFiles).not.toHaveBeenCalled();
@@ -95,8 +95,8 @@ describe('StartupService', () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      await service.bootstrap(destroy$, jest.fn());
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       expect(mockState.loadFiles).toHaveBeenCalledTimes(1);
     });
@@ -105,7 +105,7 @@ describe('StartupService', () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       expect(mockReqExec.subscribeToDownloadProgress).toHaveBeenCalledWith(destroy$);
     });
@@ -113,16 +113,16 @@ describe('StartupService', () => {
     it('should wire queued execution callback', async () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
-      const onExecute = jest.fn();
+      const onExecute = vi.fn();
 
       await service.bootstrap(destroy$, onExecute);
 
-      jest.useFakeTimers();
+      vi.useFakeTimers();
       mockReqExec.queuedExecutionRequested.next(3);
-      jest.runAllTimers();
+      vi.runAllTimers();
 
       expect(onExecute).toHaveBeenCalledWith(3);
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
   });
 
@@ -136,7 +136,7 @@ describe('StartupService', () => {
       });
       mockMarkFirstRunComplete.mockResolvedValue(undefined);
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
       // checkFirstRun is fire-and-forget; flush microtasks
       await new Promise(resolve => setTimeout(resolve, 0));
 
@@ -152,7 +152,7 @@ describe('StartupService', () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       expect(mockState.addFileFromContent).not.toHaveBeenCalled();
     });
@@ -161,13 +161,13 @@ describe('StartupService', () => {
   describe('retryServiceStartup', () => {
     it('should clear error and re-bootstrap', async () => {
       mockEnsureServiceRunning.mockRejectedValueOnce(new Error('fail'));
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
       expect(service.serviceStartupError).not.toBeNull();
 
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      service.retryServiceStartup(destroy$, jest.fn());
+      service.retryServiceStartup(destroy$, vi.fn());
 
       expect(service.serviceStartupError).toBeNull();
     });
@@ -178,7 +178,7 @@ describe('StartupService', () => {
       mockEnsureServiceRunning.mockResolvedValue(undefined);
       mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
-      await service.bootstrap(destroy$, jest.fn());
+      await service.bootstrap(destroy$, vi.fn());
 
       const callback = mockSecretService.onMasterPasswordWarning.mock.calls[0][0];
       callback();

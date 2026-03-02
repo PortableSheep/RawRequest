@@ -118,7 +118,7 @@ describe('CommandPaletteComponent', () => {
       mockShowCommandPalette.set(true);
       fixture.detectChanges();
 
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.onRequestSelect.subscribe(spy);
 
       const item: HTMLElement = fixture.nativeElement.querySelector('.rr-palette-item');

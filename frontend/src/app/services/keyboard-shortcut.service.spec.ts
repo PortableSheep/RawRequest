@@ -17,8 +17,8 @@ function makeKeyboardEvent(opts: {
     bubbles: true,
     cancelable: true,
   });
-  jest.spyOn(event, 'preventDefault');
-  jest.spyOn(event, 'stopPropagation');
+  vi.spyOn(event, 'preventDefault');
+  vi.spyOn(event, 'stopPropagation');
   return event;
 }
 
@@ -50,7 +50,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should call action when key combo matches with metaKey', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
 
     const event = makeKeyboardEvent({ key: 's', metaKey: true });
@@ -62,7 +62,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should call action when key combo matches with ctrlKey', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
 
     const event = makeKeyboardEvent({ key: 's', ctrlKey: true });
@@ -72,7 +72,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not call action when modifier does not match', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
 
     const event = makeKeyboardEvent({ key: 's' });
@@ -82,7 +82,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not call action when key does not match', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
 
     const event = makeKeyboardEvent({ key: 'p', ctrlKey: true });
@@ -92,7 +92,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should match shift+ctrl combos', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'saveAs', combo: { key: 's', ctrl: true, shift: true }, action });
 
     const event = makeKeyboardEvent({ key: 's', metaKey: true, shiftKey: true });
@@ -102,7 +102,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not trigger shift combo when shift is not pressed', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'saveAs', combo: { key: 's', ctrl: true, shift: true }, action });
 
     const event = makeKeyboardEvent({ key: 's', metaKey: true });
@@ -112,7 +112,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should match key without modifiers (e.g. Escape)', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'escape', combo: { key: 'Escape' }, action });
 
     const event = makeKeyboardEvent({ key: 'Escape' });
@@ -122,7 +122,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not match Escape when ctrl is pressed but not expected', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'escape', combo: { key: 'Escape' }, action });
 
     const event = makeKeyboardEvent({ key: 'Escape', ctrlKey: true });
@@ -132,7 +132,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should match case-insensitively', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
 
     const event = makeKeyboardEvent({ key: 'S', metaKey: true });
@@ -142,8 +142,8 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should prefer higher priority registration when multiple match', () => {
-    const lowAction = jest.fn();
-    const highAction = jest.fn();
+    const lowAction = vi.fn();
+    const highAction = vi.fn();
     service.register({ id: 'low', combo: { key: 'Escape' }, action: lowAction, priority: 0 });
     service.register({ id: 'high', combo: { key: 'Escape' }, action: highAction, priority: 10 });
 
@@ -155,8 +155,8 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should use default priority of 0', () => {
-    const firstAction = jest.fn();
-    const highAction = jest.fn();
+    const firstAction = vi.fn();
+    const highAction = vi.fn();
     service.register({ id: 'first', combo: { key: 'Escape' }, action: firstAction });
     service.register({ id: 'high', combo: { key: 'Escape' }, action: highAction, priority: 1 });
 
@@ -168,7 +168,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should allow unregistering a shortcut', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'save', combo: { key: 's', ctrl: true }, action });
     service.unregister('save');
 
@@ -179,8 +179,8 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should support registerMany', () => {
-    const saveAction = jest.fn();
-    const paletteAction = jest.fn();
+    const saveAction = vi.fn();
+    const paletteAction = vi.fn();
     service.registerMany([
       { id: 'save', combo: { key: 's', ctrl: true }, action: saveAction },
       { id: 'palette', combo: { key: 'p', ctrl: true }, action: paletteAction },
@@ -194,8 +194,8 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should support unregisterMany', () => {
-    const saveAction = jest.fn();
-    const paletteAction = jest.fn();
+    const saveAction = vi.fn();
+    const paletteAction = vi.fn();
     service.registerMany([
       { id: 'save', combo: { key: 's', ctrl: true }, action: saveAction },
       { id: 'palette', combo: { key: 'p', ctrl: true }, action: paletteAction },
@@ -210,7 +210,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not preventDefault when combo sets preventDefault to false', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'noPD', combo: { key: 'a', ctrl: true, preventDefault: false }, action });
 
     const event = makeKeyboardEvent({ key: 'a', ctrlKey: true });
@@ -221,7 +221,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should not stopPropagation when combo sets stopPropagation to false', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'noSP', combo: { key: 'a', ctrl: true, stopPropagation: false }, action });
 
     const event = makeKeyboardEvent({ key: 'a', ctrlKey: true });
@@ -240,8 +240,8 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should replace a registration with the same id', () => {
-    const first = jest.fn();
-    const second = jest.fn();
+    const first = vi.fn();
+    const second = vi.fn();
     service.register({ id: 'esc', combo: { key: 'Escape' }, action: first });
     service.register({ id: 'esc', combo: { key: 'Escape' }, action: second });
 
@@ -252,7 +252,7 @@ describe('KeyboardShortcutService', () => {
   });
 
   it('should match alt modifier correctly', () => {
-    const action = jest.fn();
+    const action = vi.fn();
     service.register({ id: 'alt-a', combo: { key: 'a', alt: true }, action });
 
     service.handleKeydown(makeKeyboardEvent({ key: 'a', altKey: true }));

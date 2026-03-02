@@ -91,31 +91,31 @@ function makeLoadTestMetrics(overrides: Partial<LoadTestMetrics> = {}): LoadTest
 // Mock services
 // ---------------------------------------------------------------------------
 
-function createMockHttpService(): jest.Mocked<Pick<
+function createMockHttpService(): vi.Mocked<Pick<
   HttpService,
   'sendRequest' | 'executeChain' | 'executeLoadTest' | 'calculateLoadTestMetrics' | 'cancelRequest' | 'addToHistory'
 >> {
   return {
-    sendRequest: jest.fn().mockResolvedValue(makeResponseData()),
-    executeChain: jest.fn().mockResolvedValue({
+    sendRequest: vi.fn().mockResolvedValue(makeResponseData()),
+    executeChain: vi.fn().mockResolvedValue({
       responses: [makeResponseData()],
       requestPreviews: [{ method: 'GET', url: 'https://example.com/api', headers: {} }]
     }),
-    executeLoadTest: jest.fn().mockResolvedValue(makeLoadTestResults()),
-    calculateLoadTestMetrics: jest.fn().mockReturnValue(makeLoadTestMetrics()),
-    cancelRequest: jest.fn().mockResolvedValue(undefined),
-    addToHistory: jest.fn().mockResolvedValue([])
+    executeLoadTest: vi.fn().mockResolvedValue(makeLoadTestResults()),
+    calculateLoadTestMetrics: vi.fn().mockReturnValue(makeLoadTestMetrics()),
+    cancelRequest: vi.fn().mockResolvedValue(undefined),
+    addToHistory: vi.fn().mockResolvedValue([])
   };
 }
 
-function createMockNotificationService(): jest.Mocked<Pick<
+function createMockNotificationService(): vi.Mocked<Pick<
   NotificationService,
   'notifyRequestComplete' | 'notifyChainComplete' | 'notifyLoadTestComplete'
 >> {
   return {
-    notifyRequestComplete: jest.fn().mockResolvedValue(undefined),
-    notifyChainComplete: jest.fn().mockResolvedValue(undefined),
-    notifyLoadTestComplete: jest.fn().mockResolvedValue(undefined)
+    notifyRequestComplete: vi.fn().mockResolvedValue(undefined),
+    notifyChainComplete: vi.fn().mockResolvedValue(undefined),
+    notifyLoadTestComplete: vi.fn().mockResolvedValue(undefined)
   };
 }
 
@@ -185,7 +185,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit filesChange with updated response data', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.filesChange.subscribe(spy);
 
       await component.executeRequest(0);
@@ -197,7 +197,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit requestExecuted with requestIndex and response', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(0);
@@ -234,7 +234,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit historyUpdated after pushing history', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.historyUpdated.subscribe(spy);
 
       await component.executeRequest(0);
@@ -277,7 +277,7 @@ describe('RequestManagerComponent', () => {
 
   describe('executeRequestByIndex', () => {
     it('should delegate to executeRequest', async () => {
-      const spy = jest.spyOn(component, 'executeRequest');
+      const spy = vi.spyOn(component, 'executeRequest');
 
       await component.executeRequestByIndex(0);
 
@@ -285,7 +285,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should skip duplicate execution for the same index while executing', async () => {
-      const spy = jest.spyOn(component, 'executeRequest');
+      const spy = vi.spyOn(component, 'executeRequest');
 
       const first = component.executeRequestByIndex(0);
       const second = component.executeRequestByIndex(0);
@@ -305,7 +305,7 @@ describe('RequestManagerComponent', () => {
     it('should emit error response on sendRequest failure', async () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('Network Error'));
 
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(0);
@@ -319,7 +319,7 @@ describe('RequestManagerComponent', () => {
     it('should emit filesChange with error response on failure', async () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('Connection refused'));
 
-      const filesSpy = jest.fn();
+      const filesSpy = vi.fn();
       component.filesChange.subscribe(filesSpy);
 
       await component.executeRequest(0);
@@ -364,8 +364,8 @@ describe('RequestManagerComponent', () => {
     it('should handle cancellation error gracefully', async () => {
       mockHttp.sendRequest.mockRejectedValue({ cancelled: true });
 
-      const filesSpy = jest.fn();
-      const execSpy = jest.fn();
+      const filesSpy = vi.fn();
+      const execSpy = vi.fn();
       component.filesChange.subscribe(filesSpy);
       component.requestExecuted.subscribe(execSpy);
 
@@ -433,7 +433,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit filesChange with chain response', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.filesChange.subscribe(spy);
 
       await component.executeRequest(1);
@@ -471,7 +471,7 @@ describe('RequestManagerComponent', () => {
     it('should handle chain execution errors', async () => {
       mockHttp.executeChain.mockRejectedValue(new Error('Chain failed'));
 
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(1);
@@ -484,7 +484,7 @@ describe('RequestManagerComponent', () => {
     it('should handle cancellation during chain execution', async () => {
       mockHttp.executeChain.mockRejectedValue({ cancelled: true });
 
-      const filesSpy = jest.fn();
+      const filesSpy = vi.fn();
       component.filesChange.subscribe(filesSpy);
 
       await component.executeRequest(1);
@@ -533,7 +533,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit requestExecuted with loadTestMetrics', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(0);
@@ -556,7 +556,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should emit requestProgress during load test', async () => {
-      const progressSpy = jest.fn();
+      const progressSpy = vi.fn();
       component.requestProgress.subscribe(progressSpy);
 
       // Make executeLoadTest call the progress callback
@@ -585,7 +585,7 @@ describe('RequestManagerComponent', () => {
     it('should handle load test errors', async () => {
       mockHttp.executeLoadTest.mockRejectedValue(new Error('Load test timeout'));
 
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(0);
@@ -602,7 +602,7 @@ describe('RequestManagerComponent', () => {
 
   describe('response data handling', () => {
     it('should include chainItems in emitted response', async () => {
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.requestExecuted.subscribe(spy);
 
       await component.executeRequest(0);

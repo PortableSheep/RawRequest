@@ -60,7 +60,7 @@ describe('LoadTestVisualizationService', () => {
 
   describe('startActiveRunTick / stopActiveRunTick', () => {
     it('should start and stop without error', () => {
-      const cdr = { detectChanges: jest.fn() } as unknown as ChangeDetectorRef;
+      const cdr = { detectChanges: vi.fn() } as unknown as ChangeDetectorRef;
       service.initializeLoadRun();
       expect(() =>
         service.startActiveRunTick(

@@ -16,27 +16,27 @@ function createMockSecretService(secrets: any = {}) {
     allSecrets: secrets,
     vaultInfo: null as any,
     secretToDelete: null as any,
-    loadVaultInfo: jest.fn().mockResolvedValue(undefined),
-    saveSecret: jest.fn().mockResolvedValue(undefined),
-    deleteConfirmedSecret: jest.fn().mockResolvedValue('deleted_key'),
-    cancelDeleteSecret: jest.fn(),
-    confirmDeleteSecret: jest.fn(),
-    exportVault: jest.fn().mockResolvedValue('{}'),
-    resetVaultAndClear: jest.fn().mockResolvedValue(undefined),
-    getSecretValue: jest.fn().mockResolvedValue('revealed_value'),
-    setMasterPasswordAndRefresh: jest.fn().mockResolvedValue(undefined),
-    verifyMasterPassword: jest.fn().mockResolvedValue(true),
+    loadVaultInfo: vi.fn().mockResolvedValue(undefined),
+    saveSecret: vi.fn().mockResolvedValue(undefined),
+    deleteConfirmedSecret: vi.fn().mockResolvedValue('deleted_key'),
+    cancelDeleteSecret: vi.fn(),
+    confirmDeleteSecret: vi.fn(),
+    exportVault: vi.fn().mockResolvedValue('{}'),
+    resetVaultAndClear: vi.fn().mockResolvedValue(undefined),
+    getSecretValue: vi.fn().mockResolvedValue('revealed_value'),
+    setMasterPasswordAndRefresh: vi.fn().mockResolvedValue(undefined),
+    verifyMasterPassword: vi.fn().mockResolvedValue(true),
   };
 }
 
 function createMockToastService() {
-  return { success: jest.fn(), error: jest.fn(), info: jest.fn() };
+  return { success: vi.fn(), error: vi.fn(), info: vi.fn() };
 }
 
 function createMockPanelVisibilityService() {
   return {
     showSecretsModal: signal(false),
-    openSecretsModal: jest.fn(),
+    openSecretsModal: vi.fn(),
   };
 }
 
@@ -262,7 +262,7 @@ describe('SecretsModalComponent', () => {
       mockSecretService.saveSecret.mockRejectedValueOnce(new Error('fail'));
       component.newKey = 'k';
       component.newValue = 'v';
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation();
       await component.handleSave();
       expect(mockToast.error).toHaveBeenCalledWith('Failed to save secret');
     });
@@ -331,8 +331,8 @@ describe('SecretsModalComponent', () => {
     it('should call secretService.exportVault and show toast', async () => {
       // Mock URL.createObjectURL/revokeObjectURL for jsdom
       const mockUrl = 'blob:mock';
-      global.URL.createObjectURL = jest.fn().mockReturnValue(mockUrl);
-      global.URL.revokeObjectURL = jest.fn();
+      global.URL.createObjectURL = vi.fn().mockReturnValue(mockUrl);
+      global.URL.revokeObjectURL = vi.fn();
       await component.triggerExport();
       expect(mockSecretService.exportVault).toHaveBeenCalled();
       expect(mockToast.success).toHaveBeenCalled();
@@ -340,7 +340,7 @@ describe('SecretsModalComponent', () => {
 
     it('should show error toast on export failure', async () => {
       mockSecretService.exportVault.mockRejectedValueOnce(new Error('fail'));
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation();
       await component.triggerExport();
       expect(mockToast.error).toHaveBeenCalledWith('Failed to export secrets');
     });
@@ -458,7 +458,7 @@ describe('SecretsModalComponent', () => {
 
     it('should handle load error gracefully', async () => {
       mockSecretService.getSecretValue.mockRejectedValueOnce(new Error('fail'));
-      jest.spyOn(console, 'error').mockImplementation();
+      vi.spyOn(console, 'error').mockImplementation();
       await component.loadSecretValue('default', 'api_key');
       expect(component.getRevealedValue('default', 'api_key')).toBe('(error)');
     });

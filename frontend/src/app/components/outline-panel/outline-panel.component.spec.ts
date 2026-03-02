@@ -129,7 +129,7 @@ describe('OutlinePanelComponent', () => {
   describe('selectRequest', () => {
     it('should emit onRequestSelect and close panel', () => {
       mockShowOutlinePanel.set(true);
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.onRequestSelect.subscribe(spy);
 
       component.selectRequest(2);

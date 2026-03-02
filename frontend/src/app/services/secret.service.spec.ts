@@ -2,36 +2,36 @@ import { TestBed } from '@angular/core/testing';
 import { SecretService } from './secret.service';
 import { BACKEND_CLIENT, BackendClientContract } from './backend-client.contract';
 
-type MockBackendClient = { [K in keyof BackendClientContract]: jest.Mock };
+type MockBackendClient = { [K in keyof BackendClientContract]: vi.Mock };
 
 function createMockBackend(): MockBackendClient {
   return {
-    sendRequest: jest.fn(),
-    sendRequestWithID: jest.fn(),
-    sendRequestWithTimeout: jest.fn(),
-    executeRequests: jest.fn(),
-    executeRequestsWithID: jest.fn(),
-    cancelRequest: jest.fn(),
-    startLoadTest: jest.fn(),
-    setVariable: jest.fn(),
-    getVariable: jest.fn(),
-    loadFileHistoryFromDir: jest.fn(),
-    loadFileHistoryFromRunLocation: jest.fn(),
-    saveResponseFile: jest.fn(),
-    saveResponseFileToRunLocation: jest.fn(),
-    getScriptLogs: jest.fn(),
-    clearScriptLogs: jest.fn(),
-    recordScriptLog: jest.fn(),
-    listSecrets: jest.fn(),
-    saveSecret: jest.fn(),
-    deleteSecret: jest.fn(),
-    getSecretValue: jest.fn(),
-    getVaultInfo: jest.fn(),
-    hasMasterPassword: jest.fn(),
-    setMasterPassword: jest.fn(),
-    verifyMasterPassword: jest.fn(),
-    resetVault: jest.fn(),
-    exportSecrets: jest.fn(),
+    sendRequest: vi.fn(),
+    sendRequestWithID: vi.fn(),
+    sendRequestWithTimeout: vi.fn(),
+    executeRequests: vi.fn(),
+    executeRequestsWithID: vi.fn(),
+    cancelRequest: vi.fn(),
+    startLoadTest: vi.fn(),
+    setVariable: vi.fn(),
+    getVariable: vi.fn(),
+    loadFileHistoryFromDir: vi.fn(),
+    loadFileHistoryFromRunLocation: vi.fn(),
+    saveResponseFile: vi.fn(),
+    saveResponseFileToRunLocation: vi.fn(),
+    getScriptLogs: vi.fn(),
+    clearScriptLogs: vi.fn(),
+    recordScriptLog: vi.fn(),
+    listSecrets: vi.fn(),
+    saveSecret: vi.fn(),
+    deleteSecret: vi.fn(),
+    getSecretValue: vi.fn(),
+    getVaultInfo: vi.fn(),
+    hasMasterPassword: vi.fn(),
+    setMasterPassword: vi.fn(),
+    verifyMasterPassword: vi.fn(),
+    resetVault: vi.fn(),
+    exportSecrets: vi.fn(),
   };
 }
 
@@ -78,7 +78,7 @@ describe('SecretService', () => {
     });
 
     it('should invoke master password warning when secrets exist but no master password', async () => {
-      const warningCb = jest.fn();
+      const warningCb = vi.fn();
       service.onMasterPasswordWarning(warningCb);
 
       backend.listSecrets.mockResolvedValue({ dev: ['API_KEY'] });
@@ -91,7 +91,7 @@ describe('SecretService', () => {
     });
 
     it('should not invoke warning when vault has master password', async () => {
-      const warningCb = jest.fn();
+      const warningCb = vi.fn();
       service.onMasterPasswordWarning(warningCb);
 
       backend.listSecrets.mockResolvedValue({ dev: ['API_KEY'] });
@@ -104,7 +104,7 @@ describe('SecretService', () => {
     });
 
     it('should only invoke warning once', async () => {
-      const warningCb = jest.fn();
+      const warningCb = vi.fn();
       service.onMasterPasswordWarning(warningCb);
 
       backend.listSecrets.mockResolvedValue({ dev: ['KEY'] });

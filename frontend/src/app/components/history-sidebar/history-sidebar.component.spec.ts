@@ -41,7 +41,7 @@ describe('HistorySidebarComponent', () => {
     mockSelectedHistoryItem.set(null);
     mockShowHistory.set(false);
     mockShowHistoryModal.set(false);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     await TestBed.configureTestingModule({
       imports: [HistorySidebarComponent],
@@ -154,7 +154,7 @@ describe('HistorySidebarComponent', () => {
       mockHistory.set([item]);
       fixture.detectChanges();
 
-      jest.spyOn(component, 'viewHistory');
+      vi.spyOn(component, 'viewHistory');
       const el: HTMLElement = fixture.nativeElement.querySelector('.history-item');
       el.click();
 

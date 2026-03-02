@@ -37,7 +37,7 @@ function makeTab(overrides: Partial<FileTab> = {}): FileTab {
 describe('HeaderComponent', () => {
   let component: HeaderComponent;
   let fixture: ComponentFixture<HeaderComponent>;
-  let themeService: jest.Mocked<ThemeService>;
+  let themeService: vi.Mocked<ThemeService>;
 
   let mockWs: any;
   let mockPanels: any;
@@ -47,46 +47,46 @@ describe('HeaderComponent', () => {
 
   beforeEach(async () => {
     const themeMock = {
-      toggle: jest.fn(),
-      resolvedTheme: jest.fn().mockReturnValue('dark'),
-    } as unknown as jest.Mocked<ThemeService>;
+      toggle: vi.fn(),
+      resolvedTheme: vi.fn().mockReturnValue('dark'),
+    } as unknown as vi.Mocked<ThemeService>;
 
     mockWs = {
-      files: jest.fn().mockReturnValue([]),
-      currentFileIndex: jest.fn().mockReturnValue(0),
-      currentFileEnvironments: jest.fn().mockReturnValue([]),
-      currentEnv: jest.fn().mockReturnValue(''),
-      currentFileRequestNames: jest.fn().mockReturnValue([]),
-      onCurrentFileIndexChange: jest.fn(),
-      addNewTab: jest.fn(),
-      closeTab: jest.fn(),
-      closeOtherTabs: jest.fn(),
-      reorderTabs: jest.fn(),
-      onCurrentEnvChange: jest.fn(),
-      openFilesFromDisk: jest.fn().mockResolvedValue(undefined),
-      addFileFromContent: jest.fn(),
-      importCollection: jest.fn().mockResolvedValue(0),
-      openExamplesFile: jest.fn().mockResolvedValue(undefined),
-      revealInFinder: jest.fn().mockResolvedValue(undefined),
+      files: vi.fn().mockReturnValue([]),
+      currentFileIndex: vi.fn().mockReturnValue(0),
+      currentFileEnvironments: vi.fn().mockReturnValue([]),
+      currentEnv: vi.fn().mockReturnValue(''),
+      currentFileRequestNames: vi.fn().mockReturnValue([]),
+      onCurrentFileIndexChange: vi.fn(),
+      addNewTab: vi.fn(),
+      closeTab: vi.fn(),
+      closeOtherTabs: vi.fn(),
+      reorderTabs: vi.fn(),
+      onCurrentEnvChange: vi.fn(),
+      openFilesFromDisk: vi.fn().mockResolvedValue(undefined),
+      addFileFromContent: vi.fn(),
+      importCollection: vi.fn().mockResolvedValue(0),
+      openExamplesFile: vi.fn().mockResolvedValue(undefined),
+      revealInFinder: vi.fn().mockResolvedValue(undefined),
     };
     mockPanels = {
-      openSecretsModal: jest.fn(),
-      showDonationModal: { set: jest.fn() },
-      toggleHistory: jest.fn(),
-      toggleOutlinePanel: jest.fn(),
-      toggleCommandPalette: jest.fn(),
+      openSecretsModal: vi.fn(),
+      showDonationModal: { set: vi.fn() },
+      toggleHistory: vi.fn(),
+      toggleOutlinePanel: vi.fn(),
+      toggleCommandPalette: vi.fn(),
     };
     mockFileSave = {
-      saveCurrentFile: jest.fn().mockResolvedValue(undefined),
-      saveCurrentFileAs: jest.fn().mockResolvedValue(undefined),
+      saveCurrentFile: vi.fn().mockResolvedValue(undefined),
+      saveCurrentFileAs: vi.fn().mockResolvedValue(undefined),
     };
     mockToast = {
-      success: jest.fn(),
-      error: jest.fn(),
-      info: jest.fn(),
+      success: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
     };
     mockStartup = {
-      updateService: { appVersion: jest.fn().mockReturnValue('') },
+      updateService: { appVersion: vi.fn().mockReturnValue('') },
     };
 
     await TestBed.configureTestingModule({
@@ -105,9 +105,17 @@ describe('HeaderComponent', () => {
     })
     .compileComponents();
 
-    themeService = TestBed.inject(ThemeService) as jest.Mocked<ThemeService>;
+    themeService = TestBed.inject(ThemeService) as vi.Mocked<ThemeService>;
     fixture = TestBed.createComponent(HeaderComponent);
     component = fixture.componentInstance;
+
+    // Wrap detectChanges to always markForCheck first (needed for OnPush)
+    const origDetectChanges = fixture.detectChanges.bind(fixture);
+    fixture.detectChanges = () => {
+      fixture.changeDetectorRef.markForCheck();
+      origDetectChanges();
+    };
+
     fixture.detectChanges();
   });
 
@@ -574,7 +582,7 @@ describe('HeaderComponent', () => {
 
     component.draggingIndex = 0;
     const dropEvent = new DragEvent('drop', { bubbles: true });
-    Object.defineProperty(dropEvent, 'preventDefault', { value: jest.fn() });
+    Object.defineProperty(dropEvent, 'preventDefault', { value: vi.fn() });
     component.handleTabDrop(dropEvent, 1);
 
     expect(mockWs.reorderTabs).toHaveBeenCalledWith(0, 1);
@@ -584,7 +592,7 @@ describe('HeaderComponent', () => {
   it('should not call ws.reorderTabs when dropping on same index', () => {
     component.draggingIndex = 0;
     const dropEvent = new DragEvent('drop', { bubbles: true });
-    Object.defineProperty(dropEvent, 'preventDefault', { value: jest.fn() });
+    Object.defineProperty(dropEvent, 'preventDefault', { value: vi.fn() });
     component.handleTabDrop(dropEvent, 0);
 
     expect(mockWs.reorderTabs).not.toHaveBeenCalled();

@@ -6,11 +6,11 @@ import { HistoryStoreService } from './history-store.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
 
 // Mock Wails imports
-const mockSaveFileContents = jest.fn();
-const mockShowSaveDialog = jest.fn();
-const mockMigrateResponses = jest.fn();
+const mockSaveFileContents = vi.fn();
+const mockShowSaveDialog = vi.fn();
+const mockMigrateResponses = vi.fn();
 
-jest.mock('@wailsjs/go/main/App', () => ({
+vi.mock('@wailsjs/go/main/App', () => ({
   SaveFileContents: (...args: any[]) => mockSaveFileContents(...args),
   ShowSaveDialog: (...args: any[]) => mockShowSaveDialog(...args),
   MigrateResponsesFromRunLocationToHttpFile: (...args: any[]) => mockMigrateResponses(...args),
@@ -24,19 +24,19 @@ describe('FileSaveService', () => {
 
   beforeEach(() => {
     mockState = {
-      getCurrentFile: jest.fn(),
-      currentFileIndex: jest.fn().mockReturnValue(0),
-      files: jest.fn().mockReturnValue([]),
-      replaceFileAtIndex: jest.fn(),
-      history: { set: jest.fn() },
+      getCurrentFile: vi.fn(),
+      currentFileIndex: vi.fn().mockReturnValue(0),
+      files: vi.fn().mockReturnValue([]),
+      replaceFileAtIndex: vi.fn(),
+      history: { set: vi.fn() },
     };
     mockHttp = {
-      saveFiles: jest.fn(),
-      loadHistory: jest.fn().mockResolvedValue([]),
+      saveFiles: vi.fn(),
+      loadHistory: vi.fn().mockResolvedValue([]),
     };
     mockHistoryStore = {
-      delete: jest.fn(),
-      set: jest.fn(),
+      delete: vi.fn(),
+      set: vi.fn(),
     };
 
     TestBed.configureTestingModule({
@@ -50,7 +50,7 @@ describe('FileSaveService', () => {
     });
     service = TestBed.inject(FileSaveService);
 
-    jest.clearAllMocks();
+    vi.clearAllMocks();
   });
 
   describe('saveCurrentFile', () => {
@@ -115,7 +115,7 @@ describe('FileSaveService', () => {
         name: 'file.http',
       });
       mockSaveFileContents.mockRejectedValue(new Error('disk full'));
-      const spy = jest.spyOn(console, 'error').mockImplementation();
+      const spy = vi.spyOn(console, 'error').mockImplementation();
 
       await service.saveCurrentFile();
 
@@ -173,7 +173,7 @@ describe('FileSaveService', () => {
         name: 'path.http',
       });
       mockShowSaveDialog.mockRejectedValue(new Error('dialog error'));
-      const spy = jest.spyOn(console, 'error').mockImplementation();
+      const spy = vi.spyOn(console, 'error').mockImplementation();
 
       await service.saveCurrentFileAs();
 

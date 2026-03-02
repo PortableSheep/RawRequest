@@ -6,12 +6,12 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { ScriptConsoleService } from '../../services/script-console.service';
 
 // Mock GSAP so animation calls don't break in JSDOM
-jest.mock('gsap', () => {
-  const tweenStub = { kill: jest.fn() };
+vi.mock('gsap', () => {
+  const tweenStub = { kill: vi.fn() };
   return {
     gsap: {
-      set: jest.fn(),
-      to: jest.fn((_target: unknown, vars: Record<string, unknown>) => {
+      set: vi.fn(),
+      to: vi.fn((_target: unknown, vars: Record<string, unknown>) => {
         if (typeof vars?.onComplete === 'function') (vars.onComplete as () => void)();
         return tweenStub;
       }),
@@ -38,17 +38,17 @@ describe('ConsoleDrawerComponent', () => {
 
   const mockPanels = {
     consoleOpen: mockConsoleOpen,
-    toggleConsole: jest.fn(),
+    toggleConsole: vi.fn(),
   };
   const mockScriptConsole = {
     logs: mockLogs,
-    clear: jest.fn(),
+    clear: vi.fn(),
   };
 
   beforeEach(async () => {
     mockLogs.set([]);
     mockConsoleOpen.set(false);
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     await TestBed.configureTestingModule({
       imports: [ConsoleDrawerComponent],

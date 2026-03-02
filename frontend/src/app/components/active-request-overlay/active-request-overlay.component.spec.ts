@@ -26,15 +26,15 @@ describe("ActiveRequestOverlayComponent", () => {
 
   beforeEach(async () => {
     mockWs = {
-      getCurrentFile: jest.fn().mockReturnValue({ requests: [{ method: "GET", url: "https://example.com", headers: {}, name: "Test" }], responseData: {} }),
+      getCurrentFile: vi.fn().mockReturnValue({ requests: [{ method: "GET", url: "https://example.com", headers: {}, name: "Test" }], responseData: {} }),
     };
     mockReqExec = {
       activeRequestInfo: defaultInfo,
       isCancellingActiveRequest: false,
-      getActiveRequestDetails: jest.fn().mockReturnValue(null),
-      getActiveRequestMeta: jest.fn().mockReturnValue(""),
-      getActiveRequestPreview: jest.fn().mockReturnValue(""),
-      cancelActiveRequest: jest.fn().mockResolvedValue(undefined),
+      getActiveRequestDetails: vi.fn().mockReturnValue(null),
+      getActiveRequestMeta: vi.fn().mockReturnValue(""),
+      getActiveRequestPreview: vi.fn().mockReturnValue(""),
+      cancelActiveRequest: vi.fn().mockResolvedValue(undefined),
     };
     mockLoadTestViz = {
       activeRunProgress: null,

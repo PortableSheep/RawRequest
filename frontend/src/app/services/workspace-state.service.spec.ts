@@ -22,45 +22,45 @@ function makeFileTab(overrides: Partial<FileTab> = {}): FileTab {
 
 describe('WorkspaceStateService', () => {
   let service: WorkspaceStateService;
-  let workspaceFacade: jest.Mocked<Partial<WorkspaceFacadeService>>;
-  let httpService: jest.Mocked<Partial<HttpService>>;
-  let historyStore: jest.Mocked<Partial<HistoryStoreService>>;
+  let workspaceFacade: vi.Mocked<Partial<WorkspaceFacadeService>>;
+  let httpService: vi.Mocked<Partial<HttpService>>;
+  let historyStore: vi.Mocked<Partial<HistoryStoreService>>;
 
   beforeEach(() => {
     workspaceFacade = {
-      normalizeFiles: jest.fn((files) => files),
-      syncCurrentEnvWithFile: jest.fn((files, idx) => ({
+      normalizeFiles: vi.fn((files) => files),
+      syncCurrentEnvWithFile: vi.fn((files, idx) => ({
         files,
         currentFileIndex: idx,
         currentEnv: files[idx]?.selectedEnv || '',
         activeFileId: files[idx]?.id,
       })),
-      replaceFileAtIndex: jest.fn((files, idx, newFile) => {
+      replaceFileAtIndex: vi.fn((files, idx, newFile) => {
         const updated = [...files];
         updated[idx] = newFile;
         return updated;
       }),
-      persistSessionState: jest.fn(),
-      initializeFromStorage: jest.fn(),
-      deriveWithEnvSync: jest.fn(),
-      closeTabDerived: jest.fn(),
-      closeOtherTabsDerived: jest.fn(),
-      addNewTabDerived: jest.fn(),
-      addFileFromContentDerived: jest.fn(),
-      reorderTabsDerived: jest.fn(),
-      updateFileContent: jest.fn(),
-      upsertExamplesTab: jest.fn(),
+      persistSessionState: vi.fn(),
+      initializeFromStorage: vi.fn(),
+      deriveWithEnvSync: vi.fn(),
+      closeTabDerived: vi.fn(),
+      closeOtherTabsDerived: vi.fn(),
+      addNewTabDerived: vi.fn(),
+      addFileFromContentDerived: vi.fn(),
+      reorderTabsDerived: vi.fn(),
+      updateFileContent: vi.fn(),
+      upsertExamplesTab: vi.fn(),
     };
 
     httpService = {
-      saveFiles: jest.fn(),
+      saveFiles: vi.fn(),
     };
 
     historyStore = {
-      get: jest.fn(),
-      set: jest.fn(),
-      delete: jest.fn(),
-      ensureLoaded: jest.fn().mockResolvedValue([]),
+      get: vi.fn(),
+      set: vi.fn(),
+      delete: vi.fn(),
+      ensureLoaded: vi.fn().mockResolvedValue([]),
     };
 
     TestBed.configureTestingModule({
@@ -222,7 +222,7 @@ describe('WorkspaceStateService', () => {
       const file = makeFileTab();
       service.applyState({ files: [file], currentFileIndex: 0, currentEnv: '' });
 
-      (workspaceFacade.updateFileContent as jest.Mock).mockReturnValue({
+      (workspaceFacade.updateFileContent as vi.Mock).mockReturnValue({
         files: [{ ...file, content: 'updated' }],
         currentFileIndex: 0,
         currentEnv: 'dev',
@@ -244,7 +244,7 @@ describe('WorkspaceStateService', () => {
     };
 
     it('closeTab delegates and applies state', () => {
-      (workspaceFacade.closeTabDerived as jest.Mock).mockReturnValue(derivedState);
+      (workspaceFacade.closeTabDerived as vi.Mock).mockReturnValue(derivedState);
       const file = makeFileTab();
       service.applyState({ files: [file, makeFileTab({ id: 'f2' })], currentFileIndex: 0, currentEnv: '' });
 
@@ -255,7 +255,7 @@ describe('WorkspaceStateService', () => {
     });
 
     it('addNewTab delegates and clears history', () => {
-      (workspaceFacade.addNewTabDerived as jest.Mock).mockReturnValue(derivedState);
+      (workspaceFacade.addNewTabDerived as vi.Mock).mockReturnValue(derivedState);
 
       service.addNewTab();
 
@@ -264,7 +264,7 @@ describe('WorkspaceStateService', () => {
     });
 
     it('closeOtherTabs delegates', () => {
-      (workspaceFacade.closeOtherTabsDerived as jest.Mock).mockReturnValue(derivedState);
+      (workspaceFacade.closeOtherTabsDerived as vi.Mock).mockReturnValue(derivedState);
 
       service.closeOtherTabs(0);
 
@@ -272,7 +272,7 @@ describe('WorkspaceStateService', () => {
     });
 
     it('reorderTabs delegates', () => {
-      (workspaceFacade.reorderTabsDerived as jest.Mock).mockReturnValue(derivedState);
+      (workspaceFacade.reorderTabsDerived as vi.Mock).mockReturnValue(derivedState);
       service.applyState({ files: [makeFileTab()], currentFileIndex: 0, currentEnv: '' });
 
       service.reorderTabs(0, 1);

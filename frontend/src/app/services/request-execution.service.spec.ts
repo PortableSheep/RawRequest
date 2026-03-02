@@ -35,26 +35,26 @@ function makeRequest(overrides: any = {}) {
   };
 }
 
-function makeDelegate(): { [K in keyof RequestExecutionDelegate]: jest.Mock } {
+function makeDelegate(): { [K in keyof RequestExecutionDelegate]: vi.Mock } {
   return {
-    executeRequestByIndex: jest.fn(),
-    cancelActiveRequest: jest.fn(),
+    executeRequestByIndex: vi.fn(),
+    cancelActiveRequest: vi.fn(),
   };
 }
 
-function makeCdr(): { detectChanges: jest.Mock } {
-  return { detectChanges: jest.fn() };
+function makeCdr(): { detectChanges: vi.Mock } {
+  return { detectChanges: vi.fn() };
 }
 
 describe('RequestExecutionService', () => {
   let service: RequestExecutionService;
-  let toast: { info: jest.Mock; error: jest.Mock; success: jest.Mock };
+  let toast: { info: vi.Mock; error: vi.Mock; success: vi.Mock };
   let loadTestViz: {
-    initializeLoadRun: jest.Mock;
-    startActiveRunTick: jest.Mock;
-    stopActiveRunTick: jest.Mock;
-    applyResetPatch: jest.Mock;
-    pushLoadUsersSample: jest.Mock;
+    initializeLoadRun: vi.Mock;
+    startActiveRunTick: vi.Mock;
+    stopActiveRunTick: vi.Mock;
+    applyResetPatch: vi.Mock;
+    pushLoadUsersSample: vi.Mock;
     activeRunNowMs: number;
     activeRunProgress: any;
     loadTestMetrics: any;
@@ -74,20 +74,20 @@ describe('RequestExecutionService', () => {
         },
         {
           provide: SecretService,
-          useValue: { replaceSecrets: jest.fn().mockResolvedValue('resolved') },
+          useValue: { replaceSecrets: vi.fn().mockResolvedValue('resolved') },
         },
         {
           provide: ToastService,
-          useValue: { info: jest.fn(), error: jest.fn(), success: jest.fn() },
+          useValue: { info: vi.fn(), error: vi.fn(), success: vi.fn() },
         },
         {
           provide: LoadTestVisualizationService,
           useValue: {
-            initializeLoadRun: jest.fn(),
-            startActiveRunTick: jest.fn(),
-            stopActiveRunTick: jest.fn(),
-            applyResetPatch: jest.fn(),
-            pushLoadUsersSample: jest.fn(),
+            initializeLoadRun: vi.fn(),
+            startActiveRunTick: vi.fn(),
+            stopActiveRunTick: vi.fn(),
+            applyResetPatch: vi.fn(),
+            pushLoadUsersSample: vi.fn(),
             activeRunNowMs: Date.now(),
             activeRunProgress: null,
             loadTestMetrics: null,

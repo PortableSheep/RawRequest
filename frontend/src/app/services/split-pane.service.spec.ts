@@ -9,10 +9,10 @@ describe('SplitPaneService', () => {
 
   beforeEach(() => {
     mockStorage = {};
-    jest.spyOn(Storage.prototype, 'getItem').mockImplementation(
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(
       (key: string) => mockStorage[key] ?? null,
     );
-    jest.spyOn(Storage.prototype, 'setItem').mockImplementation(
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(
       (key: string, value: string) => { mockStorage[key] = value; },
     );
 
@@ -21,7 +21,7 @@ describe('SplitPaneService', () => {
   });
 
   afterEach(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
     document.body.style.cursor = '';
     document.body.style.userSelect = '';
   });
@@ -87,14 +87,14 @@ describe('SplitPaneService', () => {
   describe('onSplitMouseDown', () => {
     it('should start dragging when in split layout', () => {
       service.isSplitLayout = true;
-      const event = { clientX: 500, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const event = { clientX: 500, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onSplitMouseDown(event);
       expect(event.preventDefault).toHaveBeenCalled();
     });
 
     it('should not start dragging when not in split layout', () => {
       service.isSplitLayout = false;
-      const event = { clientX: 500, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const event = { clientX: 500, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onSplitMouseDown(event);
       expect(event.preventDefault).not.toHaveBeenCalled();
     });
@@ -102,18 +102,18 @@ describe('SplitPaneService', () => {
 
   describe('onMouseMove', () => {
     it('should return false when not dragging', () => {
-      const event = { clientX: 600, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const event = { clientX: 600, preventDefault: vi.fn() } as unknown as MouseEvent;
       const result = service.onMouseMove(event, undefined);
       expect(result).toBe(false);
     });
 
     it('should update width during drag', () => {
       service.isSplitLayout = true;
-      const downEvent = { clientX: 500, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const downEvent = { clientX: 500, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onSplitMouseDown(downEvent);
 
       const container = { getBoundingClientRect: () => ({ width: 1200 }) } as HTMLElement;
-      const moveEvent = { clientX: 550, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const moveEvent = { clientX: 550, preventDefault: vi.fn() } as unknown as MouseEvent;
       const result = service.onMouseMove(moveEvent, container);
       expect(result).toBe(true);
       expect(service.editorPaneWidthPx).toBe(DEFAULT_LEFT_PX + 50);
@@ -122,11 +122,11 @@ describe('SplitPaneService', () => {
 
     it('should return false when not in split layout', () => {
       service.isSplitLayout = true;
-      const downEvent = { clientX: 500, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const downEvent = { clientX: 500, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onSplitMouseDown(downEvent);
 
       service.isSplitLayout = false;
-      const moveEvent = { clientX: 550, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const moveEvent = { clientX: 550, preventDefault: vi.fn() } as unknown as MouseEvent;
       const result = service.onMouseMove(moveEvent, undefined);
       expect(result).toBe(false);
     });
@@ -135,11 +135,11 @@ describe('SplitPaneService', () => {
   describe('onMouseUp', () => {
     it('should stop dragging and persist width', () => {
       service.isSplitLayout = true;
-      const downEvent = { clientX: 500, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const downEvent = { clientX: 500, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onSplitMouseDown(downEvent);
 
       const container = { getBoundingClientRect: () => ({ width: 1200 }) } as HTMLElement;
-      const moveEvent = { clientX: 550, preventDefault: jest.fn() } as unknown as MouseEvent;
+      const moveEvent = { clientX: 550, preventDefault: vi.fn() } as unknown as MouseEvent;
       service.onMouseMove(moveEvent, container);
 
       service.onMouseUp();

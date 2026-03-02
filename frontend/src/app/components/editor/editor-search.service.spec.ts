@@ -12,34 +12,34 @@ import {
 } from '@codemirror/search';
 import { EditorView } from 'codemirror';
 
-jest.mock('@codemirror/search', () => ({
-  SearchQuery: jest.fn().mockImplementation((opts: any) => ({
-    ...opts,
-    valid: true,
-    getCursor: jest.fn().mockReturnValue({
-      next: jest.fn().mockReturnValue({ done: true })
-    })
-  })),
-  findNext: jest.fn(),
-  findPrevious: jest.fn(),
-  getSearchQuery: jest.fn().mockReturnValue({
+vi.mock('@codemirror/search', () => ({
+  SearchQuery: vi.fn().mockImplementation(function(this: any, opts: any) {
+    Object.assign(this, opts);
+    this.valid = true;
+    this.getCursor = vi.fn().mockReturnValue({
+      next: vi.fn().mockReturnValue({ done: true })
+    });
+  }),
+  findNext: vi.fn(),
+  findPrevious: vi.fn(),
+  getSearchQuery: vi.fn().mockReturnValue({
     search: 'hello',
     replace: '',
     caseSensitive: false,
     regexp: false,
     wholeWord: false
   }),
-  openSearchPanel: jest.fn(),
-  closeSearchPanel: jest.fn(),
-  replaceAll: jest.fn(),
-  replaceNext: jest.fn(),
-  selectMatches: jest.fn(),
-  setSearchQuery: { of: jest.fn().mockReturnValue('setSearchQuery-effect') }
+  openSearchPanel: vi.fn(),
+  closeSearchPanel: vi.fn(),
+  replaceAll: vi.fn(),
+  replaceNext: vi.fn(),
+  selectMatches: vi.fn(),
+  setSearchQuery: { of: vi.fn().mockReturnValue('setSearchQuery-effect') }
 }));
 
-jest.mock('codemirror', () => ({
+vi.mock('codemirror', () => ({
   EditorView: {
-    scrollIntoView: jest.fn().mockReturnValue('scrollIntoView-effect')
+    scrollIntoView: vi.fn().mockReturnValue('scrollIntoView-effect')
   }
 }));
 
@@ -50,8 +50,8 @@ describe('EditorSearchService', () => {
   let mockCallbacks: any;
 
   beforeEach(() => {
-    jest.useFakeTimers();
-    jest.clearAllMocks();
+    vi.useFakeTimers();
+    vi.clearAllMocks();
 
     service = new EditorSearchService();
     mockView = {
@@ -59,26 +59,26 @@ describe('EditorSearchService', () => {
         selection: { main: { from: 0, to: 0 } },
         doc: { length: 100 }
       },
-      dispatch: jest.fn(),
-      focus: jest.fn()
+      dispatch: vi.fn(),
+      focus: vi.fn()
     };
     mockWrapperEl = {
       classList: {
-        add: jest.fn(),
-        remove: jest.fn()
+        add: vi.fn(),
+        remove: vi.fn()
       },
       offsetWidth: 100
     };
     mockCallbacks = {
-      focusFindInput: jest.fn(),
-      focusReplaceInput: jest.fn()
+      focusFindInput: vi.fn(),
+      focusReplaceInput: vi.fn()
     };
     service.init(mockView, mockWrapperEl, mockCallbacks);
   });
 
   afterEach(() => {
     service.destroy();
-    jest.useRealTimers();
+    vi.useRealTimers();
   });
 
   describe('initial state', () => {
@@ -111,7 +111,7 @@ describe('EditorSearchService', () => {
 
     it('focuses find input after a tick', () => {
       service.openSearchUi(false);
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(mockCallbacks.focusFindInput).toHaveBeenCalled();
     });
 
@@ -150,7 +150,7 @@ describe('EditorSearchService', () => {
       service.toggleReplaceUi();
       expect(service.searchUi.showReplace).toBe(true);
 
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(mockCallbacks.focusReplaceInput).toHaveBeenCalled();
     });
 
@@ -210,7 +210,7 @@ describe('EditorSearchService', () => {
 
     it('focuses find input after a tick', () => {
       service.searchNext();
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(mockCallbacks.focusFindInput).toHaveBeenCalled();
     });
 
@@ -229,7 +229,7 @@ describe('EditorSearchService', () => {
 
     it('focuses find input after a tick', () => {
       service.searchPrev();
-      jest.advanceTimersByTime(1);
+      vi.advanceTimersByTime(1);
       expect(mockCallbacks.focusFindInput).toHaveBeenCalled();
     });
   });
@@ -259,7 +259,7 @@ describe('EditorSearchService', () => {
     it('closes search on Escape', () => {
       service.openSearchUi(false);
       const event = new KeyboardEvent('keydown', { key: 'Escape' });
-      jest.spyOn(event, 'preventDefault');
+      vi.spyOn(event, 'preventDefault');
 
       service.onFindKeydown(event);
       expect(event.preventDefault).toHaveBeenCalled();
@@ -267,14 +267,14 @@ describe('EditorSearchService', () => {
     });
 
     it('calls searchNext on Enter', () => {
-      const spy = jest.spyOn(service, 'searchNext');
+      const spy = vi.spyOn(service, 'searchNext');
       const event = new KeyboardEvent('keydown', { key: 'Enter' });
       service.onFindKeydown(event);
       expect(spy).toHaveBeenCalled();
     });
 
     it('calls searchPrev on Shift+Enter', () => {
-      const spy = jest.spyOn(service, 'searchPrev');
+      const spy = vi.spyOn(service, 'searchPrev');
       const event = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true });
       service.onFindKeydown(event);
       expect(spy).toHaveBeenCalled();
@@ -291,14 +291,14 @@ describe('EditorSearchService', () => {
     });
 
     it('calls replaceOne on Enter', () => {
-      const spy = jest.spyOn(service, 'replaceOne');
+      const spy = vi.spyOn(service, 'replaceOne');
       const event = new KeyboardEvent('keydown', { key: 'Enter' });
       service.onReplaceKeydown(event);
       expect(spy).toHaveBeenCalled();
     });
 
     it('calls replaceEverything on Shift+Enter', () => {
-      const spy = jest.spyOn(service, 'replaceEverything');
+      const spy = vi.spyOn(service, 'replaceEverything');
       const event = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true });
       service.onReplaceKeydown(event);
       expect(spy).toHaveBeenCalled();

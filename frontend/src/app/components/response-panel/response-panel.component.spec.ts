@@ -60,7 +60,7 @@ function createMockWs(fileData: any = {}) {
   const fileSignal = signal(fileValue);
   return {
     currentFileView: fileSignal as WritableSignal<any>,
-    getCurrentFile: jest.fn(() => fileSignal()),
+    getCurrentFile: vi.fn(() => fileSignal()),
   };
 }
 
@@ -291,11 +291,11 @@ describe('ResponsePanelComponent', () => {
   // -----------------------------------------------------------------------
 
   describe('copy-to-clipboard', () => {
-    let writeTextSpy: jest.Mock;
+    let writeTextSpy: vi.Mock;
 
     beforeEach(() => {
       setup();
-      writeTextSpy = jest.fn().mockResolvedValue(undefined);
+      writeTextSpy = vi.fn().mockResolvedValue(undefined);
       Object.defineProperty(navigator, 'clipboard', {
         value: { writeText: writeTextSpy },
         writable: true,
@@ -325,7 +325,7 @@ describe('ResponsePanelComponent', () => {
 
     it('should set error state when clipboard write fails', async () => {
       writeTextSpy.mockRejectedValue(new Error('Permission denied'));
-      jest.spyOn(console, 'error').mockImplementation(() => {});
+      vi.spyOn(console, 'error').mockImplementation(() => {});
 
       await component.copyResponseBody('entry-1', 'body');
 
@@ -344,15 +344,15 @@ describe('ResponsePanelComponent', () => {
     });
 
     it('should reset copy state to idle after timeout', async () => {
-      jest.useFakeTimers();
+      vi.useFakeTimers();
 
       await component.copyResponseBody('entry-1', 'body');
       expect(component.getCopyState('entry-1')).toBe('copied');
 
-      jest.advanceTimersByTime(1500);
+      vi.advanceTimersByTime(1500);
       expect(component.getCopyState('entry-1')).toBe('idle');
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
 
     it('should render copy button with correct data-state attribute', async () => {
@@ -565,7 +565,7 @@ describe('ResponsePanelComponent', () => {
       );
       fixture.detectChanges();
 
-      const spy = jest.fn();
+      const spy = vi.fn();
       component.replayRequest.subscribe(spy);
 
       const el: HTMLElement = fixture.nativeElement;
@@ -622,7 +622,7 @@ describe('ResponsePanelComponent', () => {
   describe('ngOnDestroy', () => {
     it('should clear copy timers on destroy', async () => {
       setup();
-      jest.useFakeTimers();
+      vi.useFakeTimers();
 
       await component.copyResponseBody('entry-1', 'body');
       expect(component.getCopyState('entry-1')).toBe('copied');
@@ -630,9 +630,9 @@ describe('ResponsePanelComponent', () => {
       fixture.destroy();
 
       // Timer should have been cleared; no errors from dangling timers
-      jest.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(2000);
 
-      jest.useRealTimers();
+      vi.useRealTimers();
     });
   });
 });

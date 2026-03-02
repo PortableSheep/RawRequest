@@ -20,13 +20,13 @@ function makeFile(overrides: Partial<FileTab> & { id: string }): FileTab {
 
 function createService(savedFiles: FileTab[] = []) {
   const httpMock = {
-    loadFiles: jest.fn().mockReturnValue(savedFiles),
-    saveFiles: jest.fn(),
+    loadFiles: vi.fn().mockReturnValue(savedFiles),
+    saveFiles: vi.fn(),
   };
   const historyMock = {
-    set: jest.fn(),
-    get: jest.fn().mockReturnValue(undefined),
-    delete: jest.fn(),
+    set: vi.fn(),
+    get: vi.fn().mockReturnValue(undefined),
+    delete: vi.fn(),
   };
 
   const injector = Injector.create({
