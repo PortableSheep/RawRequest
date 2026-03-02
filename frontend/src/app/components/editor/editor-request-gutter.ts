@@ -21,6 +21,12 @@ class PlayGutterMarker extends GutterMarker {
     button.className = 'gutter-play-btn';
     button.dataset['requestIndex'] = this.requestIndex.toString();
     button.title = 'Send request';
+    button.onmousedown = event => {
+      // Prevent the button from stealing focus from the editor's contentDOM.
+      // Without this, clicking back in the editor triggers CM6's focusPreventScroll
+      // which can race with WebKit's async scroll adjustments, causing scroll jumps.
+      event.preventDefault();
+    };
     button.onclick = event => {
       event.preventDefault();
       event.stopPropagation();

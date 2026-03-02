@@ -299,6 +299,23 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
+            // Guard against scroll jumps when focus returns to the editor.
+            // This handler fires BEFORE CM6's focusPreventScroll, so
+            // scrollTop is still the correct user-intended position.
+            // After CM6 processes focus + selection, we check via rAF whether
+            // scroll jumped (e.g. WebKit async scroll-to-caret) and revert.
+            if (!view.hasFocus) {
+              const scrollBefore = view.scrollDOM.scrollTop;
+              requestAnimationFrame(() => {
+                if (!this.editorView) return;
+                const scrollAfter = this.editorView.scrollDOM.scrollTop;
+                const viewportH = this.editorView.scrollDOM.clientHeight;
+                if (Math.abs(scrollAfter - scrollBefore) > viewportH / 2) {
+                  this.editorView.scrollDOM.scrollTop = scrollBefore;
+                }
+              });
+            }
+
             if (this.editorContextMenu.show) {
               this.closeEditorContextMenu();
             }
@@ -363,7 +380,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                       // old cursor position if the user scrolled upward.
                       const targetPos = clickedPos ?? selection.head;
                       view.dispatch({
-                        selection: { anchor: targetPos }
+                        selection: { anchor: targetPos },
+                        scrollIntoView: false
                       });
                     }
                   }
@@ -788,17 +806,17 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   updateContent(content: string) {
     if (this.editorView) {
-      // Preserve scroll position when updating content
       const scrollPos = this.editorView.scrollDOM.scrollTop;
+      // Clamp cursor to new content length so the native caret doesn't
+      // silently drift to end-of-document after a full replacement.
+      const cursor = Math.min(this.editorView.state.selection.main.head, content.length);
       this.editorView.dispatch({
-        changes: { from: 0, to: this.editorView.state.doc.length, insert: content }
+        changes: { from: 0, to: this.editorView.state.doc.length, insert: content },
+        selection: { anchor: cursor }
       });
-      // Restore scroll position after content update
-      requestAnimationFrame(() => {
-        if (this.editorView) {
-          this.editorView.scrollDOM.scrollTop = scrollPos;
-        }
-      });
+      // Restore scroll synchronously to avoid racing with CM6's own
+      // requestAnimationFrame-based measure cycle.
+      this.editorView.scrollDOM.scrollTop = scrollPos;
     }
   }
 
