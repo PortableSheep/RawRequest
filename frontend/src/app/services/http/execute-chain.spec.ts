@@ -3,23 +3,23 @@ import { executeChain } from './execute-chain';
 describe('execute-chain', () => {
   it('syncs variables, prepares requests, calls backend, and parses responses', async () => {
     const backend = {
-      executeRequests: jest.fn(async () => 'RESP'),
-      executeRequestsWithID: jest.fn(async () => 'RESPID'),
-      setVariable: jest.fn(async () => {}),
+      executeRequests: vi.fn(async () => 'RESP'),
+      executeRequestsWithID: vi.fn(async () => 'RESPID'),
+      setVariable: vi.fn(async () => {}),
     };
 
-    const syncInitialVariablesToBackend = jest.fn(async (vars: any, setVar: any) => {
+    const syncInitialVariablesToBackend = vi.fn(async (vars: any, setVar: any) => {
       for (const k of Object.keys(vars)) {
         await setVar(k, vars[k]);
       }
     });
 
-    const prepareBackendRequestForChain = jest.fn(async (req: any) => ({
+    const prepareBackendRequestForChain = vi.fn(async (req: any) => ({
       backend: { method: req.method, url: req.url },
       preview: { method: req.method, url: req.url, headers: {}, body: undefined },
     }));
 
-    const parseConcatenatedChainResponses = jest.fn((_resp: string, previews: any[]) =>
+    const parseConcatenatedChainResponses = vi.fn((_resp: string, previews: any[]) =>
       previews.map((p) => ({ status: 200, statusText: 'OK', headers: {}, body: p.url, responseTime: 1 } as any))
     );
 
@@ -65,9 +65,9 @@ describe('execute-chain', () => {
 
   it('uses executeRequests when no requestId', async () => {
     const backend = {
-      executeRequests: jest.fn(async () => 'RESP'),
-      executeRequestsWithID: jest.fn(async () => 'RESPID'),
-      setVariable: jest.fn(async () => {}),
+      executeRequests: vi.fn(async () => 'RESP'),
+      executeRequestsWithID: vi.fn(async () => 'RESPID'),
+      setVariable: vi.fn(async () => {}),
     };
 
     await executeChain(

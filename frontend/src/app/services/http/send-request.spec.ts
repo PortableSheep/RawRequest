@@ -4,30 +4,30 @@ describe('send-request', () => {
   it('hydrates, builds preview, calls backend, parses response, and runs scripts', async () => {
     const calls: string[] = [];
 
-    const executeScript = jest.fn(async (_script: string, _ctx: any, stage: any) => {
+    const executeScript = vi.fn(async (_script: string, _ctx: any, stage: any) => {
       calls.push(`script:${stage}`);
       return [];
     });
 
-    const hydrateText = jest.fn(async (value: string) => {
+    const hydrateText = vi.fn(async (value: string) => {
       calls.push('hydrateText');
       return value.replace('{{x}}', '1').replace('SECRET', 's3cr3t');
     });
 
-    const hydrateHeaders = jest.fn(async (headers?: Record<string, string>) => {
+    const hydrateHeaders = vi.fn(async (headers?: Record<string, string>) => {
       calls.push('hydrateHeaders');
       return { ...(headers || {}), A: 's3cr3t' };
     });
 
     const backend = {
-      sendRequest: jest.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
-      sendRequestWithID: jest.fn(async () => ''),
-      sendRequestWithTimeout: jest.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
+      sendRequest: vi.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
+      sendRequestWithID: vi.fn(async () => ''),
+      sendRequestWithTimeout: vi.fn(async () => 'Status: 200 OK\nHeaders: {"headers": {"X": "1"}}\nBody: {"ok": true}'),
     };
 
-    const throwIfCancelled = jest.fn();
+    const throwIfCancelled = vi.fn();
 
-    const parseGoResponse = jest.fn((_s: string, t: number) => ({
+    const parseGoResponse = vi.fn((_s: string, t: number) => ({
       status: 200,
       statusText: 'OK',
       headers: { X: '1' },
@@ -82,11 +82,11 @@ describe('send-request', () => {
 
   it('throws a ResponseData fallback on backend error and includes preview if available', async () => {
     const backend = {
-      sendRequest: jest.fn(async () => {
+      sendRequest: vi.fn(async () => {
         throw new Error('boom');
       }),
-      sendRequestWithID: jest.fn(async () => ''),
-      sendRequestWithTimeout: jest.fn(async () => ''),
+      sendRequestWithID: vi.fn(async () => ''),
+      sendRequestWithTimeout: vi.fn(async () => ''),
     };
 
     await expect(
@@ -125,9 +125,9 @@ describe('send-request', () => {
 
   it('rethrows cancellation errors unchanged', async () => {
     const backend = {
-      sendRequest: jest.fn(async () => '__CANCELLED__'),
-      sendRequestWithID: jest.fn(async () => ''),
-      sendRequestWithTimeout: jest.fn(async () => ''),
+      sendRequest: vi.fn(async () => '__CANCELLED__'),
+      sendRequestWithID: vi.fn(async () => ''),
+      sendRequestWithTimeout: vi.fn(async () => ''),
     };
 
     expect(backend.sendRequestWithTimeout).not.toHaveBeenCalled();
@@ -164,9 +164,9 @@ describe('send-request', () => {
 
   it('uses backend timeout call when request.options.timeout is set', async () => {
     const backend = {
-      sendRequest: jest.fn(async () => ''),
-      sendRequestWithID: jest.fn(async () => ''),
-      sendRequestWithTimeout: jest.fn(async () => 'Status: 200 OK\nHeaders: {}\nBody: ok'),
+      sendRequest: vi.fn(async () => ''),
+      sendRequestWithID: vi.fn(async () => ''),
+      sendRequestWithTimeout: vi.fn(async () => 'Status: 200 OK\nHeaders: {}\nBody: ok'),
     };
 
     await sendRequest(

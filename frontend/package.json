@@ -8,8 +8,8 @@
     "build:stats": "ng build --configuration production --stats-json --no-progress",
     "perf:baseline": "npm run build:stats && node scripts/perf-baseline.mjs",
     "watch": "ng build --watch --configuration development",
-    "test": "jest",
-    "test:watch": "jest --watch"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "private": true,
   "dependencies": {
@@ -22,10 +22,8 @@
     "@angular/platform-browser": "^21.0.3",
     "@angular/platform-browser-dynamic": "^21.0.3",
     "@angular/router": "^21.0.3",
-    "@codemirror/highlight": "^0.19.8",
     "@codemirror/lang-javascript": "^6.2.4",
     "@codemirror/language": "^6.11.3",
-    "@codemirror/legacy-modes": "^6.5.2",
     "@codemirror/lint": "^6.9.2",
     "@codemirror/search": "^6.5.11",
     "@codemirror/state": "^6.5.2",
@@ -40,6 +38,8 @@
     "zone.js": "^0.15.0"
   },
   "devDependencies": {
+    "@analogjs/vite-plugin-angular": "^2.3.1",
+    "@analogjs/vitest-angular": "^2.3.1",
     "@angular/build": "^21.0.2",
     "@angular/cli": "^21.0.2",
     "@angular/compiler-cli": "^21.0.3",
@@ -47,11 +47,8 @@
     "@testing-library/angular": "^17.1.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
-    "@types/jest": "^30.0.0",
-    "jest": "^30.0.0",
-    "jest-environment-jsdom": "^30.0.0",
-    "jest-preset-angular": "^16.0.0",
     "jsdom": "^26.0.0",
-    "typescript": "~5.9.3"
+    "typescript": "~5.9.3",
+    "vitest": "^4.0.18"
   }
 }

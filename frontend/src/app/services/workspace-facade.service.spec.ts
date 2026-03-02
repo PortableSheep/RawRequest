@@ -11,7 +11,7 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
 
   it('returns shouldAddNewTab=true when no saved files', () => {
     const httpMock: Pick<HttpService, 'loadFiles'> = {
-      loadFiles: jest.fn().mockReturnValue([])
+      loadFiles: vi.fn().mockReturnValue([])
     };
 
     const injector = Injector.create({
@@ -42,7 +42,7 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
     localStorage.setItem('last_session_key', JSON.stringify({ fileId: 'file1', selectedEnv: 'prod' }));
 
     const httpMock: Pick<HttpService, 'loadFiles'> = {
-      loadFiles: jest.fn().mockReturnValue([file])
+      loadFiles: vi.fn().mockReturnValue([file])
     };
 
     const injector = Injector.create({

@@ -14,7 +14,7 @@ describe('HistoryStoreService', () => {
     } as any];
 
     const httpMock: Pick<HttpService, 'loadHistory'> = {
-      loadHistory: jest.fn().mockResolvedValue(history)
+      loadHistory: vi.fn().mockResolvedValue(history)
     };
 
     const injector = Injector.create({

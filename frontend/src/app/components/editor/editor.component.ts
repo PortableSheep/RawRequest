@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewIni
 
 import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, RangeSetBuilder, Compartment, Prec } from '@codemirror/state';
-import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, Tooltip, keymap } from '@codemirror/view';
+import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, keymap } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { foldKeymap, foldService, syntaxTree, LRLanguage, LanguageSupport } from '@codemirror/language';
 import {
@@ -10,7 +10,6 @@ import {
   findNext,
   findPrevious,
   getSearchQuery,
-  highlightSelectionMatches,
   openSearchPanel,
   closeSearchPanel,
   replaceAll,
@@ -37,12 +36,8 @@ import type { SecretIndex } from '../../services/secret.service';
 import { ThemeService } from '../../services/theme.service';
 import {
   extractDependsTarget,
-  extractSetVarKeys,
   isMethodLine,
-  isSeparatorLine,
-  ENV_PLACEHOLDER_REGEX,
-  REQUEST_REF_PLACEHOLDER_REGEX,
-  SECRET_PLACEHOLDER_REGEX
+  isSeparatorLine
 } from '../../utils/http-file-analysis';
 
 const rawRequestHttpLanguage = LRLanguage.define({ parser: rawRequestHttpParser });
@@ -271,7 +266,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         this.createRequestBlockIndexer(),
         this.createRequestFolding(),
         search({ top: true }),
-        highlightSelectionMatches(),
         this.createRequestHighlighter(),
         this.createDependsLinker(),
         this.autocompleteCompartment.of(this.createAutocomplete()),

@@ -16,7 +16,7 @@ describe('backend-variable-sync', () => {
   });
 
   it('swallows errors and warns', async () => {
-    const warn = jest.fn();
+    const warn = vi.fn();
     await syncInitialVariablesToBackend(
       { a: '1' },
       async () => {

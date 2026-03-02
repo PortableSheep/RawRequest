@@ -23,7 +23,7 @@ describe('file-tabs-storage', () => {
 
   it('swallows JSON parse errors and logs', () => {
     const storage = { getItem: () => '{bad', setItem: () => {} };
-    const error = jest.fn();
+    const error = vi.fn();
     expect(loadFileTabsFromStorage('k', storage, { error })).toEqual([]);
     expect(error).toHaveBeenCalled();
   });

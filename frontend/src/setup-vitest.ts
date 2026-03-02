@@ -1,7 +1,9 @@
-import { setupZoneTestEnv } from 'jest-preset-angular/setup-env/zone';
-import '@testing-library/jest-dom';
+import '@angular/compiler';
+import '@analogjs/vitest-angular/setup-zone';
+import { setupTestBed } from '@analogjs/vitest-angular/setup-testbed';
+import '@testing-library/jest-dom/vitest';
 
-setupZoneTestEnv();
+setupTestBed({ zoneless: false });
 
 // Minimal Wails runtime stubs so unit tests can import services that depend on
 // generated bindings without requiring the real desktop runtime.
@@ -24,7 +26,7 @@ if (!w.go.main.App) {
 			get(_target, prop) {
 				if (typeof prop === 'string') {
 					if (prop === 'CheckForUpdates') {
-						return jest.fn(async () => ({
+						return vi.fn(async () => ({
 							available: false,
 							currentVersion: 'test',
 							latestVersion: 'test',
@@ -34,7 +36,7 @@ if (!w.go.main.App) {
 							publishedAt: ''
 						}));
 					}
-					return jest.fn(async () => undefined);
+					return vi.fn(async () => undefined);
 				}
 				return undefined;
 			}
@@ -46,7 +48,7 @@ w.runtime ??= new Proxy(
 	{},
 	{
 		get() {
-			return jest.fn(async () => undefined);
+			return vi.fn(async () => undefined);
 		}
 	}
 );
