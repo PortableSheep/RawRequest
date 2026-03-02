@@ -1,6 +1,9 @@
 import {
   Component,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  OnInit,
+  OnDestroy,
   inject,
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
@@ -35,10 +38,19 @@ export interface LoadTestVizData {
   styleUrls: ["./active-request-overlay.component.scss"],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ActiveRequestOverlayComponent {
+export class ActiveRequestOverlayComponent implements OnInit, OnDestroy {
   private readonly ws = inject(WorkspaceStateService);
+  private readonly cdr = inject(ChangeDetectorRef);
   readonly reqExec = inject(RequestExecutionService);
   readonly loadTestViz = inject(LoadTestVisualizationService);
+
+  ngOnInit(): void {
+    this.loadTestViz.registerCdr(this.cdr);
+  }
+
+  ngOnDestroy(): void {
+    this.loadTestViz.unregisterCdr(this.cdr);
+  }
 
   get activeRequestInfo() { return this.reqExec.activeRequestInfo; }
   get isCancelling() { return this.reqExec.isCancellingActiveRequest; }

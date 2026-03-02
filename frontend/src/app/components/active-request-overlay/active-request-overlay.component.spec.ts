@@ -43,6 +43,8 @@ describe("ActiveRequestOverlayComponent", () => {
       loadRpsSparklinePathDView: "",
       loadRpsSparklineTransformView: "",
       currentLoadRpsView: 0,
+      registerCdr: vi.fn(),
+      unregisterCdr: vi.fn(),
     };
 
     await TestBed.configureTestingModule({

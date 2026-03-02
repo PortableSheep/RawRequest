@@ -55,6 +55,7 @@ describe('RequestExecutionService', () => {
     stopActiveRunTick: vi.Mock;
     applyResetPatch: vi.Mock;
     pushLoadUsersSample: vi.Mock;
+    notifyRegisteredViews: vi.Mock;
     activeRunNowMs: number;
     activeRunProgress: any;
     loadTestMetrics: any;
@@ -88,6 +89,7 @@ describe('RequestExecutionService', () => {
             stopActiveRunTick: vi.fn(),
             applyResetPatch: vi.fn(),
             pushLoadUsersSample: vi.fn(),
+            notifyRegisteredViews: vi.fn(),
             activeRunNowMs: Date.now(),
             activeRunProgress: null,
             loadTestMetrics: null,

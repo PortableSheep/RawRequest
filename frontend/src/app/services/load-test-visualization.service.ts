@@ -15,6 +15,7 @@ import { buildInitialLoadRunUiState } from '../logic/request/active-request.logi
 @Injectable({ providedIn: 'root' })
 export class LoadTestVisualizationService {
   private readonly ngZone = inject(NgZone);
+  private readonly additionalCdrs: ChangeDetectorRef[] = [];
 
   activeRunProgress: ActiveRunProgress | null = null;
   private activeRunTickHandle: any = null;
@@ -50,6 +51,28 @@ export class LoadTestVisualizationService {
   private rpsRenderTarget: number | null = null;
 
   loadTestMetrics: any = null;
+
+  /** Register an additional ChangeDetectorRef to be checked during the sparkline animation loop. */
+  registerCdr(cdr: ChangeDetectorRef): void {
+    if (!this.additionalCdrs.includes(cdr)) {
+      this.additionalCdrs.push(cdr);
+    }
+  }
+
+  /** Unregister a previously registered ChangeDetectorRef. */
+  unregisterCdr(cdr: ChangeDetectorRef): void {
+    const idx = this.additionalCdrs.indexOf(cdr);
+    if (idx >= 0) {
+      this.additionalCdrs.splice(idx, 1);
+    }
+  }
+
+  /** Trigger change detection on all registered additional CDRs. */
+  notifyRegisteredViews(): void {
+    for (const c of this.additionalCdrs) {
+      c.detectChanges();
+    }
+  }
 
   get currentLoadRpsView(): number {
     if (typeof this.rpsRenderValue === 'number' && Number.isFinite(this.rpsRenderValue)) {
@@ -197,6 +220,7 @@ export class LoadTestVisualizationService {
         this.loadRpsSparklinePathDView = rpsTick.pathDView;
 
         cdr.detectChanges();
+        this.notifyRegisteredViews();
       };
 
       this.sparklineRafHandle = requestAnimationFrame(step);

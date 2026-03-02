@@ -312,6 +312,9 @@ export class RequestExecutionService {
     this.isRequestRunningSignal.set(this.isRequestRunning);
     this.pendingRequestIndexSignal.set(this.pendingRequestIndex);
 
+    // Notify OnPush overlay so it re-renders the cleared state.
+    this.loadTestViz.notifyRegisteredViews();
+
     if (!this.isRequestRunning) {
       this.downloadProgressSignal.set(null);
     }
