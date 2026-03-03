@@ -1018,6 +1018,8 @@ html[data-theme="light"] body::after {
   display: inline-flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .rr-active-dot {
@@ -1054,6 +1056,10 @@ html[data-theme="light"] body::after {
 .rr-active-card__meta {
   font-size: 12px;
   color: var(--rr-text-subtle);
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .rr-active-card__details {
