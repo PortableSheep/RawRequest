@@ -696,6 +696,16 @@ html[data-theme="light"] body::after {
   font-weight: 600;
   display: inline-flex;
   align-items: center;
+
+  &--clickable {
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+
+    &:hover {
+      background: var(--rr-surface-hover, rgba(255, 255, 255, 0.08));
+      border-color: var(--rr-border-hover, rgba(255, 255, 255, 0.15));
+    }
+  }
 }
 
 .rr-icon {

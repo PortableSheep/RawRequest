@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
+import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, ListReleases, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
 import {
   decideUpdateReadyState,
   normalizeUpdateProgressPercent,
@@ -16,6 +16,14 @@ export interface UpdateInfo {
   releaseNotes: string;
   releaseName: string;
   publishedAt: string;
+}
+
+export interface ReleaseInfo {
+  version: string;
+  name: string;
+  publishedAt: string;
+  releaseUrl: string;
+  isCurrent: boolean;
 }
 
 const DISMISSED_VERSION_KEY = 'rawrequest_dismissed_update_version';
@@ -39,6 +47,8 @@ export class UpdateService {
   private _updateReadyVersion = signal<string | null>(null);
   private _updateStatus = signal<string>('');
   private _updateProgress = signal<number | null>(null);
+  private _availableReleases = signal<ReleaseInfo[]>([]);
+  private _isLoadingReleases = signal<boolean>(false);
   private initialized = false;
   private unsubscribers: Array<() => void> = [];
 
@@ -54,6 +64,8 @@ export class UpdateService {
   readonly updateReadyVersion = computed(() => this._updateReadyVersion());
   readonly updateStatus = computed(() => this._updateStatus());
   readonly updateProgress = computed(() => this._updateProgress());
+  readonly availableReleases = computed(() => this._availableReleases());
+  readonly isLoadingReleases = computed(() => this._isLoadingReleases());
 
   private hasWailsBindings(): boolean {
     const g: any = globalThis as any;
@@ -177,22 +189,43 @@ export class UpdateService {
   async startUpdateAndRestart(): Promise<boolean> {
     const info = this._updateInfo();
     if (!info?.latestVersion) return false;
+    return this.startInstallVersion(info.latestVersion);
+  }
+
+  async startInstallVersion(version: string): Promise<boolean> {
+    if (!version?.trim()) return false;
 
     try {
-		this._isUpdating.set(true);
-		this._updateStatus.set('Preparing update…');
-		this._updateProgress.set(null);
-      await StartUpdateAndRestart(info.latestVersion);
-		// In the new flow, this call may finish without quitting (download-only).
-		if (!this._isUpdateReady()) {
-			this._isUpdating.set(false);
-		}
+      this._isUpdating.set(true);
+      this._updateStatus.set('Preparing update…');
+      this._updateProgress.set(null);
+      await StartUpdateAndRestart(version);
+      if (!this._isUpdateReady()) {
+        this._isUpdating.set(false);
+      }
       return true;
     } catch (err) {
       console.error('Failed to start updater:', err);
-		this._error.set(err instanceof Error ? err.message : 'Failed to start updater');
-		this._isUpdating.set(false);
+      this._error.set(err instanceof Error ? err.message : 'Failed to start updater');
+      this._isUpdating.set(false);
       return false;
+    }
+  }
+
+  async listReleases(): Promise<ReleaseInfo[]> {
+    if (!this.hasWailsBindings()) return [];
+
+    this._isLoadingReleases.set(true);
+    try {
+      const releases = await ListReleases();
+      this._availableReleases.set(releases ?? []);
+      return releases ?? [];
+    } catch (err) {
+      console.error('Failed to list releases:', err);
+      this._error.set(err instanceof Error ? err.message : 'Failed to list releases');
+      return [];
+    } finally {
+      this._isLoadingReleases.set(false);
     }
   }
 

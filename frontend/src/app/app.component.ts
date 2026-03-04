@@ -29,6 +29,7 @@ import { OutlinePanelComponent } from "./components/outline-panel/outline-panel.
 import { CommandPaletteComponent } from "./components/command-palette/command-palette.component";
 import { ActiveRequestOverlayComponent } from "./components/active-request-overlay/active-request-overlay.component";
 import { ToastContainerComponent } from "./components/toast-container/toast-container.component";
+import { VersionManagerComponent } from "./components/version-manager/version-manager.component";
 import {
   FileTab,
   ResponseData,
@@ -76,6 +77,7 @@ import { StartupService } from "./services/startup.service";
     OutlinePanelComponent,
     CommandPaletteComponent,
     ActiveRequestOverlayComponent,
+    VersionManagerComponent,
   ],
   templateUrl: "./app.component.html",
   styleUrls: ["./app.component.scss"],

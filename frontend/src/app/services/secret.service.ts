@@ -203,13 +203,15 @@ export class SecretService {
     void this.loadVaultInfo(force);
   }
 
-  async loadVaultInfo(force = false): Promise<void> {
+  async loadVaultInfo(force = false): Promise<VaultInfo | null> {
     try {
       const info = await this.getVaultInfo(force);
       this.vaultInfo = info;
       this.checkMasterPasswordNeeded();
+      return info;
     } catch (error) {
-      return console.error('Failed to load vault info', error);
+      console.error('Failed to load vault info', error);
+      return null;
     }
   }
 

@@ -86,6 +86,10 @@ export function IsFirstRun() {
   return window['go']['main']['App']['IsFirstRun']();
 }
 
+export function ListReleases() {
+  return window['go']['main']['App']['ListReleases']();
+}
+
 export function ListSecrets() {
   return window['go']['main']['App']['ListSecrets']();
 }

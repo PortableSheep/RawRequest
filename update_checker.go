@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"rawrequest/internal/updatechecklogic"
@@ -31,6 +32,14 @@ type UpdateInfo struct {
 	ReleaseNotes   string `json:"releaseNotes"`
 	ReleaseName    string `json:"releaseName"`
 	PublishedAt    string `json:"publishedAt"`
+}
+
+type ReleaseInfo struct {
+	Version     string `json:"version"`
+	Name        string `json:"name"`
+	PublishedAt string `json:"publishedAt"`
+	ReleaseURL  string `json:"releaseUrl"`
+	IsCurrent   bool   `json:"isCurrent"`
 }
 
 const (
@@ -95,4 +104,46 @@ func (a *App) CheckForUpdates() (UpdateInfo, error) {
 func (a *App) OpenReleaseURL(url string) error {
 	runtime.BrowserOpenURL(a.ctx, url)
 	return nil
+}
+
+func (a *App) ListReleases() ([]ReleaseInfo, error) {
+	client := &http.Client{Timeout: 10 * time.Second}
+	req, err := updatechecklogic.BuildListReleasesRequest(githubOwner, githubRepo, "RawRequest-UpdateChecker", 15)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch releases: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	releases, err := updatechecklogic.ParseReleasesJSON(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse releases: %w", err)
+	}
+
+	stable := updatechecklogic.FilterStableReleases(releases)
+	var result []ReleaseInfo
+	for _, r := range stable {
+		v := strings.TrimPrefix(r.TagName, "v")
+		result = append(result, ReleaseInfo{
+			Version:     v,
+			Name:        r.Name,
+			PublishedAt: r.PublishedAt.Format("January 2, 2006"),
+			ReleaseURL:  r.HTMLURL,
+			IsCurrent:   v == Version,
+		})
+	}
+	return result, nil
 }

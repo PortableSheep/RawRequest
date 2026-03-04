@@ -1,0 +1,96 @@
+@if (panels.showVersionManager()) {
+  <div class="rr-modal-shell" (click)="handleShellClick($event)">
+    <div class="rr-modal version-manager modal-animated" (click)="$event.stopPropagation()" role="dialog" aria-modal="true" aria-labelledby="version-manager-title">
+      <div class="rr-modal__header">
+        <h5 id="version-manager-title" class="rr-modal__title">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon" style="vertical-align: middle; margin-right: 6px; width: 18px; height: 18px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Version Manager
+        </h5>
+        <button type="button" class="rr-icon-btn rr-modal__close" (click)="close()" aria-label="Close">
+          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6L6 18M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="rr-modal__body version-manager__body">
+        <p class="version-manager__subtitle">
+          Current version: <strong>v{{ updateService.appVersion() }}</strong>
+        </p>
+
+        @if (updateService.isLoadingReleases()) {
+          <div class="version-manager__loading">Loading releases…</div>
+        } @else if (updateService.availableReleases().length === 0) {
+          <div class="version-manager__empty">No releases found.</div>
+        } @else {
+          <div class="version-manager__list">
+            @for (release of updateService.availableReleases(); track release.version) {
+              <div class="version-manager__row" [class.version-manager__row--current]="release.isCurrent">
+                <div class="version-manager__row-info">
+                  <span class="version-manager__version">v{{ release.version }}</span>
+                  @if (release.isCurrent) {
+                    <span class="version-manager__current-badge">Current</span>
+                  }
+                  @if (release.publishedAt) {
+                    <span class="version-manager__date">{{ release.publishedAt }}</span>
+                  }
+                </div>
+                <div class="version-manager__row-actions">
+                  @if (release.isCurrent) {
+                    <button class="rr-btn rr-btn--sm" disabled>Installed</button>
+                  } @else {
+                    <button
+                      class="rr-btn rr-btn--sm rr-btn--primary"
+                      (click)="promptInstall(release)"
+                      [disabled]="updateService.isUpdating()"
+                    >
+                      Install
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+  <div class="rr-modal-backdrop modal-backdrop-animated" (click)="close()"></div>
+}
+
+@if (confirmVersion) {
+  <div class="rr-modal-shell version-manager__confirm-shell" style="z-index: 1001">
+    <div class="rr-modal version-manager__confirm modal-animated" role="alertdialog" aria-modal="true">
+      <div class="rr-modal__header">
+        <h5 class="rr-modal__title">
+          @if (confirmVersion.version < (updateService.appVersion() || '')) {
+            Downgrade to v{{ confirmVersion.version }}?
+          } @else {
+            Install v{{ confirmVersion.version }}?
+          }
+        </h5>
+      </div>
+      <div class="rr-modal__body">
+        <p>
+          @if (confirmVersion.version < (updateService.appVersion() || '')) {
+            This will install an <strong>older</strong> version. Any features added after v{{ confirmVersion.version }} will not be available.
+          } @else {
+            This will install v{{ confirmVersion.version }}, replacing your current version.
+          }
+        </p>
+        <p class="version-manager__confirm-note">The app will restart after the update is applied.</p>
+      </div>
+      <div class="rr-modal__footer">
+        <button class="rr-btn" (click)="cancelInstall()">Cancel</button>
+        <button class="rr-btn rr-btn--primary" (click)="confirmInstall()">
+          Install v{{ confirmVersion.version }}
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="rr-modal-backdrop modal-backdrop-animated" style="z-index: 1000" (click)="cancelInstall()"></div>
+}

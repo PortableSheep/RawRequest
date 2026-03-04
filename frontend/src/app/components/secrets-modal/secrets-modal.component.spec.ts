@@ -468,6 +468,40 @@ describe('SecretsModalComponent', () => {
     });
   });
 
+  describe('auto-prompt master password on open', () => {
+    it('should auto-show set password prompt when secrets exist but no master password', async () => {
+      mockSecretService.loadVaultInfo.mockResolvedValue({ hasMasterPassword: false });
+
+      mockPanels.showSecretsModal.set(true);
+      fixture.detectChanges();
+      await flushPromises();
+
+      expect(component.showMasterPasswordPrompt).toBe(true);
+      expect(component.masterPasswordMode).toBe('set');
+    });
+
+    it('should not auto-prompt when master password exists', async () => {
+      mockSecretService.loadVaultInfo.mockResolvedValue({ hasMasterPassword: true });
+
+      mockPanels.showSecretsModal.set(true);
+      fixture.detectChanges();
+      await flushPromises();
+
+      expect(component.showMasterPasswordPrompt).toBe(false);
+    });
+
+    it('should not auto-prompt when no secrets exist', async () => {
+      mockSecretService.allSecrets = {};
+      mockSecretService.loadVaultInfo.mockResolvedValue({ hasMasterPassword: false });
+
+      mockPanels.showSecretsModal.set(true);
+      fixture.detectChanges();
+      await flushPromises();
+
+      expect(component.showMasterPasswordPrompt).toBe(false);
+    });
+  });
+
   // -----------------------------------------------------------------------
   // State reset on open
   // -----------------------------------------------------------------------
@@ -529,3 +563,7 @@ describe('SecretsModalComponent', () => {
     });
   });
 });
+
+function flushPromises(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}

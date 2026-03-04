@@ -45,6 +45,8 @@ export function ImportFromPath(arg1:string):Promise<importers.ImportResult>;
 
 export function IsFirstRun():Promise<boolean>;
 
+export function ListReleases():Promise<Array<main.ReleaseInfo>>;
+
 export function ListSecrets():Promise<Record<string, Array<string>>>;
 
 export function LoadFileHistory(arg1:string):Promise<string>;

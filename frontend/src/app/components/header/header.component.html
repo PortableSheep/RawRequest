@@ -78,9 +78,9 @@
 
     <div class="rr-topbar__right">
         @if (startup.updateService.appVersion()) {
-            <span class="rr-badge">
+            <button class="rr-badge rr-badge--clickable" (click)="panels.showVersionManager.set(true)" title="Manage versions">
                 v{{ startup.updateService.appVersion() }}
-            </span>
+            </button>
         }
         <div class="rr-select-wrap">
             @if(ws.currentFileEnvironments().length > 0) {

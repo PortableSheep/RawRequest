@@ -83,6 +83,26 @@ export namespace main {
 	        this.message = source["message"];
 	    }
 	}
+	export class ReleaseInfo {
+	    version: string;
+	    name: string;
+	    publishedAt: string;
+	    releaseUrl: string;
+	    isCurrent: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReleaseInfo(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.version = source["version"];
+	        this.name = source["name"];
+	        this.publishedAt = source["publishedAt"];
+	        this.releaseUrl = source["releaseUrl"];
+	        this.isCurrent = source["isCurrent"];
+	    }
+	}
 	export class UpdateInfo {
 	    available: boolean;
 	    currentVersion: string;

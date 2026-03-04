@@ -70,13 +70,23 @@ export class SecretsModalComponent {
         this.masterPasswordError = '';
         this.showDeleteConfirm = false;
         this.secretToDelete = null;
-        void this.secretService.loadVaultInfo();
+        void this.initModalState();
       }
       this.wasOpen = open;
     });
   }
 
   Object = Object;
+
+  private async initModalState(): Promise<void> {
+    const info = await this.secretService.loadVaultInfo();
+    if (info && !info.hasMasterPassword && this.getTotalSecretCount() > 0) {
+      this.masterPasswordMode = 'set';
+      this.masterPasswordInput = '';
+      this.masterPasswordError = '';
+      this.showMasterPasswordPrompt = true;
+    }
+  }
 
   // Master password & value reveal state
   showMasterPasswordPrompt = false;

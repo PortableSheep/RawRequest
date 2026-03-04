@@ -129,6 +129,23 @@ describe('SecretService', () => {
       expect(service.vaultInfo).toEqual(info);
     });
 
+    it('should return the loaded vault info', async () => {
+      const info = { hasMasterPassword: true, secretCount: 3 };
+      backend.getVaultInfo.mockResolvedValue(info);
+
+      const result = await service.loadVaultInfo(true);
+
+      expect(result).toEqual(info);
+    });
+
+    it('should return null on backend error', async () => {
+      backend.getVaultInfo.mockRejectedValue(new Error('network error'));
+
+      const result = await service.loadVaultInfo(true);
+
+      expect(result).toBeNull();
+    });
+
     it('should not throw on backend error', async () => {
       backend.getVaultInfo.mockRejectedValue(new Error('network error'));
 

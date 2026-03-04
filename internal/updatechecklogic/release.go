@@ -52,3 +52,19 @@ func DecideUpdate(currentVersion string, rel Release) UpdateDecision {
 	}
 	return decision
 }
+
+func ParseReleasesJSON(body []byte) ([]Release, error) {
+	var releases []Release
+	err := json.Unmarshal(body, &releases)
+	return releases, err
+}
+
+func FilterStableReleases(releases []Release) []Release {
+	var stable []Release
+	for _, r := range releases {
+		if !IsSkippableRelease(r) {
+			stable = append(stable, r)
+		}
+	}
+	return stable
+}

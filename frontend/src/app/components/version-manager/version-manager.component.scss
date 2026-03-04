@@ -1,0 +1,86 @@
+:host {
+  display: block;
+}
+
+.version-manager {
+  max-width: 520px;
+  width: 100%;
+}
+
+.version-manager__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.version-manager__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rr-text-muted, #888);
+}
+
+.version-manager__loading,
+.version-manager__empty {
+  text-align: center;
+  padding: 24px 0;
+  color: var(--rr-text-muted, #888);
+  font-size: 13px;
+}
+
+.version-manager__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.version-manager__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--rr-surface-secondary, rgba(255, 255, 255, 0.03));
+
+  &--current {
+    background: var(--rr-surface-active, rgba(255, 255, 255, 0.06));
+  }
+}
+
+.version-manager__row-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.version-manager__version {
+  font-weight: 600;
+  font-size: 13px;
+  font-family: var(--rr-font-mono, monospace);
+}
+
+.version-manager__current-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--rr-accent, #3b82f6);
+  color: #fff;
+}
+
+.version-manager__date {
+  font-size: 12px;
+  color: var(--rr-text-muted, #888);
+}
+
+.version-manager__row-actions {
+  flex-shrink: 0;
+}
+
+.version-manager__confirm-note {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--rr-text-muted, #888);
+}

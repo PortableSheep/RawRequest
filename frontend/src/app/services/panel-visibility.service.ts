@@ -13,6 +13,7 @@ export class PanelVisibilityService {
   readonly showSecretsModal = signal(false);
   readonly showSnippetModal = signal(false);
   readonly showDeleteConfirmModal = signal(false);
+  readonly showVersionManager = signal(false);
   readonly consoleOpen = signal(false);
 
   /** True when no sidebar or modal overlay is active. */
