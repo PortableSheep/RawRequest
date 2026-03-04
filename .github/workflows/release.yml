@@ -51,7 +51,7 @@ jobs:
       - name: Build macOS (Universal)
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          wails build -platform darwin/universal -ldflags "-X main.Version=${VERSION}"
+          wails build -platform darwin/universal -ldflags "-X rawrequest/internal/app.Version=${VERSION}"
 
       - name: Smoke check CLI commands (macOS)
         run: |
@@ -130,7 +130,7 @@ jobs:
         shell: bash
         run: |
           VERSION=${{ steps.version.outputs.version }}
-          wails build -platform windows/amd64 -ldflags "-X main.Version=${VERSION}"
+          wails build -platform windows/amd64 -ldflags "-X rawrequest/internal/app.Version=${VERSION}"
 
       - name: Smoke check CLI commands (Windows)
         shell: powershell

@@ -39,7 +39,7 @@ clean() {
 build_macos() {
     print_status "Building for macOS (universal)..."
     
-    wails build -platform darwin/universal -clean -ldflags "-X main.Version=$VERSION"
+    wails build -platform darwin/universal -clean -ldflags "-X rawrequest/internal/app.Version=$VERSION"
     
     # Package for Homebrew
     print_status "Packaging for Homebrew..."
@@ -84,7 +84,7 @@ build_windows() {
         fi
     fi
     
-    wails build -platform windows/amd64 -ldflags "-X main.Version=$VERSION"
+    wails build -platform windows/amd64 -ldflags "-X rawrequest/internal/app.Version=$VERSION"
     
     # Create portable ZIP
     print_status "Creating portable ZIP..."

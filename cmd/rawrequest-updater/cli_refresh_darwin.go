@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -74,10 +75,29 @@ func repairCLISymlink(linkPath, targetPath string) {
 	// Symlink is broken or points at a backup — repair it.
 	fmt.Printf("Repairing CLI symlink %s -> %s\n", linkPath, targetPath)
 	if err := os.Remove(linkPath); err != nil {
-		fmt.Printf("Warning: could not remove old symlink %s: %v\n", linkPath, err)
+		// Direct removal failed (likely permission denied for root-owned symlinks).
+		// Try privileged repair via osascript.
+		fmt.Printf("Elevated permissions needed to repair %s, requesting admin access...\n", linkPath)
+		if privErr := repairCLISymlinkPrivileged(linkPath, targetPath); privErr != nil {
+			fmt.Printf("Warning: could not repair symlink %s: %v\n", linkPath, privErr)
+		}
 		return
 	}
 	if err := os.Symlink(targetPath, linkPath); err != nil {
 		fmt.Printf("Warning: could not create symlink %s -> %s: %v\n", linkPath, targetPath, err)
 	}
+}
+
+// repairCLISymlinkPrivileged uses osascript to run ln -sf with admin
+// privileges, presenting a macOS authorization dialog.
+func repairCLISymlinkPrivileged(linkPath, targetPath string) error {
+	script := fmt.Sprintf(
+		`do shell script "ln -sf %q %q" with administrator privileges`,
+		targetPath, linkPath,
+	)
+	cmd := exec.Command("osascript", "-e", script)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("%w: %s", err, strings.TrimSpace(string(out)))
+	}
+	return nil
 }

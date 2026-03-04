@@ -71,13 +71,13 @@ done
 build_cli() {
   echo -e "${GREEN}[DEV]${NC} Building rawrequest CLI binary..."
   cd "$PROJECT_ROOT"
-  go build -ldflags "-X main.Version=dev" -o "$CLI_BIN" .
+  go build -ldflags "-X rawrequest/internal/app.Version=dev" -o "$CLI_BIN" .
 }
 
 build_app() {
   echo -e "${GREEN}[DEV]${NC} Building RawRequest desktop app (wails)..."
   cd "$PROJECT_ROOT"
-  wails build -ldflags "-X main.Version=dev"
+  wails build -ldflags "-X rawrequest/internal/app.Version=dev"
 }
 
 link_cli() {
