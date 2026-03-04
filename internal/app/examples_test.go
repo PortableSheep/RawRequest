@@ -1,9 +1,18 @@
-package main
+package app
 
 import (
 	"os"
 	"testing"
+	"testing/fstest"
 )
+
+func testExamplesFS() fstest.MapFS {
+	return fstest.MapFS{
+		"examples/examples.http": &fstest.MapFile{
+			Data: []byte("GET https://httpbin.org/get\n"),
+		},
+	}
+}
 
 func TestGetExamplesForFirstRun_IsolatedHomeDir(t *testing.T) {
 	// Prevent tests from reading/writing the user's real app dir.
@@ -13,7 +22,7 @@ func TestGetExamplesForFirstRun_IsolatedHomeDir(t *testing.T) {
 	})
 	_ = os.Setenv("HOME", t.TempDir())
 
-	app := NewApp()
+	app := NewApp(testExamplesFS())
 
 	resp, err := app.GetExamplesForFirstRun()
 	if err != nil {
@@ -46,7 +55,7 @@ func TestGetExamplesFile_AlwaysReturnsContent(t *testing.T) {
 	})
 	_ = os.Setenv("HOME", t.TempDir())
 
-	app := NewApp()
+	app := NewApp(testExamplesFS())
 	resp, err := app.GetExamplesFile()
 	if err != nil {
 		t.Fatalf("GetExamplesFile error: %v", err)

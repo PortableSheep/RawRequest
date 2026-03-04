@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"rawrequest/internal/app"
 	"rawrequest/internal/cli"
 	mcpserver "rawrequest/internal/mcp"
 
@@ -33,18 +34,18 @@ func main() {
 			os.Exit(0)
 		}
 		if opts.Command == cli.CommandService {
-			if err := startServiceServer(opts); err != nil {
+			if err := app.StartServiceServer(opts); err != nil {
 				fmt.Fprintf(os.Stderr, "Service error: %v\n", err)
 				os.Exit(1)
 			}
 			os.Exit(0)
 		}
-		exitCode := cli.Run(opts, Version)
+		exitCode := cli.Run(opts, app.Version)
 		os.Exit(exitCode)
 	}
 
 	// GUI mode - Create an instance of the app structure
-	app := NewApp()
+	a := app.NewApp(examplesFS)
 
 	// Create application with options
 	err := wails.Run(&options.App{
@@ -61,11 +62,11 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 9, G: 9, B: 11, A: 1}, // zinc-950
-		OnStartup:        app.startup,
-		OnDomReady:       app.onDomReady,
-		OnBeforeClose:    app.onBeforeClose,
+		OnStartup:        a.Startup,
+		OnDomReady:       a.OnDomReady,
+		OnBeforeClose:    a.OnBeforeClose,
 		Bind: []interface{}{
-			app,
+			a,
 		},
 	})
 
@@ -83,7 +84,7 @@ func startMCPServer(opts *cli.Options) error {
 	vaultDir := filepath.Join(configDir, "rawrequest", "secrets")
 
 	var secretResolver cli.SecretResolver
-	vault, err := NewSecretVault(vaultDir)
+	vault, err := app.NewSecretVault(vaultDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: secret vault unavailable: %v\n", err)
 	} else {
@@ -93,7 +94,7 @@ func startMCPServer(opts *cli.Options) error {
 	return mcpserver.Serve(mcpserver.Options{
 		DefaultEnv:     opts.Environment,
 		SecretResolver: secretResolver,
-		Version:        Version,
+		Version:        app.Version,
 		Workspace:      opts.Workspace,
 	})
 }

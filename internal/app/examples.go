@@ -1,4 +1,6 @@
-package main
+package app
+
+import "io/fs"
 
 type ExamplesForFirstRunResponse struct {
 	Content    string `json:"content"`
@@ -11,7 +13,7 @@ func (a *App) GetExamplesForFirstRun() (*ExamplesForFirstRunResponse, error) {
 		return &ExamplesForFirstRunResponse{Content: "", FilePath: "", IsFirstRun: false}, nil
 	}
 
-	content, err := examplesFS.ReadFile("examples/examples.http")
+	content, err := fs.ReadFile(a.examplesFS, "examples/examples.http")
 	if err != nil {
 		return nil, err
 	}
@@ -20,7 +22,7 @@ func (a *App) GetExamplesForFirstRun() (*ExamplesForFirstRunResponse, error) {
 }
 
 func (a *App) GetExamplesFile() (*ExamplesForFirstRunResponse, error) {
-	content, err := examplesFS.ReadFile("examples/examples.http")
+	content, err := fs.ReadFile(a.examplesFS, "examples/examples.http")
 	if err != nil {
 		return nil, err
 	}

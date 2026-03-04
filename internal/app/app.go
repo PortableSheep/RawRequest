@@ -1,10 +1,12 @@
-//go:generate go run ./scripts/generate_script_cleaner.go
+//go:generate go run ../../scripts/generate_script_cleaner.go
 
-package main
+package app
 
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"maps"
 	"strings"
 	"sync"
 
@@ -58,6 +60,7 @@ type App struct {
 	secretVaultErr    error
 	managedServicePID int
 	managedServiceMu  sync.Mutex
+	examplesFS        fs.FS
 }
 
 const (
@@ -73,8 +76,8 @@ type ScriptLogEntry struct {
 	Message   string `json:"message"`
 }
 
-func NewApp() *App {
-	return &App{
+func NewApp(examplesFS ...fs.FS) *App {
+	a := &App{
 		variables:      make(map[string]string),
 		environments:   make(map[string]map[string]string),
 		currentEnv:     "default",
@@ -82,13 +85,17 @@ func NewApp() *App {
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
 	}
+	if len(examplesFS) > 0 {
+		a.examplesFS = examplesFS[0]
+	}
+	return a
 }
 
-func (a *App) startup(ctx context.Context) {
+func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
 }
 
-func (a *App) onDomReady(ctx context.Context) {
+func (a *App) OnDomReady(ctx context.Context) {
 	a.RestoreWindowState()
 
 	if a.IsFirstRun() {
@@ -96,13 +103,13 @@ func (a *App) onDomReady(ctx context.Context) {
 	}
 }
 
-func (a *App) onBeforeClose(ctx context.Context) bool {
+func (a *App) OnBeforeClose(ctx context.Context) bool {
 	_ = a.stopManagedService()
 	_ = a.SaveWindowState()
 	return false
 }
 
-func (a *App) executeRequests(requests []map[string]interface{}) string {
+func (a *App) executeRequests(requests []map[string]any) string {
 	return a.executeRequestsWithContext(context.Background(), requests)
 }
 
@@ -193,8 +200,6 @@ func (a *App) currentEnvVarsSnapshot() map[string]string {
 		return nil
 	}
 	out := make(map[string]string, len(vars))
-	for k, v := range vars {
-		out[k] = v
-	}
+	maps.Copy(out, vars)
 	return out
 }

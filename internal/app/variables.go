@@ -1,4 +1,4 @@
-package main
+package app
 
 func (a *App) SetVariable(key, value string) {
 	a.variablesMu.Lock()

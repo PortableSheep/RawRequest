@@ -1,6 +1,6 @@
 //go:build !darwin || !cgo
 
-package main
+package app
 
 import "errors"
 

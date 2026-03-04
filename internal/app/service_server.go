@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/json"
@@ -13,7 +13,7 @@ import (
 
 const defaultServiceAddr = "127.0.0.1:7345"
 
-func startServiceServer(opts *cli.Options) error {
+func StartServiceServer(opts *cli.Options) error {
 	addr := defaultServiceAddr
 	if opts != nil {
 		if trimmed := strings.TrimSpace(opts.ServiceAddr); trimmed != "" {
