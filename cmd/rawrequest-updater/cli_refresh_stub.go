@@ -1,7 +1,6 @@
-//go:build !windows
+//go:build !windows && !darwin
 
 package main
 
-// refreshCLICopyBestEffort is a no-op on non-Windows platforms.
-// On macOS the CLI uses a symlink that survives app bundle replacement.
+// refreshCLICopyBestEffort is a no-op on platforms other than macOS and Windows.
 func refreshCLICopyBestEffort(_ string) {}

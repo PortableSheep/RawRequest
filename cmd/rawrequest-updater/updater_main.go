@@ -318,7 +318,26 @@ func extractTarGz(src, dest string) error {
 			}
 			out.Close()
 		case tar.TypeSymlink:
-			continue
+			linkTarget := hdr.Linkname
+			// Reject absolute symlink targets for security.
+			if filepath.IsAbs(linkTarget) {
+				continue
+			}
+			// Resolve the full path the symlink would point to and
+			// ensure it stays within the extraction root.
+			resolved := filepath.Clean(filepath.Join(filepath.Dir(target), linkTarget))
+			rel, err := filepath.Rel(dest, resolved)
+			if err != nil || strings.HasPrefix(rel, "..") {
+				continue
+			}
+			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+				return err
+			}
+			// Remove any existing entry so os.Symlink doesn't fail.
+			_ = os.Remove(target)
+			if err := os.Symlink(linkTarget, target); err != nil {
+				return err
+			}
 		default:
 			continue
 		}
