@@ -10,7 +10,7 @@ const mockSaveFileContents = vi.fn();
 const mockShowSaveDialog = vi.fn();
 const mockMigrateResponses = vi.fn();
 
-vi.mock('@wailsjs/go/main/App', () => ({
+vi.mock('@wailsjs/go/app/App', () => ({
   SaveFileContents: (...args: any[]) => mockSaveFileContents(...args),
   ShowSaveDialog: (...args: any[]) => mockShowSaveDialog(...args),
   MigrateResponsesFromRunLocationToHttpFile: (...args: any[]) => mockMigrateResponses(...args),

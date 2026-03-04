@@ -255,7 +255,7 @@ export class WorkspaceStateService {
 
   /** Open/upsert the examples tab. */
   async openExamplesFile(): Promise<void> {
-    const { GetExamplesFile } = await import('@wailsjs/go/main/App');
+    const { GetExamplesFile } = await import('@wailsjs/go/app/App');
     const result = await GetExamplesFile();
     const content = result?.content || '';
     const name = result?.filePath || 'Examples.http';
@@ -314,7 +314,7 @@ export class WorkspaceStateService {
     if (!file?.filePath) {
       throw new Error('File has not been saved to disk yet.');
     }
-    const { RevealInFinder } = await import('@wailsjs/go/main/App');
+    const { RevealInFinder } = await import('@wailsjs/go/app/App');
     await RevealInFinder(file.filePath);
   }
 }

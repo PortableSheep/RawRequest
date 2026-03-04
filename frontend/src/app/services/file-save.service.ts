@@ -27,7 +27,7 @@ export class FileSaveService {
         SaveFileContents,
         ShowSaveDialog,
         MigrateResponsesFromRunLocationToHttpFile,
-      } = await import('@wailsjs/go/main/App');
+      } = await import('@wailsjs/go/app/App');
 
       if (file.filePath && file.filePath.length) {
         await SaveFileContents(file.filePath, file.content);
@@ -90,7 +90,7 @@ export class FileSaveService {
         SaveFileContents,
         ShowSaveDialog,
         MigrateResponsesFromRunLocationToHttpFile,
-      } = await import('@wailsjs/go/main/App');
+      } = await import('@wailsjs/go/app/App');
 
       const previousId = file.id;
       const previousPath = file.filePath;

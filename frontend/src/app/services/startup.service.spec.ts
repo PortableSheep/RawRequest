@@ -11,7 +11,7 @@ const mockEnsureServiceRunning = vi.fn();
 const mockGetExamplesForFirstRun = vi.fn();
 const mockMarkFirstRunComplete = vi.fn();
 
-vi.mock('@wailsjs/go/main/App', () => ({
+vi.mock('@wailsjs/go/app/App', () => ({
   EnsureServiceRunning: (...args: any[]) => mockEnsureServiceRunning(...args),
   GetExamplesForFirstRun: (...args: any[]) => mockGetExamplesForFirstRun(...args),
   MarkFirstRunComplete: (...args: any[]) => mockMarkFirstRunComplete(...args),

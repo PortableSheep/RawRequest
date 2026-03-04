@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { SendNotification } from '@wailsjs/go/main/App';
+import { SendNotification } from '@wailsjs/go/app/App';
 
 @Injectable({
   providedIn: 'root'

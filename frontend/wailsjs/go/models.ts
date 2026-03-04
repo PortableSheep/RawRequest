@@ -1,53 +1,4 @@
-export namespace importers {
-	
-	export class ImportedFile {
-	    Name: string;
-	    Content: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportedFile(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Name = source["Name"];
-	        this.Content = source["Content"];
-	    }
-	}
-	export class ImportResult {
-	    Files: ImportedFile[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ImportResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Files = this.convertValues(source["Files"], ImportedFile);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
-export namespace main {
+export namespace app {
 	
 	export class ExamplesForFirstRunResponse {
 	    content: string;
@@ -63,24 +14,6 @@ export namespace main {
 	        this.content = source["content"];
 	        this.filePath = source["filePath"];
 	        this.isFirstRun = source["isFirstRun"];
-	    }
-	}
-	export class ScriptLogEntry {
-	    timestamp: string;
-	    level: string;
-	    source: string;
-	    message: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ScriptLogEntry(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.timestamp = source["timestamp"];
-	        this.level = source["level"];
-	        this.source = source["source"];
-	        this.message = source["message"];
 	    }
 	}
 	export class ReleaseInfo {
@@ -101,6 +34,24 @@ export namespace main {
 	        this.publishedAt = source["publishedAt"];
 	        this.releaseUrl = source["releaseUrl"];
 	        this.isCurrent = source["isCurrent"];
+	    }
+	}
+	export class ScriptLogEntry {
+	    timestamp: string;
+	    level: string;
+	    source: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ScriptLogEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.timestamp = source["timestamp"];
+	        this.level = source["level"];
+	        this.source = source["source"];
+	        this.message = source["message"];
 	    }
 	}
 	export class UpdateInfo {
@@ -170,6 +121,55 @@ export namespace main {
 	        this.height = source["height"];
 	        this.maximized = source["maximized"];
 	    }
+	}
+
+}
+
+export namespace importers {
+	
+	export class ImportedFile {
+	    Name: string;
+	    Content: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportedFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Name = source["Name"];
+	        this.Content = source["Content"];
+	    }
+	}
+	export class ImportResult {
+	    Files: ImportedFile[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ImportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.Files = this.convertValues(source["Files"], ImportedFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }

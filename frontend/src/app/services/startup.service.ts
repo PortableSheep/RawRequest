@@ -69,7 +69,7 @@ export class StartupService {
     const storage = this.safeStorage();
     const baseUrl = resolveServiceBackendBaseUrl(globalThis as any, storage);
     try {
-      const { EnsureServiceRunning } = await import('@wailsjs/go/main/App');
+      const { EnsureServiceRunning } = await import('@wailsjs/go/app/App');
       await EnsureServiceRunning(baseUrl);
       this.serviceStartupError = null;
       return true;
@@ -101,7 +101,7 @@ export class StartupService {
 
   private async checkFirstRun(): Promise<void> {
     try {
-      const { GetExamplesForFirstRun } = await import('@wailsjs/go/main/App');
+      const { GetExamplesForFirstRun } = await import('@wailsjs/go/app/App');
       const resp = await GetExamplesForFirstRun();
       const content = resp?.content || '';
       const filePath = resp?.filePath || 'examples.http';
@@ -111,7 +111,7 @@ export class StartupService {
         const fileName = 'examples.http';
         this.state.addFileFromContent(fileName, content, filePath);
         try {
-          const { MarkFirstRunComplete } = await import('@wailsjs/go/main/App');
+          const { MarkFirstRunComplete } = await import('@wailsjs/go/app/App');
           await MarkFirstRunComplete();
         } catch (err) {
           console.warn('Failed to mark first run complete:', err);

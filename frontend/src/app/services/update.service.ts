@@ -1,5 +1,5 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, ListReleases, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/main/App';
+import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, ListReleases, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/app/App';
 import {
   decideUpdateReadyState,
   normalizeUpdateProgressPercent,

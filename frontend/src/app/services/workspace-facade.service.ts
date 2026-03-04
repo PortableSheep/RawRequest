@@ -327,7 +327,7 @@ export class WorkspaceFacadeService {
   // --- Async I/O methods for file/import dialogs ---
 
   async openFilesFromDisk(lastSessionKey: string, files: FileTab[]): Promise<OpenFileResult[]> {
-    const { OpenFileDialog, ReadFileContents } = await import('@wailsjs/go/main/App');
+    const { OpenFileDialog, ReadFileContents } = await import('@wailsjs/go/app/App');
     const filePaths = await OpenFileDialog();
     if (!filePaths?.length) return [];
 
@@ -359,15 +359,15 @@ export class WorkspaceFacadeService {
   ): Promise<ImportCollectionResult | null> {
     let importPath: string;
     if (type === 'postman') {
-      const { OpenImportFileDialog } = await import('@wailsjs/go/main/App');
+      const { OpenImportFileDialog } = await import('@wailsjs/go/app/App');
       importPath = await OpenImportFileDialog();
     } else {
-      const { OpenImportDirectoryDialog } = await import('@wailsjs/go/main/App');
+      const { OpenImportDirectoryDialog } = await import('@wailsjs/go/app/App');
       importPath = await OpenImportDirectoryDialog();
     }
     if (!importPath) return null;
 
-    const { ImportFromPath } = await import('@wailsjs/go/main/App');
+    const { ImportFromPath } = await import('@wailsjs/go/app/App');
     const result = await ImportFromPath(importPath);
     if (!result?.Files?.length) return null;
 
