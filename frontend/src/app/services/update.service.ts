@@ -69,7 +69,7 @@ export class UpdateService {
 
   private hasWailsBindings(): boolean {
     const g: any = globalThis as any;
-    if (!g || !g.go?.main?.App) return false;
+    if (!g || !g.go?.app?.App) return false;
     if (!g.runtime) return false;
     return true;
   }

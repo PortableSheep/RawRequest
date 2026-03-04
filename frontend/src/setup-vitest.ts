@@ -16,11 +16,11 @@ declare global {
 
 const w = window as any;
 w.go ??= {};
-w.go.main ??= {};
+w.go.app ??= {};
 
 // Create a lazily-resolving mock for any backend method.
-if (!w.go.main.App) {
-	w.go.main.App = new Proxy(
+if (!w.go.app.App) {
+	w.go.app.App = new Proxy(
 		{},
 		{
 			get(_target, prop) {
