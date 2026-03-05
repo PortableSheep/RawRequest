@@ -20,6 +20,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+trap 'echo -e "\n${RED}Error: Installation failed at line $LINENO. Run with \"bash -x\" for details.${NC}" >&2' ERR
+
 echo -e "${GREEN}Installing RawRequest...${NC}"
 
 # Check OS
@@ -109,6 +111,13 @@ if [ -L "$CLI_LINK" ] || [ -e "$CLI_LINK" ]; then
 fi
 run_install_cmd ln -s "$CLI_TARGET" "$CLI_LINK"
 
+# Verify the symlink target exists
+if [ ! -x "$CLI_TARGET" ]; then
+    echo -e "${RED}Error: CLI binary not found at $CLI_TARGET${NC}"
+    echo "The app bundle may be incomplete. Try reinstalling."
+    exit 1
+fi
+
 # Install a service launcher command for split architecture workflows.
 SERVICE_CMD="$BIN_DIR/rawrequest-service"
 SERVICE_SCRIPT="$TMP_DIR/rawrequest-service"
@@ -133,10 +142,44 @@ echo "  rawrequest run api.http -n login"
 echo "  rawrequest mcp"
 echo "  rawrequest service"
 echo "  rawrequest-service"
-if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+
+# Verify the CLI is actually discoverable in the user's default login shell.
+# The install-time bash PATH may differ from the user's interactive shell.
+USER_SHELL="${SHELL:-/bin/zsh}"
+if ! "$USER_SHELL" -lc "command -v rawrequest" >/dev/null 2>&1; then
     echo ""
-    echo -e "${YELLOW}Note:${NC} $BIN_DIR is not currently on PATH in this shell."
-    echo "Add it to your shell profile to run rawrequest directly."
+    echo -e "${YELLOW}Warning:${NC} rawrequest is not on PATH in your shell ($(basename "$USER_SHELL"))."
+    echo "The symlink was created at: $CLI_LINK"
+    echo ""
+    SHELL_NAME="$(basename "$USER_SHELL")"
+    case "$SHELL_NAME" in
+        zsh)
+            PROFILE="$HOME/.zshrc"
+            ;;
+        bash)
+            PROFILE="$HOME/.bash_profile"
+            ;;
+        fish)
+            PROFILE="$HOME/.config/fish/config.fish"
+            ;;
+        *)
+            PROFILE="your shell profile"
+            ;;
+    esac
+    if [ "$SHELL_NAME" = "fish" ]; then
+        echo "Add this to $PROFILE:"
+        echo "  fish_add_path $BIN_DIR"
+    else
+        echo "Add this to $PROFILE:"
+        echo "  export PATH=\"$BIN_DIR:\$PATH\""
+    fi
+    echo ""
+    echo "Then restart your terminal or run:"
+    if [ "$SHELL_NAME" = "fish" ]; then
+        echo "  source $PROFILE"
+    else
+        echo "  source $PROFILE"
+    fi
 fi
 echo ""
 echo "Or find it in your Applications folder."
