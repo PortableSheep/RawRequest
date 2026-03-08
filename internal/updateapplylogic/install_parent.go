@@ -7,11 +7,12 @@ import (
 )
 
 func InstallParentDir(installPath string) (string, error) {
-	parent := installPath
-	if strings.HasSuffix(strings.ToLower(strings.TrimSpace(installPath)), ".app") {
-		parent = filepath.Dir(installPath)
+	trimmed := strings.TrimSpace(installPath)
+	if trimmed == "" {
+		return "", errors.New("could not determine install parent directory")
 	}
-	if strings.TrimSpace(parent) == "" {
+	parent := filepath.Dir(trimmed)
+	if parent == "" || parent == trimmed {
 		return "", errors.New("could not determine install parent directory")
 	}
 	return parent, nil

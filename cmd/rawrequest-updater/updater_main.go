@@ -173,10 +173,11 @@ func dief(format string, args ...any) {
 }
 
 func installParentDir(installPath string) string {
-	if strings.HasSuffix(strings.ToLower(installPath), ".app") {
-		return filepath.Dir(installPath)
+	parent := filepath.Dir(installPath)
+	if parent == "" {
+		return installPath
 	}
-	return installPath
+	return parent
 }
 
 func ensureDirWritable(dir string) error {

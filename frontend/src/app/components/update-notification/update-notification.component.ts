@@ -13,10 +13,16 @@ export class UpdateNotificationComponent {
   protected updateService = inject(UpdateService);
 
   async downloadOrRestart(): Promise<void> {
+    // Capture before the call — if the update is already downloaded, the Go
+    // side will launch the updater helper and quit the app.  The Wails runtime
+    // teardown will sever the RPC channel, causing the await to reject. That
+    // rejection is expected and must not trigger the browser-open fallback.
+    const isRestart = this.updateService.isUpdateReady();
+
     const started = await this.updateService.startUpdateAndRestart();
-    if (!started) {
+    if (!started && !isRestart) {
       await this.updateService.openReleasePage();
-		this.updateService.remindLater();
+      this.updateService.remindLater();
     }
   }
 

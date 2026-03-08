@@ -10,9 +10,10 @@ func TestInstallParentDir(t *testing.T) {
 		wantErr string
 	}{
 		{name: "empty", path: "", want: "", wantErr: "could not determine install parent directory"},
-		{name: "regular path", path: "/Applications/RawRequest", want: "/Applications/RawRequest", wantErr: ""},
+		{name: "regular path", path: "/Applications/RawRequest", want: "/Applications", wantErr: ""},
 		{name: "app bundle", path: "/Applications/RawRequest.app", want: "/Applications", wantErr: ""},
 		{name: "app bundle case-insensitive", path: "/Applications/RawRequest.APP", want: "/Applications", wantErr: ""},
+		{name: "windows install dir", path: "C:/Apps/RawRequest", want: "C:/Apps", wantErr: ""},
 	}
 
 	for _, tt := range tests {
