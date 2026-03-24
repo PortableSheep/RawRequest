@@ -22,6 +22,8 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
   let size: number | undefined;
   let requestPreview: { method: string; url: string; headers: { [key: string]: string }; body?: string } | undefined;
   let assertions: AssertionResult[] | undefined;
+  let isBinary = false;
+  let binaryContentType = '';
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -61,6 +63,10 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
           }
           if (typeof metadata.size === 'number') {
             size = metadata.size;
+          }
+          if (metadata.isBinary) {
+            isBinary = true;
+            binaryContentType = metadata.contentType || '';
           }
         }
       } catch (e) {
@@ -111,6 +117,11 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
     size
   };
 
+  if (isBinary) {
+    responseData.isBinary = true;
+    responseData.contentType = binaryContentType;
+  }
+
   if (assertions && assertions.length) {
     responseData.assertions = assertions;
   }
@@ -120,8 +131,8 @@ export function parseGoResponse(responseStr: string, responseTime: number): Resp
     responseData.requestPreview = requestPreview as any;
   }
 
-  // Try to parse JSON
-  if (body) {
+  // Try to parse JSON (skip for binary responses)
+  if (body && !isBinary) {
     try {
       responseData.json = JSON.parse(body);
     } catch (e) {

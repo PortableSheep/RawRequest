@@ -53,9 +53,11 @@ export class ResponsePanelComponent implements OnDestroy {
   expandedEntryId = signal<string | null>(null);
   entryTabs = signal<Record<string, EntryTab>>({});
   copyStates = signal<Record<string, 'idle' | 'copied' | 'error'>>({});
+  saveStates = signal<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   requestCollapsed = signal<Record<string, boolean>>({});
   assertionsCollapsed = signal<Record<string, boolean>>({});
   private copyTimers = new Map<string, any>();
+  private saveTimers = new Map<string, any>();
 
   // Tooltip state
   tooltipText = signal<string | null>(null);
@@ -163,6 +165,8 @@ export class ResponsePanelComponent implements OnDestroy {
   ngOnDestroy(): void {
     this.copyTimers.forEach(timer => clearTimeout(timer));
     this.copyTimers.clear();
+    this.saveTimers.forEach(timer => clearTimeout(timer));
+    this.saveTimers.clear();
     // Clean up tooltip
     if (this.tooltipShowTimer) {
       clearTimeout(this.tooltipShowTimer);
@@ -291,6 +295,60 @@ export class ResponsePanelComponent implements OnDestroy {
 
   formatBytes(bytes: number): string {
     return formatBytesForResponsePanel(bytes);
+  }
+
+  getSaveState(entryId: string): 'idle' | 'saving' | 'saved' | 'error' {
+    return this.saveStates()[entryId] ?? 'idle';
+  }
+
+  async saveBinaryResponse(entry: ChainEntryPreview) {
+    if (!entry.response?.isBinary || !entry.response.body) {
+      return;
+    }
+
+    this.setSaveState(entry.id, 'saving');
+
+    try {
+      const { SaveBase64ToFile } = await import('@wailsjs/go/app/App');
+      const contentType = entry.response.contentType || '';
+      const requestUrl = entry.request?.url || '';
+      await SaveBase64ToFile(entry.response.body, contentType, requestUrl);
+      this.setSaveState(entry.id, 'saved');
+    } catch (error: any) {
+      if (error?.message?.includes('save cancelled') || error?.includes?.('save cancelled')) {
+        this.setSaveState(entry.id, 'idle');
+      } else {
+        console.error('Save failed', error);
+        this.setSaveState(entry.id, 'error');
+      }
+    }
+  }
+
+  private setSaveState(entryId: string, state: 'idle' | 'saving' | 'saved' | 'error') {
+    this.saveStates.update(current => ({ ...current, [entryId]: state }));
+    if (state === 'idle') {
+      const timer = this.saveTimers.get(entryId);
+      if (timer) {
+        clearTimeout(timer);
+        this.saveTimers.delete(entryId);
+      }
+      return;
+    }
+
+    if (state === 'saving') {
+      return;
+    }
+
+    const existing = this.saveTimers.get(entryId);
+    if (existing) {
+      clearTimeout(existing);
+    }
+
+    const timer = setTimeout(() => {
+      this.saveStates.update(current => ({ ...current, [entryId]: 'idle' }));
+      this.saveTimers.delete(entryId);
+    }, 2000);
+    this.saveTimers.set(entryId, timer);
   }
 
 }

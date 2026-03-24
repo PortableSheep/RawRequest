@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -127,6 +128,25 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 		Size:    execResult.Size,
 		Headers: execResult.ResponseHeaders,
 	}
+
+	// Detect binary content type and handle accordingly
+	respContentType := execResult.ResponseHeaders["content-type"]
+	isBinary := hcl.IsBinaryContentType(respContentType)
+
+	var bodyStr string
+	if isBinary {
+		bodyStr = base64.StdEncoding.EncodeToString(execResult.Body)
+		metadata.IsBinary = true
+		metadata.ContentType = respContentType
+
+		// Store raw bytes for later "save to file"
+		if requestID != "" {
+			a.storeBinaryBody(requestID, execResult.Body)
+		}
+	} else {
+		bodyStr = string(execResult.Body)
+	}
+
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return fmt.Sprintf(
@@ -134,7 +154,7 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 		execResult.StatusText,
 		string(requestMetaJSON),
 		string(metadataJSON),
-		string(execResult.Body),
+		bodyStr,
 	)
 }
 

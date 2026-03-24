@@ -30,9 +30,11 @@ type TimingBreakdown struct {
 }
 
 type ResponseMetadata struct {
-	Timing  TimingBreakdown   `json:"timing"`
-	Size    int64             `json:"size"`
-	Headers map[string]string `json:"headers"`
+	Timing      TimingBreakdown   `json:"timing"`
+	Size        int64             `json:"size"`
+	Headers     map[string]string `json:"headers"`
+	IsBinary    bool              `json:"isBinary,omitempty"`
+	ContentType string            `json:"contentType,omitempty"`
 }
 
 type WindowState struct {
@@ -61,6 +63,8 @@ type App struct {
 	managedServicePID int
 	managedServiceMu  sync.Mutex
 	examplesFS        fs.FS
+	binaryBodies      map[string][]byte
+	binaryBodiesMu    sync.Mutex
 }
 
 const (
@@ -84,6 +88,7 @@ func NewApp(examplesFS ...fs.FS) *App {
 		requestCancels: make(map[string]context.CancelFunc),
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
+		binaryBodies:   make(map[string][]byte),
 	}
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]

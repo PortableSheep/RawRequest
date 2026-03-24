@@ -32,11 +32,13 @@ func Parse(response string) map[string]interface{} {
 		if strings.HasPrefix(line, "Headers: ") {
 			metadataStr := strings.TrimPrefix(line, "Headers: ")
 			var metadata struct {
-				Headers map[string]string `json:"headers"`
-				Timing  struct {
+				Headers     map[string]string `json:"headers"`
+				Timing      struct {
 					Total int64 `json:"total"`
 				} `json:"timing"`
-				Size int64 `json:"size"`
+				Size        int64  `json:"size"`
+				IsBinary    bool   `json:"isBinary"`
+				ContentType string `json:"contentType"`
 			}
 			if err := json.Unmarshal([]byte(metadataStr), &metadata); err == nil {
 				if metadata.Headers != nil {
@@ -46,6 +48,10 @@ func Parse(response string) map[string]interface{} {
 				}
 				result["responseTime"] = metadata.Timing.Total
 				result["size"] = metadata.Size
+				if metadata.IsBinary {
+					result["isBinary"] = true
+					result["contentType"] = metadata.ContentType
+				}
 			} else {
 				result["headers"] = make(map[string]string)
 			}

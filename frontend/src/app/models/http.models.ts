@@ -42,6 +42,8 @@ export interface ResponsePreview {
   timing?: TimingBreakdown;
   size?: number;  // Response body size in bytes
   assertions?: AssertionResult[];
+  isBinary?: boolean;
+  contentType?: string;
 }
 
 export interface AssertionResult {
@@ -180,6 +182,8 @@ export interface ResponseData {
   requestPreview?: RequestPreview;
   chainItems?: ChainEntryPreview[];
   assertions?: AssertionResult[];
+  isBinary?: boolean;
+  contentType?: string;
 }
 
 export interface FileTab {

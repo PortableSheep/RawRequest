@@ -557,3 +557,65 @@
   color: rgba(251, 113, 133, 0.95);
 }
 
+// Binary response indicator
+.response-entry__binary-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-secondary, #888);
+  border-radius: 6px;
+  background: var(--bg-inset, rgba(255, 255, 255, 0.03));
+  border: 1px dashed var(--border-subtle, rgba(255, 255, 255, 0.08));
+}
+
+.response-entry__binary-icon {
+  color: var(--text-tertiary, #666);
+  .rr-icon--lg {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+.response-entry__binary-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary, #ccc);
+  margin: 4px 0 0;
+}
+
+.response-entry__binary-type {
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-secondary, #888);
+  margin: 0;
+}
+
+.response-entry__binary-size {
+  font-size: 12px;
+  color: var(--text-tertiary, #666);
+  margin: 0;
+}
+
+.response-entry__save-binary {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  &[data-state='saved'] {
+    border-color: rgba(52, 211, 153, 0.35);
+    background: rgba(52, 211, 153, 0.12);
+    color: rgba(110, 231, 183, 0.95);
+  }
+
+  &[data-state='error'] {
+    border-color: rgba(244, 63, 94, 0.35);
+    background: rgba(244, 63, 94, 0.12);
+    color: rgba(251, 113, 133, 0.95);
+  }
+}
+

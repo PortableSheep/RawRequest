@@ -29,3 +29,34 @@ func TestParse_BadHeadersStillHasHeadersMap(t *testing.T) {
 		t.Fatalf("expected headers map")
 	}
 }
+
+func TestParse_BinaryMetadata(t *testing.T) {
+	input := `Status: 200 OK
+Headers: {"headers":{"content-type":"application/pdf"},"timing":{"total":50},"size":1024,"isBinary":true,"contentType":"application/pdf"}
+Body: dGVzdA==`
+
+	res := Parse(input)
+	if res["isBinary"] != true {
+		t.Fatalf("expected isBinary=true, got %v", res["isBinary"])
+	}
+	if res["contentType"].(string) != "application/pdf" {
+		t.Fatalf("expected contentType=application/pdf, got %v", res["contentType"])
+	}
+	if res["size"].(int64) != 1024 {
+		t.Fatalf("expected size=1024, got %v", res["size"])
+	}
+	if res["body"].(string) != "dGVzdA==" {
+		t.Fatalf("expected base64 body, got %v", res["body"])
+	}
+}
+
+func TestParse_NonBinaryOmitsFlag(t *testing.T) {
+	input := `Status: 200 OK
+Headers: {"headers":{"content-type":"application/json"},"timing":{"total":10},"size":42}
+Body: {"key":"value"}`
+
+	res := Parse(input)
+	if _, exists := res["isBinary"]; exists {
+		t.Fatalf("expected isBinary to be absent for text response")
+	}
+}

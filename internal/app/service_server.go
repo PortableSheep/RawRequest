@@ -1,10 +1,12 @@
 package app
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -82,6 +84,9 @@ func (s *httpService) registerRoutes(mux *http.ServeMux) {
 
 	// Import
 	mux.HandleFunc("/v1/import-collection", s.handleImportCollection)
+
+	// Binary response save
+	mux.HandleFunc("/v1/save-binary-response", s.handleSaveBinaryResponse)
 }
 
 func withServiceCORS(next http.Handler) http.Handler {
@@ -183,6 +188,10 @@ func writeServiceJSON(w http.ResponseWriter, payload any) {
 
 func writeServiceError(w http.ResponseWriter, status int, err error) {
 	http.Error(w, err.Error(), status)
+}
+
+func decodeBase64Body(encoded string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(encoded)
 }
 
 type sendRequestPayload struct {
@@ -804,4 +813,71 @@ func (s *httpService) handleImportCollection(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeServiceJSON(w, result)
+}
+
+type saveBinaryResponsePayload struct {
+	RequestID   string `json:"requestId"`
+	DestPath    string `json:"destPath"`
+	Base64Body  string `json:"base64Body,omitempty"`
+	ContentType string `json:"contentType,omitempty"`
+	RequestURL  string `json:"requestUrl,omitempty"`
+}
+
+func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePost(w, r) {
+		return
+	}
+	var payload saveBinaryResponsePayload
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return
+	}
+
+	if payload.DestPath != "" {
+		if payload.RequestID != "" {
+			if err := s.app.SaveBinaryResponseToPath(payload.RequestID, payload.DestPath); err != nil {
+				writeServiceError(w, http.StatusInternalServerError, err)
+				return
+			}
+		} else if payload.Base64Body != "" {
+			data, err := decodeBase64Body(payload.Base64Body)
+			if err != nil {
+				writeServiceError(w, http.StatusBadRequest, err)
+				return
+			}
+			if err := os.WriteFile(payload.DestPath, data, 0644); err != nil {
+				writeServiceError(w, http.StatusInternalServerError, err)
+				return
+			}
+		} else {
+			writeServiceError(w, http.StatusBadRequest, fmt.Errorf("requestId or base64Body required"))
+			return
+		}
+		writeServiceJSON(w, map[string]string{"path": payload.DestPath})
+	} else {
+		tmpDir := os.TempDir()
+		name := suggestFilename(payload.RequestURL, payload.ContentType)
+		tmpPath := filepath.Join(tmpDir, name)
+
+		if payload.RequestID != "" {
+			if err := s.app.SaveBinaryResponseToPath(payload.RequestID, tmpPath); err != nil {
+				writeServiceError(w, http.StatusInternalServerError, err)
+				return
+			}
+		} else if payload.Base64Body != "" {
+			data, err := decodeBase64Body(payload.Base64Body)
+			if err != nil {
+				writeServiceError(w, http.StatusBadRequest, err)
+				return
+			}
+			if err := os.WriteFile(tmpPath, data, 0644); err != nil {
+				writeServiceError(w, http.StatusInternalServerError, err)
+				return
+			}
+		} else {
+			writeServiceError(w, http.StatusBadRequest, fmt.Errorf("requestId or base64Body required"))
+			return
+		}
+		writeServiceJSON(w, map[string]string{"path": tmpPath})
+	}
 }

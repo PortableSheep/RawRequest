@@ -80,6 +80,9 @@ type ResponseResult struct {
 	Size         int64             `json:"size"`
 	Error        string            `json:"error,omitempty"`
 	ScriptLogs   []ScriptLogEntry  `json:"scriptLogs,omitempty"`
+	IsBinary     bool              `json:"isBinary,omitempty"`
+	ContentType  string            `json:"contentType,omitempty"`
+	rawBody      []byte            // raw bytes for binary responses (not serialised)
 }
 
 // TimingInfo contains request timing breakdown
@@ -385,8 +388,18 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 		Total:           execResult.Timing.Total,
 	}
 	result.Size = execResult.Size
-	result.Body = string(execResult.Body)
 	result.Headers = execResult.ResponseHeaders
+
+	// Detect binary content type
+	respContentType := execResult.ResponseHeaders["content-type"]
+	if hcl.IsBinaryContentType(respContentType) {
+		result.IsBinary = true
+		result.ContentType = respContentType
+		result.rawBody = execResult.Body
+		result.Body = fmt.Sprintf("[Binary response: %s, %d bytes]", respContentType, execResult.Size)
+	} else {
+		result.Body = string(execResult.Body)
+	}
 
 	// Execute post-script
 	if !r.noScripts && req.PostScript != "" {
@@ -599,7 +612,12 @@ func outputResults(results []ResponseResult, format OutputFormat) {
 			if i > 0 {
 				fmt.Println("---")
 			}
-			fmt.Print(r.Body)
+			if r.IsBinary && r.rawBody != nil {
+				// Write raw bytes to stdout (pipe-friendly)
+				os.Stdout.Write(r.rawBody)
+			} else {
+				fmt.Print(r.Body)
+			}
 		}
 	case OutputJSON:
 		var output interface{}
@@ -628,7 +646,11 @@ func outputResults(results []ResponseResult, format OutputFormat) {
 			fmt.Printf("Status: %s\n", r.StatusText)
 			fmt.Printf("Time: %dms, Size: %d bytes\n", r.ResponseTime, r.Size)
 			fmt.Println()
-			if r.Body != "" {
+			if r.IsBinary {
+				fmt.Printf("[Binary response: %s, %s]\n",
+					r.ContentType,
+					formatBinarySize(r.Size))
+			} else if r.Body != "" {
 				// Try to pretty print JSON
 				var js interface{}
 				if err := json.Unmarshal([]byte(r.Body), &js); err == nil {
@@ -640,6 +662,24 @@ func outputResults(results []ResponseResult, format OutputFormat) {
 			}
 		}
 	}
+}
+
+func formatBinarySize(bytes int64) string {
+	if bytes == 0 {
+		return "0 B"
+	}
+	units := []string{"B", "KB", "MB", "GB"}
+	k := float64(1024)
+	size := float64(bytes)
+	i := 0
+	for size >= k && i < len(units)-1 {
+		size /= k
+		i++
+	}
+	if i == 0 {
+		return fmt.Sprintf("%d B", bytes)
+	}
+	return fmt.Sprintf("%.1f %s", size, units[i])
 }
 
 func truncate(s string, maxLen int) string {

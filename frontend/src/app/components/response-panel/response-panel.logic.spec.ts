@@ -156,4 +156,49 @@ describe('response-panel.logic', () => {
       expect(formatBytesForResponsePanel(1024 * 1024)).toBe('1.0 MB');
     });
   });
+
+  describe('binary response preview', () => {
+    it('passes isBinary and contentType through buildResponsePreview', () => {
+      const responseData: ResponseData = {
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/pdf' },
+        body: 'dGVzdA==',
+        responseTime: 50,
+        size: 2048,
+        isBinary: true,
+        contentType: 'application/pdf',
+        requestPreview: {
+          method: 'GET',
+          url: 'https://example.com/file.pdf',
+          headers: {}
+        }
+      };
+
+      const result = getChainItemsForResponsePanel(responseData, null);
+      expect(result).toHaveLength(1);
+      expect(result[0].response?.isBinary).toBe(true);
+      expect(result[0].response?.contentType).toBe('application/pdf');
+      expect(result[0].response?.size).toBe(2048);
+    });
+
+    it('does not set isBinary for text responses', () => {
+      const responseData: ResponseData = {
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: 'hello',
+        responseTime: 10,
+        requestPreview: {
+          method: 'GET',
+          url: 'https://example.com',
+          headers: {}
+        }
+      };
+
+      const result = getChainItemsForResponsePanel(responseData, null);
+      expect(result).toHaveLength(1);
+      expect(result[0].response?.isBinary).toBeFalsy();
+    });
+  });
 });

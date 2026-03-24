@@ -52,4 +52,34 @@ describe('go-response', () => {
     expect(r.statusText).toBe('Parse Error');
     expect(r.body).toContain('totally not in the expected format');
   });
+
+  it('parses binary response metadata and skips JSON parsing', () => {
+    const responseStr = [
+      'Status: 200 OK',
+      'Request: {"method":"GET","url":"https://example.com/file.pdf","headers":{}}',
+      'Headers: {"headers":{"content-type":"application/pdf"},"timing":{"total":100},"size":2048,"isBinary":true,"contentType":"application/pdf"}',
+      'Body: dGVzdA=='
+    ].join('\n');
+
+    const r = parseGoResponse(responseStr, 999);
+    expect(r.status).toBe(200);
+    expect(r.isBinary).toBe(true);
+    expect(r.contentType).toBe('application/pdf');
+    expect(r.body).toBe('dGVzdA==');
+    expect(r.size).toBe(2048);
+    expect(r.json).toBeUndefined();
+  });
+
+  it('does not set isBinary for text responses', () => {
+    const responseStr = [
+      'Status: 200 OK',
+      'Headers: {"headers":{"content-type":"application/json"},"timing":{"total":10},"size":5}',
+      'Body: {"a":1}'
+    ].join('\n');
+
+    const r = parseGoResponse(responseStr, 1);
+    expect(r.isBinary).toBeFalsy();
+    expect(r.contentType).toBeFalsy();
+    expect(r.json).toEqual({ a: 1 });
+  });
 });

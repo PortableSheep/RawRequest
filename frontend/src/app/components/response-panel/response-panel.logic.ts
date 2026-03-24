@@ -113,6 +113,8 @@ function buildResponsePreview(response: ResponseData): ResponsePreview {
     responseTime: response.responseTime,
     timing: response.timing,
     size: response.size,
-    assertions: response.assertions
+    assertions: response.assertions,
+    isBinary: response.isBinary,
+    contentType: response.contentType
   };
 }
