@@ -2,7 +2,9 @@ package httpclientlogic
 
 import (
 	"mime"
+	"net/http"
 	"strings"
+	"unicode/utf8"
 )
 
 // IsBinaryContentType returns true if the given Content-Type header value
@@ -57,6 +59,41 @@ func IsBinaryContentType(contentType string) bool {
 	return true
 }
 
+// IsBinaryBody inspects up to the first 512 bytes of data and returns true
+// if the content appears to be binary. Detection checks for null bytes and
+// invalid UTF-8 sequences — the same heuristics Git uses.
+func IsBinaryBody(data []byte) bool {
+	if len(data) == 0 {
+		return false
+	}
+
+	sample := data
+	if len(sample) > 512 {
+		sample = sample[:512]
+	}
+
+	for _, b := range sample {
+		if b == 0 {
+			return true
+		}
+	}
+
+	if !utf8.Valid(sample) {
+		return true
+	}
+
+	return false
+}
+
+// SniffContentType uses Go's http.DetectContentType (WHATWG MIME sniffing)
+// to determine the content type from the first 512 bytes of data.
+func SniffContentType(data []byte) string {
+	if len(data) == 0 {
+		return "application/octet-stream"
+	}
+	return http.DetectContentType(data)
+}
+
 // ContentTypeForFilename returns a suggested filename extension for the given
 // content type, used when proposing a save-as filename.
 func ExtensionForContentType(contentType string) string {
@@ -78,6 +115,7 @@ func ExtensionForContentType(contentType string) string {
 		"application/x-tar":         ".tar",
 		"application/x-gzip":        ".tar.gz",
 		"application/java-archive":  ".jar",
+		"application/java":          ".class",
 		"application/wasm":          ".wasm",
 		"application/x-7z-compressed": ".7z",
 		"application/x-rar-compressed": ".rar",

@@ -61,6 +61,45 @@ jobs:
           echo "$HELP_OUTPUT" | grep -q "rawrequest mcp"
           echo "$HELP_OUTPUT" | grep -q "rawrequest service"
 
+      - name: Import signing certificate
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_FILE=$(mktemp /tmp/certificate.XXXXXX.p12)
+          echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_FILE"
+
+          KEYCHAIN_PATH=$(mktemp /tmp/build.XXXXXX.keychain-db)
+          KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          security import "$CERT_FILE" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: \
+            -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          rm -f "$CERT_FILE"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+
+      - name: Sign app bundle
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          codesign --deep --force --options runtime \
+            --entitlements build/darwin/entitlements.plist \
+            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --timestamp \
+            ./build/bin/RawRequest.app
+
+      - name: Verify code signature
+        run: |
+          codesign --verify --deep --strict --verbose=2 ./build/bin/RawRequest.app
+          spctl --assess --type exec --verbose=2 ./build/bin/RawRequest.app || true
+
       - name: Package for Homebrew
         run: |
           VERSION=${{ steps.version.outputs.version }}
@@ -81,6 +120,32 @@ jobs:
             "dist/releases/RawRequest-${VERSION}-macos.dmg" \
             "./build/bin/RawRequest.app" || \
           (cd ./build/bin && zip -r "../../dist/releases/RawRequest-${VERSION}-macos.zip" "RawRequest.app")
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          DMG_PATH="dist/releases/RawRequest-${VERSION}-macos.dmg"
+          if [ -f "$DMG_PATH" ]; then
+            xcrun notarytool submit "$DMG_PATH" \
+              --apple-id "$APPLE_ID" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD" \
+              --team-id "$APPLE_TEAM_ID" \
+              --wait --timeout 10m
+            xcrun stapler staple "$DMG_PATH"
+          else
+            echo "DMG not found, skipping notarization (ZIP fallback was used)"
+          fi
+
+      - name: Cleanup signing keychain
+        if: always()
+        run: |
+          if [ -n "$KEYCHAIN_PATH" ] && [ -f "$KEYCHAIN_PATH" ]; then
+            security delete-keychain "$KEYCHAIN_PATH"
+          fi
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4

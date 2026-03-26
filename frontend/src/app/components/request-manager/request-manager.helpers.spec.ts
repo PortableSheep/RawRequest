@@ -101,5 +101,49 @@ describe('request-manager helpers', () => {
       expect(items[0].response?.status).toBe(200);
       expect(items[0].response?.assertions).toEqual([{ passed: true, message: 'ok', stage: 'post' }]);
     });
+
+    it('preserves isBinary and contentType in chain items', () => {
+      const chain: Request[] = [
+        { name: 'download', method: 'GET', url: '/file.jar', headers: {} } as any
+      ];
+
+      const responses: ResponseData[] = [
+        {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: 'base64data==',
+          responseTime: 50,
+          isBinary: true,
+          contentType: 'application/java-archive'
+        }
+      ];
+
+      const items = buildChainItems(chain, [null], responses, 0);
+      expect(items).toHaveLength(1);
+      expect(items[0].response?.isBinary).toBe(true);
+      expect(items[0].response?.contentType).toBe('application/java-archive');
+    });
+
+    it('omits isBinary when response is not binary', () => {
+      const chain: Request[] = [
+        { name: 'api', method: 'GET', url: '/data', headers: {} } as any
+      ];
+
+      const responses: ResponseData[] = [
+        {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: '{"ok":true}',
+          responseTime: 10
+        }
+      ];
+
+      const items = buildChainItems(chain, [null], responses, 0);
+      expect(items).toHaveLength(1);
+      expect(items[0].response?.isBinary).toBeUndefined();
+      expect(items[0].response?.contentType).toBeUndefined();
+    });
   });
 });

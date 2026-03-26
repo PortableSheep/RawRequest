@@ -133,6 +133,14 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 	respContentType := execResult.ResponseHeaders["content-type"]
 	isBinary := hcl.IsBinaryContentType(respContentType)
 
+	// Fallback: inspect body bytes when Content-Type suggests text
+	if !isBinary && len(execResult.Body) > 0 && hcl.IsBinaryBody(execResult.Body) {
+		isBinary = true
+		if respContentType == "" {
+			respContentType = hcl.SniffContentType(execResult.Body)
+		}
+	}
+
 	var bodyStr string
 	if isBinary {
 		bodyStr = base64.StdEncoding.EncodeToString(execResult.Body)

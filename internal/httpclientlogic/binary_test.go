@@ -94,6 +94,7 @@ func TestExtensionForContentType(t *testing.T) {
 		{"application/pdf", ".pdf"},
 		{"application/zip", ".zip"},
 		{"application/java-archive", ".jar"},
+		{"application/java", ".class"},
 		{"image/png", ".png"},
 		{"image/jpeg", ".jpg"},
 		{"image/gif", ".gif"},
@@ -109,6 +110,65 @@ func TestExtensionForContentType(t *testing.T) {
 			got := ExtensionForContentType(tc.contentType)
 			if got != tc.wantExt {
 				t.Errorf("ExtensionForContentType(%q) = %q, want %q", tc.contentType, got, tc.wantExt)
+			}
+		})
+	}
+}
+
+func TestIsBinaryBody(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       []byte
+		wantBinary bool
+	}{
+		{"empty body", nil, false},
+		{"empty slice", []byte{}, false},
+		{"plain ASCII", []byte("Hello, world!"), false},
+		{"JSON text", []byte(`{"key": "value"}`), false},
+		{"HTML text", []byte("<html><body>hello</body></html>"), false},
+		{"multibyte UTF-8", []byte("日本語テキスト"), false},
+		{"UTF-8 with emoji", []byte("Hello 🌍 world"), false},
+		{"newlines and tabs", []byte("line1\nline2\ttab\r\n"), false},
+
+		{"null byte at start", []byte{0x00, 0x48, 0x65, 0x6c}, true},
+		{"null byte in middle", []byte("hel\x00lo"), true},
+		{"PNG magic bytes", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, true},
+		{"PDF magic bytes", []byte("%PDF-1.4 \x00"), true},
+		{"ZIP magic bytes", []byte{0x50, 0x4B, 0x03, 0x04, 0x00, 0x00}, true},
+		{"GIF magic bytes", []byte("GIF89a\x00\x01"), true},
+		{"invalid UTF-8 sequence", []byte{0xFF, 0xFE, 0x41, 0x42}, true},
+		{"lone continuation byte", []byte{0x80, 0x41, 0x42}, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := IsBinaryBody(tc.data)
+			if got != tc.wantBinary {
+				t.Errorf("IsBinaryBody(%q) = %v, want %v", tc.name, got, tc.wantBinary)
+			}
+		})
+	}
+}
+
+func TestSniffContentType(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     []byte
+		wantType string
+	}{
+		{"empty data", nil, "application/octet-stream"},
+		{"plain text", []byte("Hello, world!"), "text/plain; charset=utf-8"},
+		{"HTML", []byte("<html><body>test</body></html>"), "text/html; charset=utf-8"},
+		{"PNG", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}, "image/png"},
+		{"GIF", []byte("GIF89a"), "image/gif"},
+		{"PDF", []byte("%PDF-1.4"), "application/pdf"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := SniffContentType(tc.data)
+			if got != tc.wantType {
+				t.Errorf("SniffContentType(%s) = %q, want %q", tc.name, got, tc.wantType)
 			}
 		})
 	}
