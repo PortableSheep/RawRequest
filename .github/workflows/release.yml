@@ -85,6 +85,11 @@ jobs:
           rm -f "$CERT_FILE"
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
+      - name: Package for Homebrew
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          ./scripts/package_homebrew.sh v${VERSION}
+
       - name: Sign app bundle
         run: |
           IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
@@ -97,22 +102,27 @@ jobs:
 
           APP_PATH="./build/bin/RawRequest.app"
 
-          # Sign all nested binaries, dylibs, and frameworks first
-          find "$APP_PATH/Contents" -type f \( -name "*.dylib" -o -name "*.so" -o -perm +111 \) ! -path "*/MacOS/RawRequest" -print0 | while IFS= read -r -d '' file; do
-            codesign --force --options runtime \
-              --sign "$IDENTITY" \
-              --timestamp \
-              "$file" 2>/dev/null || true
+          # Sign every Mach-O binary inside the bundle (except the main executable)
+          find "$APP_PATH/Contents" -type f -perm /111 ! -name "RawRequest" -print0 | while IFS= read -r -d '' file; do
+            if file "$file" | grep -q "Mach-O"; then
+              echo "Signing nested: $file"
+              codesign --force --options runtime \
+                --sign "$IDENTITY" \
+                --timestamp \
+                "$file"
+            fi
           done
 
+          # Sign any frameworks
           find "$APP_PATH/Contents/Frameworks" -depth -type d -name "*.framework" -print0 2>/dev/null | while IFS= read -r -d '' fw; do
+            echo "Signing framework: $fw"
             codesign --force --options runtime \
               --sign "$IDENTITY" \
               --timestamp \
-              "$fw" 2>/dev/null || true
+              "$fw"
           done
 
-          # Sign the main app bundle last
+          # Sign the main app bundle (signs the main executable + seals the bundle)
           codesign --force --options runtime \
             --entitlements build/darwin/entitlements.plist \
             --sign "$IDENTITY" \
@@ -123,11 +133,6 @@ jobs:
         run: |
           codesign --verify --deep --strict --verbose=2 ./build/bin/RawRequest.app
           spctl --assess --type exec --verbose=2 ./build/bin/RawRequest.app || true
-
-      - name: Package for Homebrew
-        run: |
-          VERSION=${{ steps.version.outputs.version }}
-          ./scripts/package_homebrew.sh v${VERSION}
 
       - name: Create DMG
         run: |
