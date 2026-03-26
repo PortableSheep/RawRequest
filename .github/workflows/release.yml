@@ -86,12 +86,18 @@ jobs:
           echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
 
       - name: Sign app bundle
-        env:
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
+          IDENTITY=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}')
+          if [ -z "$IDENTITY" ]; then
+            echo "No Developer ID Application identity found in keychain"
+            security find-identity -v -p codesigning "$KEYCHAIN_PATH"
+            exit 1
+          fi
+          echo "Signing with: $IDENTITY"
+
           codesign --deep --force --options runtime \
             --entitlements build/darwin/entitlements.plist \
-            --sign "Developer ID Application: ($APPLE_TEAM_ID)" \
+            --sign "$IDENTITY" \
             --timestamp \
             ./build/bin/RawRequest.app
 
