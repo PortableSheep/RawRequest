@@ -69,7 +69,7 @@ jobs:
           CERT_FILE=$(mktemp /tmp/certificate.XXXXXX.p12)
           echo "$APPLE_CERTIFICATE_BASE64" | base64 --decode > "$CERT_FILE"
 
-          KEYCHAIN_PATH=$(mktemp /tmp/build.XXXXXX.keychain-db)
+          KEYCHAIN_PATH="/tmp/build-keychain-$(uuidgen).keychain-db"
           KEYCHAIN_PASSWORD=$(openssl rand -base64 32)
 
           security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
