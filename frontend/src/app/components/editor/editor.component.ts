@@ -263,7 +263,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             {
               key: 'Escape',
               run: () => {
-                if (this.searchService.searchUi.open) {
+                if (this.searchService.searchUi().open) {
                   this.searchService.closeSearchUi();
                   return true;
                 }
@@ -273,7 +273,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             {
               key: 'F3',
               run: () => {
-                if (!this.searchService.searchUi.open) this.openSearchUi(false);
+                if (!this.searchService.searchUi().open) this.openSearchUi(false);
                 this.searchService.searchNext();
                 return true;
               }
@@ -281,7 +281,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             {
               key: 'Shift-F3',
               run: () => {
-                if (!this.searchService.searchUi.open) this.openSearchUi(false);
+                if (!this.searchService.searchUi().open) this.openSearchUi(false);
                 this.searchService.searchPrev();
                 return true;
               }

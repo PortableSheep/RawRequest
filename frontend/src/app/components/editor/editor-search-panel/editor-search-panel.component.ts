@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, inject, input } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, inject, input, computed } from '@angular/core';
 import { EditorSearchService } from '../editor-search.service';
 
 @Component({
@@ -17,8 +17,8 @@ export class EditorSearchPanelComponent implements AfterViewInit {
 
   readonly searchService = inject(EditorSearchService);
 
-  get searchUi() { return this.searchService.searchUi; }
-  get searchUiStatsText() { return this.searchService.searchUiStatsText; }
+  readonly searchUi = this.searchService.searchUi;
+  readonly searchUiStatsText = this.searchService.searchUiStatsText;
 
   ngAfterViewInit(): void {
     this.searchService.registerPanelCallbacks({

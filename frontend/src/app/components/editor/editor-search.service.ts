@@ -1,4 +1,4 @@
-import { Injectable, OnDestroy } from '@angular/core';
+import { Injectable, OnDestroy, signal } from '@angular/core';
 import { EditorView } from 'codemirror';
 import {
   SearchQuery,
@@ -34,7 +34,7 @@ export class EditorSearchService implements OnDestroy {
   private wrapperEl: HTMLElement | null = null;
   private callbacks: EditorSearchCallbacks | null = null;
 
-  searchUi: SearchUiState = {
+  readonly searchUi = signal<SearchUiState>({
     open: false,
     showReplace: false,
     query: '',
@@ -42,9 +42,9 @@ export class EditorSearchService implements OnDestroy {
     caseSensitive: false,
     regexp: false,
     wholeWord: false
-  };
+  });
 
-  searchUiStatsText = '';
+  readonly searchUiStatsText = signal('');
   private searchStatsTimer: number | undefined;
   private searchFlashTimer: number | undefined;
 
@@ -79,7 +79,7 @@ export class EditorSearchService implements OnDestroy {
     openSearchPanel(this.view);
 
     const current = getSearchQuery(this.view.state);
-    this.searchUi = {
+    this.searchUi.set({
       open: true,
       showReplace,
       query: current.search ?? '',
@@ -87,7 +87,7 @@ export class EditorSearchService implements OnDestroy {
       caseSensitive: !!current.caseSensitive,
       regexp: !!current.regexp,
       wholeWord: !!current.wholeWord
-    };
+    });
 
     this.scheduleSearchStatsUpdate();
 
@@ -97,21 +97,23 @@ export class EditorSearchService implements OnDestroy {
   }
 
   closeSearchUi(): void {
-    this.searchUi = { ...this.searchUi, open: false, showReplace: false };
-    this.searchUiStatsText = '';
+    this.searchUi.update(s => ({ ...s, open: false, showReplace: false }));
+    this.searchUiStatsText.set('');
     if (this.view) {
+      // Clear the search query so match highlight decorations are removed.
+      this.view.dispatch({ effects: setSearchQuery.of(new SearchQuery({ search: '' })) });
       closeSearchPanel(this.view);
     }
     this.view?.focus();
   }
 
   toggleReplaceUi(): void {
-    if (!this.searchUi.open) {
+    if (!this.searchUi().open) {
       this.openSearchUi(true);
       return;
     }
-    const next = !this.searchUi.showReplace;
-    this.searchUi = { ...this.searchUi, showReplace: next };
+    const next = !this.searchUi().showReplace;
+    this.searchUi.update(s => ({ ...s, showReplace: next }));
 
     if (next) {
       setTimeout(() => {
@@ -121,27 +123,27 @@ export class EditorSearchService implements OnDestroy {
   }
 
   onFindInput(event: Event): void {
-    this.searchUi = { ...this.searchUi, query: (event.target as HTMLInputElement).value };
+    this.searchUi.update(s => ({ ...s, query: (event.target as HTMLInputElement).value }));
     this.commitSearchQuery();
   }
 
   onReplaceInput(event: Event): void {
-    this.searchUi = { ...this.searchUi, replace: (event.target as HTMLInputElement).value };
+    this.searchUi.update(s => ({ ...s, replace: (event.target as HTMLInputElement).value }));
     this.commitSearchQuery();
   }
 
   toggleCaseSensitive(): void {
-    this.searchUi = { ...this.searchUi, caseSensitive: !this.searchUi.caseSensitive };
+    this.searchUi.update(s => ({ ...s, caseSensitive: !s.caseSensitive }));
     this.commitSearchQuery();
   }
 
   toggleRegexp(): void {
-    this.searchUi = { ...this.searchUi, regexp: !this.searchUi.regexp };
+    this.searchUi.update(s => ({ ...s, regexp: !s.regexp }));
     this.commitSearchQuery();
   }
 
   toggleWholeWord(): void {
-    this.searchUi = { ...this.searchUi, wholeWord: !this.searchUi.wholeWord };
+    this.searchUi.update(s => ({ ...s, wholeWord: !s.wholeWord }));
     this.commitSearchQuery();
   }
 
@@ -229,12 +231,13 @@ export class EditorSearchService implements OnDestroy {
   private commitSearchQuery(): void {
     if (!this.view) return;
 
+    const ui = this.searchUi();
     const query = new SearchQuery({
-      search: this.searchUi.query,
-      replace: this.searchUi.replace,
-      caseSensitive: this.searchUi.caseSensitive,
-      regexp: this.searchUi.regexp,
-      wholeWord: this.searchUi.wholeWord
+      search: ui.query,
+      replace: ui.replace,
+      caseSensitive: ui.caseSensitive,
+      regexp: ui.regexp,
+      wholeWord: ui.wholeWord
     });
 
     this.view.dispatch({ effects: setSearchQuery.of(query) });
@@ -253,22 +256,22 @@ export class EditorSearchService implements OnDestroy {
   private updateSearchStatsText(): void {
     if (!this.view) return;
 
-    const queryText = this.searchUi.query;
-    if (!queryText) {
-      this.searchUiStatsText = '';
+    const ui = this.searchUi();
+    if (!ui.query) {
+      this.searchUiStatsText.set('');
       return;
     }
 
     const query = new SearchQuery({
-      search: this.searchUi.query,
-      replace: this.searchUi.replace,
-      caseSensitive: this.searchUi.caseSensitive,
-      regexp: this.searchUi.regexp,
-      wholeWord: this.searchUi.wholeWord
+      search: ui.query,
+      replace: ui.replace,
+      caseSensitive: ui.caseSensitive,
+      regexp: ui.regexp,
+      wholeWord: ui.wholeWord
     });
 
     if (!query.valid) {
-      this.searchUiStatsText = 'Invalid';
+      this.searchUiStatsText.set('Invalid');
       return;
     }
 
@@ -293,12 +296,12 @@ export class EditorSearchService implements OnDestroy {
     }
 
     if (total === 0) {
-      this.searchUiStatsText = '0 results';
+      this.searchUiStatsText.set('0 results');
       return;
     }
 
     const totalText = tooMany ? `${total}+` : `${total}`;
-    this.searchUiStatsText = `${currentIndex} of ${totalText}`;
+    this.searchUiStatsText.set(`${currentIndex} of ${totalText}`);
   }
 
   private flashCurrentMatch(): void {

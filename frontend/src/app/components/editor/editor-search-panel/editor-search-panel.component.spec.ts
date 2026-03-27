@@ -1,9 +1,13 @@
 import { ChangeDetectionStrategy } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal, WritableSignal } from '@angular/core';
 import { EditorSearchPanelComponent } from './editor-search-panel.component';
 import { EditorSearchService, SearchUiState } from '../editor-search.service';
 
-function createMockSearchService(): Partial<EditorSearchService> {
+function createMockSearchService(): Partial<EditorSearchService> & {
+  searchUi: WritableSignal<SearchUiState>;
+  searchUiStatsText: WritableSignal<string>;
+} {
   const defaultState: SearchUiState = {
     open: true,
     showReplace: false,
@@ -15,8 +19,8 @@ function createMockSearchService(): Partial<EditorSearchService> {
   };
 
   return {
-    searchUi: { ...defaultState },
-    searchUiStatsText: '',
+    searchUi: signal<SearchUiState>({ ...defaultState }),
+    searchUiStatsText: signal(''),
     registerPanelCallbacks: vi.fn(),
     onFindInput: vi.fn(),
     onFindKeydown: vi.fn(),
@@ -75,8 +79,7 @@ describe('EditorSearchPanelComponent', () => {
   });
 
   it('should not render anything when search is closed', () => {
-    mockSearchService.searchUi = { ...mockSearchService.searchUi!, open: false };
-    fixture.changeDetectorRef.markForCheck();
+    mockSearchService.searchUi.set({ ...mockSearchService.searchUi(), open: false });
     fixture.detectChanges();
     const el: HTMLElement = fixture.nativeElement;
     expect(el.querySelector('.editor-search')).toBeNull();
@@ -101,24 +104,21 @@ describe('EditorSearchPanelComponent', () => {
   });
 
   it('should show replace row when showReplace is true', () => {
-    mockSearchService.searchUi = { ...mockSearchService.searchUi!, showReplace: true };
-    fixture.changeDetectorRef.markForCheck();
+    mockSearchService.searchUi.set({ ...mockSearchService.searchUi(), showReplace: true });
     fixture.detectChanges();
     const rows = fixture.nativeElement.querySelectorAll('.editor-search__row');
     expect(rows.length).toBe(2);
   });
 
   it('should display stats text when available', () => {
-    (mockSearchService as any).searchUiStatsText = '3 of 10';
-    fixture.changeDetectorRef.markForCheck();
+    mockSearchService.searchUiStatsText.set('3 of 10');
     fixture.detectChanges();
     const meta: HTMLElement = fixture.nativeElement.querySelector('.editor-search__meta');
     expect(meta?.textContent?.trim()).toBe('3 of 10');
   });
 
   it('should mark case-sensitive toggle as active', () => {
-    mockSearchService.searchUi = { ...mockSearchService.searchUi!, caseSensitive: true };
-    fixture.changeDetectorRef.markForCheck();
+    mockSearchService.searchUi.set({ ...mockSearchService.searchUi(), caseSensitive: true });
     fixture.detectChanges();
     const toggles = fixture.nativeElement.querySelectorAll('.editor-search__toggle');
     expect(toggles[0].classList.contains('is-active')).toBe(true);

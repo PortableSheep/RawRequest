@@ -84,13 +84,13 @@ describe('EditorSearchService', () => {
   describe('initial state', () => {
     it('has search UI closed by default', () => {
       const fresh = new EditorSearchService();
-      expect(fresh.searchUi.open).toBe(false);
-      expect(fresh.searchUi.query).toBe('');
-      expect(fresh.searchUi.replace).toBe('');
-      expect(fresh.searchUi.caseSensitive).toBe(false);
-      expect(fresh.searchUi.regexp).toBe(false);
-      expect(fresh.searchUi.wholeWord).toBe(false);
-      expect(fresh.searchUiStatsText).toBe('');
+      expect(fresh.searchUi().open).toBe(false);
+      expect(fresh.searchUi().query).toBe('');
+      expect(fresh.searchUi().replace).toBe('');
+      expect(fresh.searchUi().caseSensitive).toBe(false);
+      expect(fresh.searchUi().regexp).toBe(false);
+      expect(fresh.searchUi().wholeWord).toBe(false);
+      expect(fresh.searchUiStatsText()).toBe('');
     });
   });
 
@@ -99,14 +99,14 @@ describe('EditorSearchService', () => {
       service.openSearchUi(false);
 
       expect(openSearchPanel).toHaveBeenCalledWith(mockView);
-      expect(service.searchUi.open).toBe(true);
-      expect(service.searchUi.showReplace).toBe(false);
-      expect(service.searchUi.query).toBe('hello');
+      expect(service.searchUi().open).toBe(true);
+      expect(service.searchUi().showReplace).toBe(false);
+      expect(service.searchUi().query).toBe('hello');
     });
 
     it('opens with replace visible when showReplace is true', () => {
       service.openSearchUi(true);
-      expect(service.searchUi.showReplace).toBe(true);
+      expect(service.searchUi().showReplace).toBe(true);
     });
 
     it('focuses find input after a tick', () => {
@@ -119,7 +119,7 @@ describe('EditorSearchService', () => {
       const uninitialized = new EditorSearchService();
       uninitialized.openSearchUi(false);
       expect(openSearchPanel).not.toHaveBeenCalledTimes(2);
-      expect(uninitialized.searchUi.open).toBe(false);
+      expect(uninitialized.searchUi().open).toBe(false);
     });
   });
 
@@ -128,27 +128,38 @@ describe('EditorSearchService', () => {
       service.openSearchUi(false);
       service.closeSearchUi();
 
-      expect(service.searchUi.open).toBe(false);
-      expect(service.searchUi.showReplace).toBe(false);
-      expect(service.searchUiStatsText).toBe('');
+      expect(service.searchUi().open).toBe(false);
+      expect(service.searchUi().showReplace).toBe(false);
+      expect(service.searchUiStatsText()).toBe('');
       expect(closeSearchPanel).toHaveBeenCalledWith(mockView);
       expect(mockView.focus).toHaveBeenCalled();
+    });
+
+    it('clears the search query to remove match highlights', () => {
+      service.openSearchUi(false);
+      vi.clearAllMocks();
+      service.closeSearchUi();
+
+      expect(setSearchQuery.of).toHaveBeenCalled();
+      expect(mockView.dispatch).toHaveBeenCalledWith({
+        effects: 'setSearchQuery-effect'
+      });
     });
   });
 
   describe('toggleReplaceUi', () => {
     it('opens search UI with replace if not already open', () => {
       service.toggleReplaceUi();
-      expect(service.searchUi.open).toBe(true);
-      expect(service.searchUi.showReplace).toBe(true);
+      expect(service.searchUi().open).toBe(true);
+      expect(service.searchUi().showReplace).toBe(true);
     });
 
     it('toggles replace visibility when search is open', () => {
       service.openSearchUi(false);
-      expect(service.searchUi.showReplace).toBe(false);
+      expect(service.searchUi().showReplace).toBe(false);
 
       service.toggleReplaceUi();
-      expect(service.searchUi.showReplace).toBe(true);
+      expect(service.searchUi().showReplace).toBe(true);
 
       vi.advanceTimersByTime(1);
       expect(mockCallbacks.focusReplaceInput).toHaveBeenCalled();
@@ -157,29 +168,29 @@ describe('EditorSearchService', () => {
     it('hides replace when toggled off', () => {
       service.openSearchUi(true);
       service.toggleReplaceUi();
-      expect(service.searchUi.showReplace).toBe(false);
+      expect(service.searchUi().showReplace).toBe(false);
     });
   });
 
   describe('toggle options', () => {
     it('toggleCaseSensitive flips the flag', () => {
-      expect(service.searchUi.caseSensitive).toBe(false);
+      expect(service.searchUi().caseSensitive).toBe(false);
       service.toggleCaseSensitive();
-      expect(service.searchUi.caseSensitive).toBe(true);
+      expect(service.searchUi().caseSensitive).toBe(true);
       service.toggleCaseSensitive();
-      expect(service.searchUi.caseSensitive).toBe(false);
+      expect(service.searchUi().caseSensitive).toBe(false);
     });
 
     it('toggleRegexp flips the flag', () => {
-      expect(service.searchUi.regexp).toBe(false);
+      expect(service.searchUi().regexp).toBe(false);
       service.toggleRegexp();
-      expect(service.searchUi.regexp).toBe(true);
+      expect(service.searchUi().regexp).toBe(true);
     });
 
     it('toggleWholeWord flips the flag', () => {
-      expect(service.searchUi.wholeWord).toBe(false);
+      expect(service.searchUi().wholeWord).toBe(false);
       service.toggleWholeWord();
-      expect(service.searchUi.wholeWord).toBe(true);
+      expect(service.searchUi().wholeWord).toBe(true);
     });
 
     it('dispatches search query on toggle', () => {
@@ -192,13 +203,13 @@ describe('EditorSearchService', () => {
     it('onFindInput updates query', () => {
       const event = { target: { value: 'test query' } } as unknown as Event;
       service.onFindInput(event);
-      expect(service.searchUi.query).toBe('test query');
+      expect(service.searchUi().query).toBe('test query');
     });
 
     it('onReplaceInput updates replace', () => {
       const event = { target: { value: 'replacement' } } as unknown as Event;
       service.onReplaceInput(event);
-      expect(service.searchUi.replace).toBe('replacement');
+      expect(service.searchUi().replace).toBe('replacement');
     });
   });
 
@@ -263,7 +274,7 @@ describe('EditorSearchService', () => {
 
       service.onFindKeydown(event);
       expect(event.preventDefault).toHaveBeenCalled();
-      expect(service.searchUi.open).toBe(false);
+      expect(service.searchUi().open).toBe(false);
     });
 
     it('calls searchNext on Enter', () => {
@@ -287,7 +298,7 @@ describe('EditorSearchService', () => {
       const event = new KeyboardEvent('keydown', { key: 'Escape' });
 
       service.onReplaceKeydown(event);
-      expect(service.searchUi.open).toBe(false);
+      expect(service.searchUi().open).toBe(false);
     });
 
     it('calls replaceOne on Enter', () => {
