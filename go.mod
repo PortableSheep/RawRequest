@@ -1,6 +1,6 @@
 module rawrequest
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/dop251/goja v0.0.0-20251201205617-2bb4c724c0f9
@@ -9,7 +9,7 @@ require (
 	github.com/wailsapp/wails/v2 v2.11.0
 	github.com/zalando/go-keyring v0.2.3
 	golang.org/x/crypto v0.33.0
-	golang.org/x/sys v0.30.0
+	golang.org/x/sys v0.42.0
 )
 
 require (
