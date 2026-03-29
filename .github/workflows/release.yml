@@ -190,7 +190,7 @@ jobs:
           fi
 
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-release
           path: dist/releases/*
@@ -292,7 +292,7 @@ jobs:
           & 'C:\Program Files (x86)\NSIS\makensis.exe' /DVERSION=$VERSION /DSTAGING_DIR="$ROOT\dist\releases\installer-staging" /DOUT_DIR="$ROOT\dist\releases" "build\windows\installer.nsi"
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-release
           path: |
