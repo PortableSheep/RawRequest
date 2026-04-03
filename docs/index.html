@@ -3,8 +3,50 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="RawRequest — a code-first desktop HTTP client. Run .http files with envs, secrets, scripts, and built-in load testing." />
+  <meta name="description" content="RawRequest — a code-first HTTP client for developers. Write requests in .http files, run from GUI, terminal, or AI. Open source, cross-platform." />
+  <meta name="keywords" content="HTTP client, REST client, API testing, .http files, developer tools, Postman alternative, open source" />
+  <meta name="author" content="RawRequest" />
+  <meta name="theme-color" content="#6366f1" />
   <title>RawRequest — Code-first desktop HTTP client</title>
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="RawRequest — Code-First HTTP Client" />
+  <meta property="og:description" content="Write HTTP requests in .http files. Run from a polished GUI, terminal, or AI-powered MCP server. Open source and cross-platform." />
+  <meta property="og:url" content="https://rawrequest.com" />
+  <meta property="og:site_name" content="RawRequest" />
+  <meta property="og:image" content="https://rawrequest.com/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="RawRequest — Code-First HTTP Client" />
+  <meta name="twitter:description" content="Write HTTP requests in .http files. Run from GUI, terminal, or AI." />
+  <meta name="twitter:image" content="https://rawrequest.com/og-image.png" />
+
+  <!-- Canonical URL & Favicon -->
+  <link rel="canonical" href="https://rawrequest.com" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "RawRequest",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS, Windows, Linux",
+    "description": "Code-first HTTP client for developers. Write requests in .http files.",
+    "url": "https://rawrequest.com",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    }
+  }
+  </script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet" />
@@ -25,23 +67,24 @@
       <div class="nav-actions">
         <a class="btn ghost" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
       </div>
+      <button class="nav-toggle" aria-label="Toggle menu">☰</button>
     </header>
 
     <main>
       <section class="hero">
         <div class="hero-text">
-          <p class="eyebrow">Desktop HTTP client</p>
-          <h1>Code-first requests, on desktop.</h1>
-          <p class="subhead">Run <code>.http</code> files with envs, secrets, JavaScript scripts, and built-in load testing. Use the GUI, CLI, or let an AI drive it via MCP.</p>
-          <div class="hero-actions">
+          <p class="eyebrow animate-fade-up" style="transition-delay: 0ms">Desktop HTTP client</p>
+          <h1 class="animate-fade-up" style="transition-delay: 100ms">Write requests. Run everywhere.</h1>
+          <p class="subhead animate-fade-up" style="transition-delay: 200ms">A code-first HTTP client for developers who think in text. Write .http files, run from GUI, terminal, or AI.</p>
+          <div class="hero-actions animate-fade-up" style="transition-delay: 300ms">
             <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
             <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">View on GitHub</a>
           </div>
-          <div class="hero-meta">
+          <div class="hero-meta animate-fade-up" style="transition-delay: 400ms">
             <span>macOS + Windows</span>
           </div>
         </div>
-        <div class="hero-card">
+        <div class="hero-card animate-scale-up" style="transition-delay: 200ms">
           <div class="card-header">requests.http</div>
           <pre class="code"><code># Environments
 @env.dev.baseUrl = http://localhost:3000
@@ -81,16 +124,31 @@ Accept: application/json
 
         <div class="shot-grid">
           <figure class="shot-card">
+            <div class="shot-chrome">
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+            </div>
             <img src="MainWindow.png" alt="RawRequest main window" loading="lazy" />
-            <figcaption>Request editor + response viewer</figcaption>
+            <figcaption>Request editor with syntax highlighting, linting, and response viewer</figcaption>
           </figure>
           <figure class="shot-card">
+            <div class="shot-chrome">
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+            </div>
             <img src="LoadTestInProgress.png" alt="Load test running" loading="lazy" />
-            <figcaption>Load test in progress</figcaption>
+            <figcaption>Live load test with real-time progress and metrics</figcaption>
           </figure>
           <figure class="shot-card">
+            <div class="shot-chrome">
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+              <span class="shot-chrome__dot"></span>
+            </div>
             <img src="LoadTestResult.png" alt="Load test results" loading="lazy" />
-            <figcaption>Load test results</figcaption>
+            <figcaption>Detailed load test results with percentile breakdowns</figcaption>
           </figure>
         </div>
       </section>
@@ -100,42 +158,99 @@ Accept: application/json
           <h2>Features</h2>
           <p>Practical tooling for day-to-day API work.</p>
         </div>
-        <div class="grid">
-          <div class="card">
-            <h3>Code-first editor</h3>
-            <p>CodeMirror 6 with syntax highlighting, folding, linting, variable diagnostics, and viewport-optimized performance for large files.</p>
+
+        <div class="feature-section animate-slide-left">
+          <div class="feature-section__text">
+            <h2>Code-first editor</h2>
+            <p>CodeMirror 6 with syntax highlighting, folding, linting, and variable diagnostics. Write requests the way you think — in text — with viewport-optimized performance for large files.</p>
           </div>
-          <div class="card">
-            <h3>Request navigation</h3>
-            <p>Outline panel (<kbd>⌘⇧O</kbd>) to browse and filter requests. Command palette (<kbd>⌘P</kbd>) for fuzzy search to jump to any request instantly.</p>
+          <div class="feature-section__visual">
+            <pre><code>### Login
+@name login
+@timeout 15000
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+{
+  "email": "dev@rawrequest.dev",
+  "password": "{{secret:password}}"
+}
+> {
+  assert(response.status === 200);
+  setVar('token', response.json.token);
+}</code></pre>
           </div>
-          <div class="card">
-            <h3>Built-in load testing</h3>
-            <p>Turn a request into a load test with <code>@load</code>. Configure duration, users, ramp-up, and target RPS. Watch progress and get percentile breakdowns.</p>
+        </div>
+
+        <div class="feature-section animate-slide-right">
+          <div class="feature-section__text">
+            <h2>Request chaining</h2>
+            <p>Chain requests with <code>@depends</code> and reference prior responses. Build full workflows — login, then fetch data using the returned token — all in a single file.</p>
           </div>
-          <div class="card">
-            <h3>Secrets manager</h3>
-            <p>Encrypted vault with <code>{{secret:key}}</code> placeholders. Sortable table with usage tracking, shared pool across environments, and optional master password to reveal values.</p>
+          <div class="feature-section__visual">
+            <pre><code>### Get Profile
+@name getProfile
+@depends login
+GET {{baseUrl}}/profile
+Authorization: Bearer {{response.login.token}}
+Accept: application/json</code></pre>
           </div>
-          <div class="card">
-            <h3>Scripts &amp; chaining</h3>
-            <p>JavaScript pre/post scripts with <code>setVar</code>, <code>assert</code>, and <code>console.log</code>. Chain requests via <code>@depends</code> and reference prior responses.</p>
+        </div>
+
+        <div class="feature-section animate-slide-left">
+          <div class="feature-section__text">
+            <h2>Built-in load testing</h2>
+            <p>Turn any request into a load test with the <code>@load</code> directive. Configure duration, virtual users, ramp-up, and target RPS. Watch progress live and get percentile breakdowns.</p>
           </div>
-          <div class="card">
-            <h3>Environments</h3>
-            <p>Define variables per environment with <code>@env.dev.baseUrl</code> syntax. Switch between dev, staging, and production with a single click.</p>
+          <div class="feature-section__visual">
+            <pre><code>### Stress Test API
+@name stressTest
+POST {{baseUrl}}/api/data
+Content-Type: application/json
+
+@load
+duration: 60s
+users: 100
+rampUp: 10s
+targetRPS: 500</code></pre>
           </div>
-          <div class="card">
-            <h3>CLI mode</h3>
-            <p>Run named requests from the terminal with <code>rawrequest run</code>. JSON, body, or quiet output. Secrets resolve automatically.</p>
+        </div>
+
+        <div class="feature-section animate-slide-right">
+          <div class="feature-section__text">
+            <h2>Secrets &amp; Environments</h2>
+            <p>Store secrets in an encrypted OS keyring vault and reference them with <code>{{secret:key}}</code>. Define per-environment variables with <code>@env</code> syntax and switch contexts with a single click.</p>
           </div>
-          <div class="card">
-            <h3>MCP server</h3>
-            <p>Let AI assistants (GitHub Copilot, Claude) discover and execute requests from <code>.http</code> files via chat. One config, all projects.</p>
+          <div class="feature-section__visual">
+            <pre><code># Environment variables
+@env.dev.baseUrl = http://localhost:3000
+@env.staging.baseUrl = https://staging.example.com
+@env.prod.baseUrl = https://api.example.com
+
+# Secret reference
+Authorization: Bearer {{secret:apiToken}}</code></pre>
           </div>
-          <div class="card">
-            <h3>Portable history</h3>
+        </div>
+
+        <div class="features-grid">
+          <div class="feature-card animate-fade-up" style="transition-delay: 0ms">
+            <h3>CLI Mode</h3>
+            <p>Run named requests from your terminal with <code>rawrequest run</code>. JSON, body, or quiet output. Secrets resolve automatically.</p>
+          </div>
+          <div class="feature-card animate-fade-up" style="transition-delay: 50ms">
+            <h3>MCP Server</h3>
+            <p>Let AI assistants like GitHub Copilot and Claude discover and execute requests from <code>.http</code> files via chat.</p>
+          </div>
+          <div class="feature-card animate-fade-up" style="transition-delay: 100ms">
+            <h3>Portable History</h3>
             <p>History and responses live beside your .http file. Predictable, reviewable, and easy to share or version control.</p>
+          </div>
+          <div class="feature-card animate-fade-up" style="transition-delay: 150ms">
+            <h3>Pre &amp; Post Scripts</h3>
+            <p>JavaScript pre/post scripts with <code>setVar</code>, <code>assert</code>, and <code>console.log</code>. Automate auth flows and validate responses.</p>
+          </div>
+          <div class="feature-card animate-fade-up" style="transition-delay: 200ms">
+            <h3>Request Navigation</h3>
+            <p>Outline panel and command palette for fuzzy search. Jump to any request in large files instantly.</p>
           </div>
         </div>
       </section>
@@ -147,24 +262,24 @@ Accept: application/json
         </div>
         <div class="steps">
           <div class="step">
-            <div class="step-num">1</div>
+            <div class="step-icon">✏️</div>
             <div>
               <h3>Author .http files</h3>
               <p>Use <code>###</code> separators, env placeholders, and scripts. Run any request instantly.</p>
             </div>
           </div>
           <div class="step">
-            <div class="step-num">2</div>
+            <div class="step-icon">🔐</div>
             <div>
               <h3>Wire secrets + envs</h3>
               <p>Use the vault + per-environment vars; lint catches missing placeholders before you hit send.</p>
             </div>
           </div>
           <div class="step">
-            <div class="step-num">3</div>
+            <div class="step-icon">📋</div>
             <div>
               <h3>Keep history nearby</h3>
-              <p>Responses and history sit beside your file (or your run location for unsaved work) so it’s easy to inspect and share.</p>
+              <p>Responses and history sit beside your file so it’s easy to inspect and share.</p>
             </div>
           </div>
         </div>
@@ -235,7 +350,7 @@ Accept: application/json
         </div>
       </section>
 
-      <section id="install" class="install">
+      <section id="install" class="install animate-fade-up">
         <div class="section-title">
           <h2>Install</h2>
           <p>Grab a release, or use the macOS installer script/Homebrew.</p>
@@ -273,12 +388,10 @@ rawrequest help</code></pre>
 
       <section class="cta">
         <div>
-          <h2>Try RawRequest</h2>
-          <p>Download a release for macOS or Windows, then start from a <code>.http</code> file.</p>
+          <h2>Ready to write requests?</h2>
         </div>
         <div class="cta-actions">
-          <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
-          <a class="btn ghost" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">Source on GitHub</a>
+          <a class="btn primary" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download RawRequest</a>
         </div>
       </section>
     </main>
@@ -293,5 +406,56 @@ rawrequest help</code></pre>
       <div class="footer-meta">Built with Go, Wails, and Angular.</div>
     </footer>
   </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.2 });
+
+      document.querySelectorAll('.animate-fade-up, .animate-slide-left, .animate-slide-right, .animate-scale-up').forEach(el => {
+        observer.observe(el);
+      });
+
+      const nav = document.querySelector('.nav');
+      window.addEventListener('scroll', () => {
+        if (window.scrollY > 100) {
+          nav.classList.add('scrolled');
+        } else {
+          nav.classList.remove('scrolled');
+        }
+      }, { passive: true });
+
+      // Trigger hero animations immediately (above fold)
+      setTimeout(() => {
+        document.querySelectorAll('.hero .animate-fade-up, .hero .animate-scale-up').forEach(el => {
+          el.classList.add('visible');
+        });
+      }, 100);
+
+      // Mobile nav toggle
+      const toggle = document.querySelector('.nav-toggle');
+      const links = document.querySelector('.nav-links');
+      if (toggle && links) {
+        toggle.addEventListener('click', () => {
+          const open = links.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', open);
+          toggle.textContent = open ? '✕' : '☰';
+        });
+        links.addEventListener('click', (e) => {
+          if (e.target.tagName === 'A') {
+            links.classList.remove('open');
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.textContent = '☰';
+          }
+        });
+      }
+    });
+  </script>
 </body>
 </html>
