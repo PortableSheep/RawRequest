@@ -13,7 +13,7 @@
 }
 
 .rr-split-btn__toggle {
-  width: 34px;
+  width: 30px;
   padding: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
@@ -21,14 +21,14 @@
 }
 
 .rr-kebab {
-  width: 34px;
+  width: 30px;
   padding: 0;
   margin-left: auto;
 }
 
 .rr-topbar__sep {
   width: 1px;
-  height: 26px;
-  margin: 0 var(--rr-space-2);
-  background: color-mix(in srgb, var(--rr-border-color), white 8%);
+  height: 20px;
+  margin: 0 4px;
+  background: var(--rr-border-hover-color);
 }

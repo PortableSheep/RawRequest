@@ -166,10 +166,6 @@ export function RevealInFinder(arg1) {
   return window['go']['app']['App']['RevealInFinder'](arg1);
 }
 
-export function SaveFileContents(arg1, arg2) {
-  return window['go']['app']['App']['SaveFileContents'](arg1, arg2);
-}
-
 export function SaveBase64ToFile(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveBase64ToFile'](arg1, arg2, arg3);
 }
@@ -180,6 +176,10 @@ export function SaveBinaryResponse(arg1, arg2, arg3) {
 
 export function SaveBinaryResponseToPath(arg1, arg2) {
   return window['go']['app']['App']['SaveBinaryResponseToPath'](arg1, arg2);
+}
+
+export function SaveFileContents(arg1, arg2) {
+  return window['go']['app']['App']['SaveFileContents'](arg1, arg2);
 }
 
 export function SaveResponseFile(arg1, arg2) {

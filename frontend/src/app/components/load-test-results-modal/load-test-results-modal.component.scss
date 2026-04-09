@@ -6,7 +6,7 @@
 
 .loadtest-results-modal__body {
 	display: grid;
-	gap: 14px;
+	gap: 10px;
 }
 
 .loadtest-results-modal__title-icon {
@@ -17,7 +17,7 @@
 
 .loadtest-results-modal__notice {
 	border-color: var(--rr-border);
-	background: color-mix(in srgb, var(--rr-panel) 85%, var(--rr-warning) 15%);
+	background: var(--rr-surface-1);
 }
 
 .loadtest-results-modal__notice-title {
@@ -34,7 +34,7 @@
 .loadtest-results-modal__cards {
 	display: grid;
 	grid-template-columns: repeat(4, minmax(0, 1fr));
-	gap: 12px;
+	gap: 8px;
 }
 
 @media (max-width: 960px) {
@@ -51,7 +51,7 @@
 
 .loadtest-results-modal__section {
 	display: grid;
-	gap: 12px;
+	gap: 8px;
 }
 
 .loadtest-results-modal__section-head {
@@ -73,7 +73,7 @@
 .loadtest-results-modal__adaptive {
 	display: grid;
 	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 12px;
+	gap: 8px;
 }
 
 @media (max-width: 960px) {
@@ -85,8 +85,8 @@
 .loadtest-results-modal__kv {
 	display: grid;
 	grid-template-columns: 1fr auto;
-	gap: 8px 12px;
-	margin-top: 8px;
+	gap: 6px 10px;
+	margin-top: 6px;
 	align-items: baseline;
 }
 
@@ -103,7 +103,7 @@
 
 .loadtest-results-modal__table-wrap {
 	border: 1px solid var(--rr-border);
-	border-radius: 10px;
+	border-radius: var(--rr-radius-sm);
 	overflow: hidden;
 	background: var(--rr-panel);
 }
@@ -111,7 +111,7 @@
 .loadtest-results-modal__status-grid {
 	display: grid;
 	grid-template-columns: repeat(3, minmax(0, 1fr));
-	gap: 12px;
+	gap: 8px;
 }
 
 @media (max-width: 960px) {
@@ -124,11 +124,11 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
+	gap: 8px;
 }
 
 .loadtest-results-modal__status-value {
-	font-weight: 700;
+	font-weight: 600;
 	color: var(--rr-text);
 }
 
@@ -137,7 +137,7 @@
 }
 
 .loadtest-results-modal__status-value--error {
-	color: #ef4444;
+	color: var(--rr-error);
 }
 
 .loadtest-results-modal__failbreak {

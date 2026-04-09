@@ -3,15 +3,15 @@
 }
 
 .delete-confirm-modal__lead {
-	margin: 0 0 12px;
+	margin: 0 0 8px;
 	font-size: 13px;
 	color: var(--rr-text-subtle);
 }
 
 .delete-confirm-modal__warning {
-	margin-top: 8px;
-	padding: 12px;
-	border-radius: 12px;
+	margin-top: 6px;
+	padding: 10px;
+	border-radius: var(--rr-radius-md);
 	border: 1px solid rgba(245, 158, 11, 0.22);
 	background: rgba(245, 158, 11, 0.10);
 	color: rgba(253, 230, 138, 0.95);
@@ -34,7 +34,7 @@
 .delete-confirm-modal__code {
 	font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 	padding: 1px 6px;
-	border-radius: 8px;
+	border-radius: var(--rr-radius-lg);
 	background: rgba(245, 158, 11, 0.16);
 	color: rgba(255, 251, 235, 0.95);
 	font-size: 11px;

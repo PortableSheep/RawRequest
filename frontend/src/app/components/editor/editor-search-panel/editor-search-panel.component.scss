@@ -5,9 +5,9 @@
   z-index: 50;
 
   width: min(640px, calc(100% - 20px));
-  background: color-mix(in srgb, var(--rr-surface-2), transparent 0%);
+  background: var(--rr-surface-2);
   border: 1px solid var(--rr-border-color);
-  border-radius: 10px;
+  border-radius: var(--rr-radius-sm);
   box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
   overflow: hidden;
 }
@@ -29,7 +29,7 @@
   min-width: 0;
   background: var(--rr-surface-1);
   border: 1px solid var(--rr-border-color);
-  border-radius: 8px;
+  border-radius: var(--rr-radius-lg);
   padding: 7px 10px;
   color: var(--rr-text);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
@@ -38,19 +38,19 @@
 
   &:focus {
     border-color: var(--rr-primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--rr-primary), transparent 75%);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
   }
 }
 
 .editor-search__btn {
   background: var(--rr-surface-3);
   border: 1px solid var(--rr-border-color);
-  border-radius: 8px;
+  border-radius: var(--rr-radius-lg);
   padding: 6px 10px;
   color: var(--rr-text);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, opacity 0.15s;
+  transition: background 80ms ease, border-color 80ms ease, opacity 80ms ease;
   white-space: nowrap;
 
   &:hover {
@@ -82,12 +82,12 @@
 .editor-search__toggle {
   background: transparent;
   border: 1px solid var(--rr-border-color);
-  border-radius: 8px;
+  border-radius: var(--rr-radius-lg);
   padding: 6px 8px;
   color: var(--rr-text-secondary);
   font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  transition: background 80ms ease, border-color 80ms ease, color 80ms ease;
 
   &:hover {
     background: var(--rr-surface-hover);
@@ -96,8 +96,8 @@
 
   &.is-active {
     color: var(--rr-text);
-    border-color: color-mix(in srgb, var(--rr-primary), var(--rr-border-color) 40%);
-    background: color-mix(in srgb, var(--rr-primary), transparent 85%);
+    border-color: rgba(99, 102, 241, 0.5);
+    background: rgba(99, 102, 241, 0.15);
   }
 }
 

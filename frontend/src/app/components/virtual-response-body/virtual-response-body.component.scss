@@ -2,7 +2,7 @@
   height: 320px;
   width: 100%;
   overflow: auto;
-  border-radius: 10px;
+  border-radius: var(--rr-radius-sm);
   border: 1px solid var(--rr-border-color);
   background-color: var(--rr-surface-1);
   padding: 12px;
@@ -51,9 +51,9 @@
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
-  background: color-mix(in srgb, var(--rr-surface-2), transparent 10%);
+  background: var(--rr-surface-2);
   border: 1px solid var(--rr-border-color);
-  border-radius: 4px;
+  border-radius: var(--rr-radius-sm);
   font-size: 10px;
   color: var(--rr-text-tertiary);
   z-index: 10;

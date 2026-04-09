@@ -2,6 +2,8 @@
   display: contents;
 }
 
+// --- Layout containers ---
+
 .console-drawer {
   pointer-events: none;
   position: fixed;
@@ -13,8 +15,8 @@
 
 .console-bubble {
   position: fixed;
-  right: 1.4rem;
-  bottom: 1rem;
+  right: 0.5rem;
+  bottom: 0;
   pointer-events: auto;
 }
 
@@ -22,72 +24,100 @@
   position: fixed;
   inset: auto 0 0;
   pointer-events: auto;
-  padding: 0 1rem 1rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0;
 }
+
+// --- Docked panel ---
 
 .console-panel {
   max-height: 70vh;
   overflow: hidden;
-  border-radius: 1rem;
-  border: 1px solid var(--rr-border-color);
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--rr-border-color);
   background: var(--rr-surface-1);
+  box-shadow: none;
+  transition: height 120ms ease;
 }
+
+// --- Compact header ---
 
 .console-panel__header {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
-  gap: 0.75rem;
-  padding: 0.75rem 1rem;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  height: 28px;
+  min-height: 28px;
+  font-size: 11px;
+  background: var(--rr-surface-2);
   border-bottom: 1px solid var(--rr-border-color);
+  color: var(--rr-text-tertiary);
 }
 
 .console-panel__hide-btn {
-  height: 34px;
+  height: 22px;
+  font-size: 11px;
+  padding: 0 6px;
+  gap: 4px;
+  color: var(--rr-text-tertiary);
 }
+
+// --- Count badges ---
 
 .console-panel__count,
 .console-bubble__count {
   display: inline-flex;
   align-items: center;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--rr-primary), transparent 55%);
-  background: color-mix(in srgb, var(--rr-primary), transparent 88%);
-  padding: 2px 8px;
-  font-size: 11px;
+  border: none;
+  background: var(--rr-primary);
+  padding: 1px 6px;
+  font-size: 10px;
   font-weight: 700;
+  color: var(--rr-text-on-primary);
+  line-height: 1.4;
 }
 
+// --- Content area ---
+
 .console-panel__content {
-  padding: 1rem;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: 0;
 }
 
 .console-panel__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  padding: 0 0.75rem;
+  height: 24px;
   font-size: 11px;
-  color: var(--rr-text-subtle);
+  color: var(--rr-text-tertiary);
 }
 
 .console-panel__clear-btn {
-  height: 28px;
-  padding: 0 10px;
-  border-radius: 10px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--rr-radius-sm);
   font-size: 11px;
+  color: var(--rr-text-tertiary);
 }
 
+// --- Viewport & scrolling ---
+
 .console-panel__viewport {
-  border-radius: 0.75rem;
-  border: 1px solid var(--rr-border-color);
+  border-radius: 0;
+  border: none;
+  border-top: 1px solid var(--rr-border-color);
   background: var(--rr-surface-1);
   overflow: hidden;
 }
@@ -98,25 +128,26 @@
 }
 
 .console-panel__logs {
-  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-family: var(--rr-font-mono), 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
 }
+
 .console-panel__viewport .overflow-auto {
   scrollbar-width: thin;
   scrollbar-color: var(--color-zinc-600) transparent;
 }
 
 .console-panel__viewport .overflow-auto::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
 }
 
 .console-panel__viewport .overflow-auto::-webkit-scrollbar-track {
-  background: var(--color-zinc-900);
+  background: transparent;
 }
 
 .console-panel__viewport .overflow-auto::-webkit-scrollbar-thumb {
   background: var(--color-zinc-600);
-  border-radius: 6px;
+  border-radius: var(--rr-radius-sm);
   border: 0;
   background-clip: border-box;
 }
@@ -126,20 +157,29 @@
   border: 0;
   background-clip: border-box;
 }
+
+// --- Log entries ---
+
 .log-entry {
-  padding: 0.35rem 0.75rem;
+  padding: 4px 10px;
   border-bottom: 1px solid var(--rr-border-color);
+  font-family: var(--rr-font-mono), 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   font-size: 11px;
-  line-height: 1.35;
+  line-height: 1.4;
+
+  &:nth-child(even) {
+    background: var(--rr-surface-2);
+  }
 
   &:last-child {
     border-bottom: 0;
   }
 
   .log-message {
-    margin: 0.25rem 0 0;
+    margin: 2px 0 0;
     white-space: pre-wrap;
     color: var(--rr-text);
+    font-family: inherit;
   }
 
   .log-meta {
@@ -147,7 +187,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
-    color: var(--rr-text-subtle);
+    color: var(--rr-text-tertiary);
   }
 
   .log-level {
@@ -160,7 +200,7 @@
   .log-source,
   .log-time {
     font-size: 10px;
-    color: color-mix(in srgb, var(--rr-text-subtle), transparent 10%);
+    color: var(--rr-text-tertiary);
   }
 
   .log-time {
@@ -170,50 +210,52 @@
   &--error {
     background-color: rgba(239, 68, 68, 0.08);
     border-left: 3px solid rgb(239, 68, 68);
-    
+
     .log-level {
       color: rgb(248, 113, 113);
     }
-    
+
     .log-message {
       color: rgb(254, 202, 202);
     }
   }
-  
+
   &--warn {
     background-color: rgba(245, 158, 11, 0.08);
     border-left: 3px solid rgb(245, 158, 11);
-    
+
     .log-level {
       color: rgb(251, 191, 36);
     }
-    
+
     .log-message {
       color: rgb(254, 243, 199);
     }
   }
-  
+
   &--info {
     border-left: 3px solid rgb(59, 130, 246);
-    
+
     .log-level {
       color: rgb(96, 165, 250);
     }
   }
-  
+
   &--debug {
     border-left: 3px solid rgb(156, 163, 175);
     opacity: 0.8;
-    
+
     .log-level {
       color: rgb(156, 163, 175);
     }
   }
-  
+
   &--log {
     border-left: 3px solid rgb(82, 82, 91);
   }
 }
+
+// --- Empty state ---
 
 .console-empty {
   height: 100%;
@@ -221,78 +263,80 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 1.5rem 0.75rem;
-  color: var(--rr-text-subtle);
+  gap: 0.35rem;
+  padding: 1rem 0.75rem;
+  color: var(--rr-text-tertiary);
 }
 
 .console-empty__icon {
-  width: 32px;
-  height: 32px;
-  color: color-mix(in srgb, var(--rr-text-subtle), transparent 20%);
+  width: 24px;
+  height: 24px;
+  color: var(--rr-text-tertiary);
+  opacity: 0.5;
 }
 
 .console-empty__text {
   margin: 0;
-  font-size: 13px;
+  font-size: 11px;
+  color: var(--rr-text-tertiary);
 }
+
+// --- Resize handle (separator line) ---
+
 .resize-handle {
   touch-action: none;
   user-select: none;
   pointer-events: auto;
   z-index: 10;
-  
-  &:hover {
-    cursor: ns-resize;
-  }
-  
-  &:active {
-    cursor: ns-resize;
-  }
-}
-
-.resize-handle {
+  cursor: row-resize;
   display: flex;
   justify-content: center;
-  padding: 0.45rem 0;
-  margin-bottom: -0.25rem;
+  align-items: center;
+  height: 4px;
+  margin: 0;
+  padding: 0;
+  position: relative;
 }
 
 .resize-handle__bar {
-  width: 3rem;
-  height: 4px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--rr-text-subtle), transparent 35%);
-  transition: background 160ms ease;
+  width: 100%;
+  height: 1px;
+  border-radius: 0;
+  background: var(--rr-border-color);
+  transition: background 80ms ease, height 80ms ease;
 }
 
 .resize-handle:hover .resize-handle__bar {
-  background: color-mix(in srgb, var(--rr-text-subtle), transparent 15%);
+  background: var(--rr-primary);
+  height: 2px;
 }
 
 .resize-handle:active .resize-handle__bar {
-  background: color-mix(in srgb, var(--rr-primary), transparent 10%);
+  background: var(--rr-primary);
+  height: 2px;
 }
+
+// --- Console bubble (status-bar style) ---
 
 .console-bubble__btn {
   pointer-events: auto;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  border-radius: 999px;
+  gap: 0.4rem;
+  border-radius: var(--rr-radius-sm) var(--rr-radius-sm) 0 0;
   border: 1px solid var(--rr-border-color);
-  background: color-mix(in srgb, var(--rr-surface-2), transparent 10%);
-  padding: 0.5rem 0.9rem;
-  font-size: 12px;
-  font-weight: 800;
+  border-bottom: none;
+  background: var(--rr-surface-2);
+  padding: 0 0.65rem;
+  height: 28px;
+  font-size: 11px;
+  font-weight: 700;
   color: var(--rr-text);
-  box-shadow:
-    0 22px 40px rgba(0, 0, 0, 0.35),
-    0 10px 22px rgba(0, 0, 0, 0.25);
-  transition: border-color 160ms ease, color 160ms ease, transform 160ms ease;
+  box-shadow: none;
+  transition: border-color 80ms ease, color 80ms ease;
 }
 
 .console-bubble__btn:hover {
-  border-color: color-mix(in srgb, var(--rr-primary), transparent 40%);
-  color: color-mix(in srgb, var(--rr-primary), white 20%);
+  border-color: var(--rr-primary);
+  color: var(--rr-primary);
 }

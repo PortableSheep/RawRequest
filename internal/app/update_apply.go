@@ -126,6 +126,10 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 			"--sha256", st.Sha256,
 			"--relaunch=true",
 		)
+		// On Windows the updater must not inherit a CWD inside the install
+		// directory, otherwise os.Rename on that directory fails with
+		// ERROR_ACCESS_DENIED.
+		cmd.Dir = os.TempDir()
 		// App stdout/stderr are often not visible in GUI builds; capture helper logs.
 		logPath := filepath.Join(filepath.Dir(a.preparedUpdateStatePath()), "updater.log")
 		if f, ferr := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644); ferr == nil {

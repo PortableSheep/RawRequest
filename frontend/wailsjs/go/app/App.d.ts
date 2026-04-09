@@ -85,13 +85,13 @@ export function RestoreWindowState():Promise<void>;
 
 export function RevealInFinder(arg1:string):Promise<void>;
 
-export function SaveFileContents(arg1:string,arg2:string):Promise<string>;
-
 export function SaveBase64ToFile(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SaveBinaryResponse(arg1:string,arg2:string,arg3:string):Promise<string>;
 
 export function SaveBinaryResponseToPath(arg1:string,arg2:string):Promise<void>;
+
+export function SaveFileContents(arg1:string,arg2:string):Promise<string>;
 
 export function SaveResponseFile(arg1:string,arg2:string):Promise<string>;
 

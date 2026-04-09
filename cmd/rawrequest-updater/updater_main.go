@@ -146,6 +146,14 @@ func main() {
 		}
 	}
 
+	// On Windows, os.Rename fails with ERROR_ACCESS_DENIED if the current
+	// working directory of any running process is inside the directory being
+	// renamed. Move our CWD to the parent of the install path so we don't
+	// block the swap.
+	if err := os.Chdir(parentDir); err != nil {
+		fmt.Printf("Warning: could not chdir to %s: %v\n", parentDir, err)
+	}
+
 	fmt.Printf("Applying update...\n")
 	if err := applyUpdate(installPath, newPayloadPath); err != nil {
 		dief("apply update failed: %v", err)
