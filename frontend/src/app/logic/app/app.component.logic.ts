@@ -103,8 +103,7 @@ export function buildActiveRequestPreview(request: Request | null, processedUrl?
 
   const method = (request.method || 'GET').toUpperCase();
   const url = processedUrl || request.url || request.name || 'https://';
-  const body = typeof request.body === 'string' ? request.body.trim() : '';
-  return body ? `${method} ${url}\n\n${body}` : `${method} ${url}`;
+  return `${method} ${url}`;
 }
 
 export function buildActiveRequestMeta(args: {

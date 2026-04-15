@@ -118,10 +118,10 @@ describe('app.component.logic', () => {
     expect(buildActiveRequestPreview(null)).toBe('// Waiting for the next request to start.');
   });
 
-  it('buildActiveRequestPreview includes body when present', () => {
+  it('buildActiveRequestPreview excludes body', () => {
     expect(
       buildActiveRequestPreview({ method: 'post', url: 'https://x', headers: {}, body: ' hi ' } as any)
-    ).toBe('POST https://x\n\nhi');
+    ).toBe('POST https://x');
   });
 
   it('buildActiveRequestPreview uses processedUrl when provided', () => {
@@ -140,13 +140,13 @@ describe('app.component.logic', () => {
     expect(buildActiveRequestPreview(req)).toBe('GET https://fallback.com');
   });
 
-  it('buildActiveRequestPreview shows resolved URL instead of template variable', () => {
+  it('buildActiveRequestPreview shows resolved URL without body', () => {
     expect(
       buildActiveRequestPreview(
         { method: 'POST', url: '{{host}}/{{path}}', headers: {}, body: '{"a":1}' } as any,
         'https://resolved.io/endpoint'
       )
-    ).toBe('POST https://resolved.io/endpoint\n\n{"a":1}');
+    ).toBe('POST https://resolved.io/endpoint');
   });
 
   it('buildActiveRequestMeta covers running request with timeout', () => {

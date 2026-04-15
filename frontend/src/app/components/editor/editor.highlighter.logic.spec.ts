@@ -86,9 +86,9 @@ describe('editor.highlighter.logic', () => {
         isRequestStart: true
       });
 
-      const m = res.decorations.find((d) => d.cls === 'cm-http-method');
+      const m = res.decorations.find((d) => d.cls.includes('cm-http-method'));
       expect(m).toBeTruthy();
-      expect(m).toEqual({ from: 102, to: 105, cls: 'cm-http-method' });
+      expect(m).toEqual({ from: 102, to: 105, cls: 'cm-http-method cm-http-method--get' });
     });
 
     it('highlights header key for HeaderLine', () => {
@@ -246,6 +246,59 @@ describe('editor.highlighter.logic', () => {
       expect(res.decorations.some(d => d.cls === 'cm-json-string')).toBe(true);
       expect(res.decorations.some(d => d.cls === 'cm-json-number')).toBe(true);
       expect(res.decorations.some(d => d.cls === 'cm-json-literal')).toBe(true);
+    });
+
+    it('adds comment styling for BodyLine starting with #', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 10,
+        text: '# This is a comment',
+        leadingWhitespace: 0,
+        lineNodeName: 'BodyLine',
+        nodeText: '# This is a comment',
+        isRequestStart: false
+      });
+
+      expect(res.lineDecorations).toContainEqual({ at: 10, cls: 'cm-comment-line' });
+      expect(res.decorations).toContainEqual({
+        from: 10,
+        to: 29,
+        cls: 'cm-http-comment'
+      });
+      // Should NOT get payload-line or JSON highlighting
+      expect(res.lineDecorations).not.toContainEqual(expect.objectContaining({ cls: 'cm-payload-line' }));
+      expect(res.decorations.some(d => d.cls === 'cm-json-key')).toBe(false);
+    });
+
+    it('adds comment styling for indented comment lines', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: '  # indented comment',
+        leadingWhitespace: 2,
+        lineNodeName: 'BodyLine',
+        nodeText: '# indented comment',
+        isRequestStart: false
+      });
+
+      expect(res.lineDecorations).toContainEqual({ at: 0, cls: 'cm-comment-line' });
+      expect(res.decorations).toContainEqual({
+        from: 2,
+        to: 20,
+        cls: 'cm-http-comment'
+      });
+    });
+
+    it('does NOT add comment styling for separator lines (###)', () => {
+      const res = getNonScriptLineDecorations({
+        lineFrom: 0,
+        text: '### separator',
+        leadingWhitespace: 0,
+        lineNodeName: 'BodyLine',
+        nodeText: '### separator',
+        isRequestStart: false
+      });
+
+      expect(res.lineDecorations).not.toContainEqual(expect.objectContaining({ cls: 'cm-comment-line' }));
+      expect(res.decorations.some(d => d.cls === 'cm-http-comment')).toBe(false);
     });
   });
 });

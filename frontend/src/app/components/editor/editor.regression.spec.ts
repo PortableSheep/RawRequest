@@ -94,14 +94,14 @@ describe('Editor Regression Tests', () => {
       expect(meta).toContain('{{baseUrl}}');
     });
 
-    it('should resolve multiple template variables in processedUrl', () => {
+    it('should resolve multiple template variables in processedUrl without body', () => {
       const preview = buildActiveRequestPreview(
         { method: 'POST', url: '{{host}}/{{version}}/{{path}}', headers: {}, body: '{"a":1}' } as any,
         'https://api.example.com/v2/users'
       );
       expect(preview).not.toContain('{{');
       expect(preview).toContain('https://api.example.com/v2/users');
-      expect(preview).toContain('{"a":1}');
+      expect(preview).not.toContain('{"a":1}');
     });
   });
 });

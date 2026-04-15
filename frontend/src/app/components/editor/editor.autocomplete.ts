@@ -1,13 +1,21 @@
-import { autocompletion, Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete';
+import { autocompletion, Completion, CompletionContext, CompletionResult, CompletionSection } from '@codemirror/autocomplete';
 import { syntaxTree } from '@codemirror/language';
 
 import { ANNOTATIONS, CONTENT_TYPES, HTTP_HEADERS, HTTP_METHODS, LOAD_TEST_KEYS } from './editor.constants';
+import { computeRequestBlockIndex, findRequestIndexByPos } from './editor-request-indexer.logic';
+import { buildDependsIndex, buildNameToIndex } from './editor.lint.logic';
+
+const SECTION_VARIABLES: CompletionSection = { name: 'Variables', rank: 0 };
+const SECTION_ENVIRONMENT: CompletionSection = { name: 'Environment', rank: 1 };
+const SECTION_SECRETS: CompletionSection = { name: 'Secrets', rank: 2 };
+const SECTION_RESPONSES: CompletionSection = { name: 'Response References', rank: 3 };
 
 export type AutocompleteDeps = {
   getVariables: () => { [key: string]: string };
   getEnvironments: () => { [env: string]: { [key: string]: string } };
   getCurrentEnv: () => string;
   getSecrets: () => Partial<Record<string, string[]>>;
+  getRequests: () => any[];
   getRequestNames: () => string[];
 };
 
@@ -115,18 +123,27 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
     const from = context.pos - prefix.length;
     const completions: Completion[] = [];
 
+    // Merge secret keys from current env + default
+    const env = (deps.getCurrentEnv() || 'default').trim() || 'default';
+    const snapshot = deps.getSecrets() || {};
+    const secretKeys = Array.from(new Set<string>([...(snapshot[env] || []), ...(snapshot['default'] || [])])).sort();
+
+    // Only include response refs for requests reachable via @depends chain
+    const chainRequests = computeChainRequests(context, deps);
+
     completions.push(
       ...buildVarCompletions({
         vars: deps.getVariables(),
         envs: deps.getEnvironments(),
         currentEnv: deps.getCurrentEnv(),
-        requestNames: deps.getRequestNames(),
+        chainRequests,
+        secretKeys,
         closeSuffix
       })
     );
 
     if (completions.length === 0) return null;
-    return { from, options: completions, validFor: /^[a-zA-Z0-9_.]*$/ };
+    return { from, options: completions, validFor: /^[a-zA-Z0-9_.:]*$/ };
   }
 
   // Check for annotation completion at start of line: @
@@ -207,16 +224,19 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
   return null;
 }
 
-export type VarCompletionItem = { label: string; type: string; detail: string; apply: string };
+export type ChainRequestRef = { index: number; name: string };
+
+export type VarCompletionItem = { label: string; type: string; detail: string; apply: string; section?: CompletionSection };
 
 export function buildVarCompletions(params: {
   vars: Record<string, string>;
   envs: Record<string, Record<string, string>>;
   currentEnv: string;
-  requestNames: string[];
+  chainRequests?: ChainRequestRef[];
+  secretKeys?: string[];
   closeSuffix?: string;
 }): VarCompletionItem[] {
-  const { vars, envs, currentEnv, requestNames, closeSuffix = '}}' } = params;
+  const { vars, envs, currentEnv, chainRequests = [], secretKeys = [], closeSuffix = '}}' } = params;
   const completions: VarCompletionItem[] = [];
 
   // Add variables
@@ -225,7 +245,8 @@ export function buildVarCompletions(params: {
       label: key,
       type: 'variable',
       detail: vars[key]?.slice(0, 30) || '',
-      apply: `${key}${closeSuffix}`
+      apply: `${key}${closeSuffix}`,
+      section: SECTION_VARIABLES
     });
   }
 
@@ -245,26 +266,72 @@ export function buildVarCompletions(params: {
       label: key,
       type: 'variable',
       detail: value?.slice(0, 30) || '',
-      apply: `${key}${closeSuffix}`
+      apply: `${key}${closeSuffix}`,
+      section: SECTION_ENVIRONMENT
     });
   }
 
-  // Add request references for chaining
-  for (let i = 0; i < requestNames.length; i++) {
-    const reqName = requestNames[i] || `request${i + 1}`;
+  // Add secret key completions
+  for (const key of secretKeys) {
     completions.push({
-      label: `request${i + 1}.response.body`,
+      label: `secret:${key}`,
+      type: 'variable',
+      detail: 'secret',
+      apply: `secret:${key}${closeSuffix}`,
+      section: SECTION_SECRETS
+    });
+  }
+
+  // Add response references only for requests reachable via @depends chain
+  for (const { index, name } of chainRequests) {
+    const reqNum = index + 1;
+    const reqLabel = name || `request${reqNum}`;
+    completions.push({
+      label: `request${reqNum}.response.body`,
       type: 'function',
-      detail: reqName,
-      apply: `request${i + 1}.response.body${closeSuffix}`
+      detail: reqLabel,
+      apply: `request${reqNum}.response.body${closeSuffix}`,
+      section: SECTION_RESPONSES
     });
     completions.push({
-      label: `request${i + 1}.response.status`,
+      label: `request${reqNum}.response.status`,
       type: 'function',
-      detail: reqName,
-      apply: `request${i + 1}.response.status${closeSuffix}`
+      detail: reqLabel,
+      apply: `request${reqNum}.response.status${closeSuffix}`,
+      section: SECTION_RESPONSES
     });
   }
 
   return completions;
+}
+
+/**
+ * Walk the @depends chain for the request at the cursor position.
+ * Returns only the ancestor requests (not the current one) in chain order.
+ */
+function computeChainRequests(context: CompletionContext, deps: AutocompleteDeps): ChainRequestRef[] {
+  const requests = deps.getRequests();
+  if (!requests?.length) return [];
+
+  const blocks = computeRequestBlockIndex(context.state.doc);
+  const currentIdx = findRequestIndexByPos(blocks, context.pos);
+  if (currentIdx === null || currentIdx < 0 || currentIdx >= requests.length) return [];
+
+  const nameToIndex = buildNameToIndex(requests);
+  const dependsIndex = buildDependsIndex(requests, nameToIndex);
+
+  // Walk the chain backward from the current request, collecting ancestors
+  const chain: ChainRequestRef[] = [];
+  const visited = new Set<number>();
+  let idx: number | null = dependsIndex[currentIdx] ?? null;
+  while (idx !== null && !visited.has(idx)) {
+    visited.add(idx);
+    const name = String(requests[idx]?.name || '').trim();
+    chain.push({ index: idx, name });
+    idx = dependsIndex[idx] ?? null;
+  }
+
+  // Reverse so root ancestor comes first (execution order)
+  chain.reverse();
+  return chain;
 }

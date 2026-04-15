@@ -489,6 +489,17 @@ describe('HeaderComponent', () => {
     expect(component.moreMenu.show).toBe(false);
   });
 
+  it('should call panels.openSecretsModal from secrets button in topbar', () => {
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.rr-topbar__right .rr-btn') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(buttons).find((el) => el.textContent?.includes('Secrets'))!;
+    expect(btn).toBeTruthy();
+    btn.click();
+
+    expect(mockPanels.openSecretsModal).toHaveBeenCalled();
+  });
+
   it('should call panels.toggleHistory from more menu', () => {
     component.moreMenu = { show: true, x: 0, y: 0 };
     fixture.detectChanges();

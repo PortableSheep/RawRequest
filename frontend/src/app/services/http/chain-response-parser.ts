@@ -1,4 +1,5 @@
 import { RequestPreview, ResponseData } from '../../models/http.models';
+import { maskHeaderValues } from '../../utils/secret-masking';
 
 export type ParseGoResponseFn = (responseStr: string, responseTime: number) => ResponseData;
 
@@ -31,6 +32,12 @@ export function parseConcatenatedChainResponses(
       if (preview) {
         if (!response.requestPreview) {
           response.requestPreview = preview;
+        } else if (preview.sensitiveHeaderKeys?.length && response.requestPreview.headers) {
+          response.requestPreview.headers = maskHeaderValues(
+            response.requestPreview.headers,
+            preview.sensitiveHeaderKeys
+          );
+          response.requestPreview.sensitiveHeaderKeys = preview.sensitiveHeaderKeys;
         }
         if (!response.processedUrl) {
           response.processedUrl = (response.requestPreview || preview).url;

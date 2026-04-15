@@ -595,7 +595,8 @@ describe('HttpService', () => {
 
       const result = await service.sendRequest(req, {});
 
-      expect(result.requestPreview.headers['X-API-Key']).toBe('SECRET_VAL');
+      expect(result.requestPreview.headers['X-API-Key']).toBe('••••••••');
+      expect(result.requestPreview.sensitiveHeaderKeys).toEqual(['X-API-Key']);
       expect(secretServiceMock.replaceSecrets).toHaveBeenCalled();
     });
   });

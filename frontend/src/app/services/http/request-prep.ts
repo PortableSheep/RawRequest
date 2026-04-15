@@ -1,4 +1,5 @@
 import { Request, RequestPreview } from '../../models/http.models';
+import { detectSensitiveHeaderKeys, maskHeaderValues } from '../../utils/secret-masking';
 
 export type BackendRequestPrepResult = { backend: Record<string, any>; preview: RequestPreview };
 
@@ -35,6 +36,8 @@ export async function prepareBackendRequest(
     bodyPlaceholder = '[FormData]';
   }
 
+  const sensitiveHeaderKeys = detectSensitiveHeaderKeys(req.headers);
+
   const backend = {
     method: req.method,
     url,
@@ -48,8 +51,9 @@ export async function prepareBackendRequest(
     name: req.name,
     method: req.method,
     url,
-    headers: { ...headers },
-    body: body || bodyPlaceholder
+    headers: maskHeaderValues({ ...headers }, sensitiveHeaderKeys),
+    body: body || bodyPlaceholder,
+    sensitiveHeaderKeys: sensitiveHeaderKeys.length ? sensitiveHeaderKeys : undefined,
   };
 
   return { backend, preview };
@@ -70,6 +74,8 @@ export async function prepareBackendRequestForChain(
     bodyPlaceholder = '[FormData]';
   }
 
+  const sensitiveHeaderKeys = detectSensitiveHeaderKeys(req.headers);
+
   const backend = {
     method: req.method,
     url,
@@ -84,8 +90,9 @@ export async function prepareBackendRequestForChain(
     name: req.name,
     method: req.method,
     url,
-    headers: { ...headers },
+    headers: maskHeaderValues({ ...headers }, sensitiveHeaderKeys),
     body: body || bodyPlaceholder,
+    sensitiveHeaderKeys: sensitiveHeaderKeys.length ? sensitiveHeaderKeys : undefined,
   };
 
   return { backend, preview };

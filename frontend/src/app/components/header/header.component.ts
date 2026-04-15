@@ -170,6 +170,10 @@ export class HeaderComponent {
     this.closeMoreMenu();
   }
 
+  handleSecretsClick(): void {
+    this.panels.openSecretsModal();
+  }
+
   handleSecretsClickFromMenu(): void {
     this.panels.openSecretsModal();
     this.closeMoreMenu();

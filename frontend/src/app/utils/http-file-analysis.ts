@@ -49,6 +49,11 @@ export function extractPlaceholders(text: string): PlaceholderMatch[] {
   return matches;
 }
 
+export function extractMethodFromLine(text: string): string | null {
+  const match = text.trimStart().match(METHOD_LINE_REGEX);
+  return match ? match[1].toUpperCase() : null;
+}
+
 export function extractDependsTarget(line: string): { target: string; start: number; end: number } | null {
   const trimmedStartIndex = line.length - line.trimStart().length;
   const trimmed = line.trimStart();

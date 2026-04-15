@@ -198,6 +198,7 @@ export function getNonScriptLineDecorations(params: {
   lineNodeName: string;
   nodeText: string;
   isRequestStart: boolean;
+  nextRequestMethod?: string;
 }): { decorations: TextDecoration[]; lineDecorations: Array<{ at: number; cls: string }> } {
   const decorations: TextDecoration[] = [];
   const lineDecorations: Array<{ at: number; cls: string }> = [];
@@ -205,12 +206,14 @@ export function getNonScriptLineDecorations(params: {
   // Highlight HTTP methods
   if (params.lineNodeName === 'MethodLine') {
     const mm = params.nodeText.trimStart().match(METHOD_LINE_REGEX);
-    const methodLen = mm?.[1]?.length ?? 0;
+    const method = mm?.[1];
+    const methodLen = method?.length ?? 0;
     if (methodLen > 0) {
+      const methodCls = method ? 'cm-http-method--' + method.toLowerCase() : '';
       decorations.push({
         from: params.lineFrom + params.leadingWhitespace,
         to: params.lineFrom + params.leadingWhitespace + methodLen,
-        cls: 'cm-http-method'
+        cls: 'cm-http-method' + (methodCls ? ' ' + methodCls : '')
       });
     }
 
@@ -316,8 +319,17 @@ export function getNonScriptLineDecorations(params: {
   // Subtle line-level decoration for payload/body lines.
   if (params.lineNodeName === 'BodyLine') {
     const trimmed = params.text.trimStart();
-    // Avoid styling script markers; keep it focused on payload content.
-    if (trimmed && trimmed !== '<' && trimmed !== '>' && !trimmed.startsWith('<') && !trimmed.startsWith('>')) {
+
+    // Comment lines: start with # but are NOT separators (###)
+    if (trimmed.startsWith('#') && !isSeparatorLine(params.text)) {
+      lineDecorations.push({ at: params.lineFrom, cls: 'cm-comment-line' });
+      decorations.push({
+        from: params.lineFrom + params.leadingWhitespace,
+        to: params.lineFrom + params.text.length,
+        cls: 'cm-http-comment'
+      });
+    } else if (trimmed && trimmed !== '<' && trimmed !== '>' && !trimmed.startsWith('<') && !trimmed.startsWith('>')) {
+      // Avoid styling script markers; keep it focused on payload content.
       lineDecorations.push({ at: params.lineFrom, cls: 'cm-payload-line' });
 
       decorations.push(
@@ -334,6 +346,10 @@ export function getNonScriptLineDecorations(params: {
   if (params.lineNodeName === 'SeparatorLine') {
     if (isSeparatorLine(params.text)) {
       lineDecorations.push({ at: params.lineFrom, cls: 'cm-separator' });
+      if (params.nextRequestMethod) {
+        const methodCls = 'cm-separator--' + params.nextRequestMethod.toLowerCase();
+        lineDecorations.push({ at: params.lineFrom, cls: methodCls });
+      }
     }
   }
 

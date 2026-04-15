@@ -100,7 +100,8 @@ function cloneRequestPreview(preview: RequestPreview): RequestPreview {
     method: preview.method,
     url: preview.url,
     headers: { ...preview.headers },
-    body: preview.body
+    body: preview.body,
+    sensitiveHeaderKeys: preview.sensitiveHeaderKeys ? [...preview.sensitiveHeaderKeys] : undefined,
   };
 }
 

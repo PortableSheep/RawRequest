@@ -24,6 +24,74 @@
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
     overflow: hidden;
   }
+
+  &.cm-tooltip-autocomplete {
+    border: 1px solid var(--rr-border-color);
+    background: var(--rr-surface-2);
+    border-radius: var(--rr-radius-md);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    padding: 4px 0;
+
+    > ul {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 12px;
+
+      > li {
+        padding: 3px 8px;
+        line-height: 1.4;
+        border-radius: 0;
+
+        &[aria-selected="true"] {
+          background: var(--rr-primary);
+          color: var(--rr-text-on-primary);
+
+          .cm-completionDetail {
+            color: rgba(255, 255, 255, 0.7);
+          }
+        }
+      }
+
+      // Section headers rendered by CM6
+      > li.cm-completionListIncompleteTop,
+      > li.cm-completionListIncompleteBottom {
+        font-style: italic;
+        color: var(--rr-text-tertiary);
+      }
+    }
+
+    .cm-completionLabel {
+      font-weight: 500;
+    }
+
+    .cm-completionDetail {
+      font-style: normal;
+      margin-left: 8px;
+      color: var(--rr-text-tertiary);
+      font-size: 11px;
+    }
+
+    .cm-completionMatchedText {
+      text-decoration: none;
+      color: var(--rr-accent-light);
+      font-weight: 600;
+    }
+
+    // Section header elements
+    .cm-completionSection {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--rr-text-tertiary);
+      padding: 6px 8px 2px;
+      border-top: 1px solid var(--rr-border-color);
+      margin-top: 2px;
+
+      &:first-child {
+        border-top: none;
+        margin-top: 0;
+      }
+    }
+  }
 }
 
 ::ng-deep .cm-variable-tooltip {

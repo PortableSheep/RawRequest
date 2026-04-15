@@ -1,4 +1,5 @@
 import { AssertionResult, Request, ResponseData, RequestPreview } from '../../models/http.models';
+import { detectSensitiveHeaderKeys, maskHeaderValues } from '../../utils/secret-masking';
 
 export type SendRequestBackend = {
   sendRequest: (method: string, url: string, headersJson: string, bodyStr: string) => Promise<string>;
@@ -47,6 +48,7 @@ export async function sendRequest(
   let processedBody: string | undefined;
   let requestPreview: RequestPreview | null = null;
   let bodyPlaceholder: string | undefined;
+  const sensitiveHeaderKeys = detectSensitiveHeaderKeys(request.headers);
   const assertions: AssertionResult[] = [];
   const scriptContext: any = { request, variables, assertions };
 
@@ -83,8 +85,9 @@ export async function sendRequest(
       name: request.name,
       method: request.method,
       url: processedUrl,
-      headers: { ...processedHeaders },
+      headers: maskHeaderValues({ ...processedHeaders }, sensitiveHeaderKeys),
       body: processedBody ?? bodyPlaceholder,
+      sensitiveHeaderKeys: sensitiveHeaderKeys.length ? sensitiveHeaderKeys : undefined,
     };
 
     const headersJson = JSON.stringify(processedHeaders);

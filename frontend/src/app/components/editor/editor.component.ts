@@ -45,6 +45,7 @@ import type { SecretIndex } from '../../services/secret.service';
 import { ThemeService } from '../../services/theme.service';
 import {
   extractDependsTarget,
+  extractMethodFromLine,
   isMethodLine,
   isSeparatorLine
 } from '../../utils/http-file-analysis';
@@ -667,6 +668,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             inScript = true;
             const markerIndex = text.indexOf(scriptStartMatch[1]);
             decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
+            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
             scriptBraceDepth = 0;
             for (const char of text) {
               if (char === '{') scriptBraceDepth++;
@@ -690,6 +692,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           if (!inScript && (trimmedText === '<' || trimmedText === '>')) {
             const markerIndex = text.indexOf(trimmedText);
             decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
+            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
             continue;
           }
 
@@ -703,6 +706,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                 if (char === '{') scriptBraceDepth++;
                 if (char === '}') scriptBraceDepth--;
               }
+              lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
               const braceIndex = text.indexOf('{');
               if (braceIndex >= 0 && braceIndex < text.length - 1) {
                 decorations.push(
@@ -720,6 +724,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
           // Inside a script block
           if (inScript) {
+            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
             let lineOpenBraces = 0;
             let lineCloseBraces = 0;
             for (const char of text) {
@@ -753,13 +758,25 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             continue;
           }
 
+          // Look ahead for the next request method when on a separator line
+          let nextRequestMethod: string | undefined;
+          if (lineNodeName === 'SeparatorLine' && isSeparatorLine(text)) {
+            for (let j = i + 1; j <= endLine + 20 && j <= view.state.doc.lines; j++) {
+              const peekText = view.state.doc.line(j).text;
+              if (isSeparatorLine(peekText)) break;
+              const method = extractMethodFromLine(peekText);
+              if (method) { nextRequestMethod = method; break; }
+            }
+          }
+
           const nonScript = getNonScriptLineDecorations({
             lineFrom: line.from,
             text,
             leadingWhitespace,
             lineNodeName,
             nodeText: view.state.doc.sliceString(resolved.from, resolved.to),
-            isRequestStart: isMethodLine(text) && !inRequestBlock
+            isRequestStart: isMethodLine(text) && !inRequestBlock,
+            nextRequestMethod
           });
           decorations.push(...nonScript.decorations);
           lineDecorations.push(...nonScript.lineDecorations);
@@ -800,6 +817,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       getEnvironments: () => this.environments(),
       getCurrentEnv: () => this.currentEnv(),
       getSecrets: () => this.secrets() || {},
+      getRequests: () => this.requests(),
       getRequestNames: () => this.requestNames()
     });
   }

@@ -6,7 +6,6 @@ describe('buildVarCompletions', () => {
       vars: {},
       envs: {},
       currentEnv: '',
-      requestNames: [],
       ...params
     });
   }
@@ -24,16 +23,13 @@ describe('buildVarCompletions', () => {
     expect(tokenItem.detail).toBe('abc123');
     expect(tokenItem.apply).toBe('token}}');
     expect(tokenItem.type).toBe('variable');
+    expect(tokenItem.section).toEqual({ name: 'Variables', rank: 0 });
   });
 
   it('truncates long variable values to 30 chars in detail', () => {
     const longVal = 'a'.repeat(50);
     const result = call({ vars: { key: longVal } });
     expect(result[0].detail).toBe('a'.repeat(30));
-  });
-
-  it('returns empty array when no vars, envs, or request names', () => {
-    expect(call()).toEqual([]);
   });
 
   // ── Environment variable completions ────────────────────────────────
@@ -46,6 +42,7 @@ describe('buildVarCompletions', () => {
     expect(labels(result)).toContain('baseUrl');
     expect(labels(result)).not.toContain('env.dev.baseUrl');
     expect(result.find(r => r.label === 'baseUrl')!.apply).toBe('baseUrl}}');
+    expect(result.find(r => r.label === 'baseUrl')!.section).toEqual({ name: 'Environment', rank: 1 });
   });
 
   it('shows current env value in detail', () => {
@@ -124,8 +121,8 @@ describe('buildVarCompletions', () => {
 
   // ── Request reference completions ───────────────────────────────────
 
-  it('adds body and status references per request name', () => {
-    const result = call({ requestNames: ['login', 'getProfile'] });
+  it('adds body and status references for chained requests', () => {
+    const result = call({ chainRequests: [{ index: 0, name: 'login' }, { index: 1, name: 'getProfile' }] });
     expect(labels(result)).toContain('request1.response.body');
     expect(labels(result)).toContain('request1.response.status');
     expect(labels(result)).toContain('request2.response.body');
@@ -133,25 +130,64 @@ describe('buildVarCompletions', () => {
   });
 
   it('shows request name in detail for references', () => {
-    const result = call({ requestNames: ['login'] });
+    const result = call({ chainRequests: [{ index: 0, name: 'login' }] });
     const item = result.find(r => r.label === 'request1.response.body')!;
     expect(item.detail).toBe('login');
     expect(item.type).toBe('function');
     expect(item.apply).toBe('request1.response.body}}');
+    expect(item.section).toEqual({ name: 'Response References', rank: 3 });
+  });
+
+  it('uses correct 1-based numbering from request index', () => {
+    const result = call({ chainRequests: [{ index: 2, name: 'thirdReq' }] });
+    expect(labels(result)).toContain('request3.response.body');
+    expect(labels(result)).toContain('request3.response.status');
+    const item = result.find(r => r.label === 'request3.response.body')!;
+    expect(item.detail).toBe('thirdReq');
+  });
+
+  it('returns no response refs when chainRequests is empty', () => {
+    const result = call({ vars: { token: 'abc' } });
+    expect(result.some(r => r.label.startsWith('request'))).toBe(false);
+  });
+
+  // ── Secret completions ─────────────────────────────────────────────
+
+  it('adds secret:keyName completions when secretKeys provided', () => {
+    const result = call({ secretKeys: ['apiKey', 'dbPassword'] });
+    expect(labels(result)).toContain('secret:apiKey');
+    expect(labels(result)).toContain('secret:dbPassword');
+    const item = result.find(r => r.label === 'secret:apiKey')!;
+    expect(item.type).toBe('variable');
+    expect(item.detail).toBe('secret');
+    expect(item.apply).toBe('secret:apiKey}}');
+    expect(item.section).toEqual({ name: 'Secrets', rank: 2 });
+  });
+
+  it('omits closing braces for secrets when closeSuffix is empty', () => {
+    const result = call({ secretKeys: ['token'], closeSuffix: '' });
+    const item = result.find(r => r.label === 'secret:token')!;
+    expect(item.apply).toBe('secret:token');
+  });
+
+  it('returns empty array when no vars, envs, secrets, or request names', () => {
+    expect(call()).toEqual([]);
   });
 
   // ── Mixed scenarios ─────────────────────────────────────────────────
 
-  it('returns vars, env vars, and request refs together', () => {
+  it('returns vars, env vars, secrets, and request refs together', () => {
     const result = call({
       vars: { token: 'abc' },
       envs: { dev: { baseUrl: 'http://dev' } },
       currentEnv: 'dev',
-      requestNames: ['login']
+      secretKeys: ['apiKey'],
+      chainRequests: [{ index: 0, name: 'login' }]
     });
     expect(labels(result)).toEqual([
       'token',
       'baseUrl',
+      'secret:apiKey',
       'request1.response.body',
       'request1.response.status'
     ]);
@@ -180,7 +216,7 @@ describe('buildVarCompletions', () => {
 
   it('omits closing braces for request refs when closeSuffix is empty', () => {
     const result = call({
-      requestNames: ['login'],
+      chainRequests: [{ index: 0, name: 'login' }],
       closeSuffix: ''
     });
     const body = result.find(r => r.label === 'request1.response.body')!;

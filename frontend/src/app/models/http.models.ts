@@ -22,6 +22,7 @@ export interface RequestPreview {
   url: string;
   headers: { [key: string]: string };
   body?: string;
+  sensitiveHeaderKeys?: string[];
 }
 
 export interface TimingBreakdown {
