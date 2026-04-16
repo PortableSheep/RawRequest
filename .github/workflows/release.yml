@@ -31,7 +31,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version-file: go.mod
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -41,12 +41,18 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        run: |
+          WAILS_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)
+          go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
 
       - name: Install frontend dependencies
         run: |
           cd frontend
-          npm install
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Build macOS (Universal)
         run: |
@@ -216,7 +222,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version-file: go.mod
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -226,12 +232,22 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install Wails
-        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+        shell: bash
+        run: |
+          set -euo pipefail
+          WAILS_VERSION=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v2)
+          go install github.com/wailsapp/wails/v2/cmd/wails@${WAILS_VERSION}
 
       - name: Install frontend dependencies
+        shell: bash
         run: |
+          set -euo pipefail
           cd frontend
-          npm install
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: Build Windows
         shell: bash
