@@ -330,7 +330,9 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   private handleEscapeKey(): void {
-    if (this.panels.showHistoryModal()) {
+    if (this.panels.showCommandPalette()) {
+      this.panels.showCommandPalette.set(false);
+    } else if (this.panels.showHistoryModal()) {
       this.closeHistoryModal();
     } else if (this.panels.showOutlinePanel()) {
       this.panels.showOutlinePanel.set(false);
