@@ -47,7 +47,7 @@ require (
 	github.com/tkrajina/go-reflector v0.5.8 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
-	github.com/wailsapp/go-webview2 v1.0.22 // indirect
+	github.com/wailsapp/go-webview2 v1.0.21 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/net v0.52.0 // indirect
