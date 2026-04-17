@@ -42,6 +42,7 @@ import { ToastService } from "./services/toast.service";
 import { ScriptSnippet } from "./services/script-snippet.service";
 import { ThemeService } from "./services/theme.service";
 import { KeyboardShortcutService } from "./services/keyboard-shortcut.service";
+import { SHORTCUT_CATALOG, shortcutHint } from "./logic/app/shortcut-catalog";
 import { SplitPaneService } from "./services/split-pane.service";
 import { PanelVisibilityService } from "./services/panel-visibility.service";
 import { Subject } from "rxjs";
@@ -98,6 +99,8 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly fileSave = inject(FileSaveService);
   readonly startup = inject(StartupService);
   private readonly cdr = inject(ChangeDetectorRef);
+
+  readonly shortcutHint = shortcutHint;
 
   @ViewChild("mainSplit") mainSplitEl?: ElementRef<HTMLElement>;
   @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
@@ -313,20 +316,26 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Keyboard shortcuts ---
 
-  private readonly SHORTCUT_IDS = [
-    'app:save', 'app:saveAs', 'app:toggleHistory', 'app:toggleOutline',
-    'app:toggleCommandPalette', 'app:escape',
-  ];
+  private readonly SHORTCUT_IDS = SHORTCUT_CATALOG.map(e => e.id);
+
+  private readonly shortcutActions: Record<string, () => void> = {
+    'app:save': () => void this.saveCurrentFile(),
+    'app:saveAs': () => void this.saveCurrentFileAs(),
+    'app:toggleHistory': () => this.panels.toggleHistory(),
+    'app:toggleOutline': () => this.panels.toggleOutlinePanel(),
+    'app:toggleCommandPalette': () => this.panels.toggleCommandPalette(),
+    'app:escape': () => this.handleEscapeKey(),
+  };
 
   private registerKeyboardShortcuts(): void {
-    this.keyboardShortcuts.registerMany([
-      { id: 'app:save', combo: { key: 's', ctrl: true }, action: () => void this.saveCurrentFile() },
-      { id: 'app:saveAs', combo: { key: 's', ctrl: true, shift: true }, action: () => void this.saveCurrentFileAs(), priority: 1 },
-      { id: 'app:toggleHistory', combo: { key: 'h', ctrl: true, shift: true }, action: () => this.panels.toggleHistory() },
-      { id: 'app:toggleOutline', combo: { key: 'o', ctrl: true, shift: true }, action: () => this.panels.toggleOutlinePanel() },
-      { id: 'app:toggleCommandPalette', combo: { key: 'p', ctrl: true }, action: () => this.panels.toggleCommandPalette() },
-      { id: 'app:escape', combo: { key: 'Escape' }, action: () => this.handleEscapeKey() },
-    ]);
+    this.keyboardShortcuts.registerMany(
+      SHORTCUT_CATALOG.map(entry => ({
+        id: entry.id,
+        combo: entry.combo,
+        priority: entry.priority,
+        action: this.shortcutActions[entry.id] ?? (() => {}),
+      })),
+    );
   }
 
   private handleEscapeKey(): void {

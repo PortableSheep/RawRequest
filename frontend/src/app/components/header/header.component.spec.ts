@@ -626,4 +626,73 @@ describe('HeaderComponent', () => {
     themeService.resolvedTheme.mockReturnValue('light' as any);
     expect(component.isDarkTheme()).toBe(false);
   });
+
+  // ── Shortcuts help popover ──────────────────────────────────────────
+
+  it('should render the shortcuts help button', () => {
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn');
+    expect(btn).toBeTruthy();
+    expect(btn.getAttribute('aria-label')).toBe('Keyboard shortcuts');
+  });
+
+  it('should toggle shortcuts help popover on button click', () => {
+    expect(component.shortcutsHelp.show).toBe(false);
+
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn') as HTMLElement;
+    btn.click();
+    fixture.detectChanges();
+
+    expect(component.shortcutsHelp.show).toBe(true);
+    const popover = fixture.nativeElement.querySelector('.rr-menu--shortcuts');
+    expect(popover).toBeTruthy();
+  });
+
+  it('should display visible shortcuts in the popover', () => {
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn') as HTMLElement;
+    btn.click();
+    fixture.detectChanges();
+
+    const rows = fixture.nativeElement.querySelectorAll('.rr-shortcuts__row');
+    expect(rows.length).toBeGreaterThan(0);
+
+    // Each row should have a label and a kbd element
+    for (const row of rows) {
+      expect(row.querySelector('.rr-shortcuts__label')).toBeTruthy();
+      expect(row.querySelector('.rr-shortcuts__kbd')).toBeTruthy();
+    }
+  });
+
+  it('should close shortcuts help popover when clicking again', () => {
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn') as HTMLElement;
+    btn.click();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(true);
+
+    btn.click();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(false);
+  });
+
+  it('should close shortcuts help popover on Escape', () => {
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn') as HTMLElement;
+    btn.click();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(true);
+
+    component.handleEscape();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(false);
+  });
+
+  it('should close shortcuts help when opening more menu', () => {
+    const btn = fixture.nativeElement.querySelector('.rr-shortcuts-btn') as HTMLElement;
+    btn.click();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(true);
+
+    const kebab = fixture.nativeElement.querySelector('.rr-kebab') as HTMLElement;
+    kebab.click();
+    fixture.detectChanges();
+    expect(component.shortcutsHelp.show).toBe(false);
+  });
 });

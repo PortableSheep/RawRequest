@@ -175,6 +175,36 @@
 
         <button
             type="button"
+            class="rr-btn btn-ambient rr-shortcuts-btn"
+            (click)="toggleShortcutsHelp($event)"
+            title="Keyboard shortcuts"
+            aria-label="Keyboard shortcuts"
+            aria-haspopup="true"
+            [attr.aria-expanded]="shortcutsHelp.show"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="2" y="6" width="20" height="12" rx="2" />
+                <path d="M6 10h0" /><path d="M10 10h0" /><path d="M14 10h0" /><path d="M18 10h0" />
+                <path d="M6 14h0" /><path d="M18 14h0" />
+                <path d="M10 14h4" />
+            </svg>
+        </button>
+
+        @if (shortcutsHelp.show) {
+            <div class="rr-menu-backdrop" (click)="closeShortcutsHelp()"></div>
+            <div class="rr-menu rr-menu--shortcuts" [style.left.px]="shortcutsHelp.x" [style.top.px]="shortcutsHelp.y" role="dialog" aria-label="Keyboard shortcuts">
+                <div class="rr-shortcuts__title">Keyboard Shortcuts</div>
+                @for (entry of visibleShortcuts; track entry.id) {
+                    <div class="rr-shortcuts__row">
+                        <span class="rr-shortcuts__label">{{ entry.label }}</span>
+                        <kbd class="rr-shortcuts__kbd">{{ formatKeyCombo(entry.combo) }}</kbd>
+                    </div>
+                }
+            </div>
+        }
+
+        <button
+            type="button"
             class="rr-btn btn-ambient rr-kebab"
             (click)="toggleMoreMenu($event)"
             title="More actions"
@@ -228,7 +258,7 @@
                         role="menuitem"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><circle cx="10" cy="10" r="7" /><path d="M21 21l-6 -6" /></svg>
-                    <span>Search Requests (⌘/Ctrl+P)</span>
+                    <span>Search Requests ({{ shortcutHint('app:toggleCommandPalette') }})</span>
                 </button>
                 <button
                         type="button"
@@ -237,7 +267,7 @@
                         role="menuitem"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M9 6h11" /><path d="M9 12h11" /><path d="M9 18h11" /><path d="M5 6v.01" /><path d="M5 12v.01" /><path d="M5 18v.01" /></svg>
-                    <span>Outline (⌘/Ctrl+Shift+O)</span>
+                    <span>Outline ({{ shortcutHint('app:toggleOutline') }})</span>
                 </button>
                 <button
                         type="button"
@@ -246,7 +276,7 @@
                         role="menuitem"
                 >
                     <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 8l0 4l2 2" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
-                    <span>History (⌘/Ctrl+Shift+H)</span>
+                    <span>History ({{ shortcutHint('app:toggleHistory') }})</span>
                 </button>
                 <button
                         type="button"

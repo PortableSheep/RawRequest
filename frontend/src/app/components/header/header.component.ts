@@ -7,6 +7,7 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { FileSaveService } from '../../services/file-save.service';
 import { ToastService } from '../../services/toast.service';
 import { StartupService } from '../../services/startup.service';
+import { shortcutHint, getVisibleShortcuts, formatKeyCombo } from '../../logic/app/shortcut-catalog';
 
 @Component({
   selector: 'app-header',
@@ -22,6 +23,8 @@ export class HeaderComponent {
   private readonly fileSave = inject(FileSaveService);
   private readonly toast = inject(ToastService);
   readonly startup = inject(StartupService);
+
+  readonly shortcutHint = shortcutHint;
 
   draggingIndex: number | null = null;
   dragOverIndex: number | null = null;
@@ -49,11 +52,21 @@ export class HeaderComponent {
     y: 0
   };
 
+  // Shortcuts help popover state
+  shortcutsHelp = {
+    show: false,
+    x: 0,
+    y: 0
+  };
+  readonly visibleShortcuts = getVisibleShortcuts();
+  readonly formatKeyCombo = formatKeyCombo;
+
   @HostListener('document:keydown.escape')
   handleEscape(): void {
     this.closeSaveMenu();
     this.closeMoreMenu();
     this.closeContextMenu();
+    this.closeShortcutsHelp();
   }
 
   @HostListener('document:mousedown', ['$event'])
@@ -72,6 +85,10 @@ export class HeaderComponent {
     if (this.contextMenu.show && !target.closest('.rr-menu--context') && !target.closest('.rr-tab')) {
       this.closeContextMenu();
     }
+
+    if (this.shortcutsHelp.show && !target.closest('.rr-menu--shortcuts') && !target.closest('.rr-shortcuts-btn')) {
+      this.closeShortcutsHelp();
+    }
   }
 
   toggleSaveMenu(event: MouseEvent): void {
@@ -81,6 +98,7 @@ export class HeaderComponent {
     // Don't allow multiple menus at once.
     this.closeContextMenu();
     this.closeMoreMenu();
+    this.closeShortcutsHelp();
 
     if (this.saveMenu.show) {
       this.closeSaveMenu();
@@ -121,6 +139,7 @@ export class HeaderComponent {
 
     this.closeContextMenu();
     this.closeSaveMenu();
+    this.closeShortcutsHelp();
 
     if (this.moreMenu.show) {
       this.closeMoreMenu();
@@ -143,6 +162,35 @@ export class HeaderComponent {
 
   closeMoreMenu(): void {
     this.moreMenu.show = false;
+  }
+
+  toggleShortcutsHelp(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    this.closeContextMenu();
+    this.closeSaveMenu();
+    this.closeMoreMenu();
+
+    if (this.shortcutsHelp.show) {
+      this.closeShortcutsHelp();
+      return;
+    }
+
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) return;
+
+    const rect = target.getBoundingClientRect();
+    const menuWidth = 240;
+    const padding = 10;
+    const x = Math.min(Math.max(rect.right - menuWidth, padding), window.innerWidth - menuWidth - padding);
+    const y = rect.bottom + 6;
+
+    this.shortcutsHelp = { show: true, x, y };
+  }
+
+  closeShortcutsHelp(): void {
+    this.shortcutsHelp.show = false;
   }
 
   handleOpenExamplesClick(): void {
