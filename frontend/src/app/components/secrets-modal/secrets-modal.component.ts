@@ -1,4 +1,4 @@
-import { Component, computed, effect, HostListener, inject } from '@angular/core';
+import { Component, computed, effect, ElementRef, HostListener, inject, viewChild } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { SecretService } from '../../services/secret.service';
@@ -32,8 +32,8 @@ export class SecretsModalComponent {
 
   readonly isOpen = this.panels.showSecretsModal;
   readonly environments = this.ws.currentFileEnvironments;
-  readonly allSecrets = computed(() => this.secretService.allSecrets);
-  readonly vaultInfo = computed(() => this.secretService.vaultInfo);
+  readonly allSecrets = this.secretService.allSecrets;
+  readonly vaultInfo = this.secretService.vaultInfo;
   readonly fileContent = computed(() => this.ws.currentFileView().content);
 
   // Internal form state
@@ -67,7 +67,11 @@ export class SecretsModalComponent {
         this.revealedValues = {};
         this.showMasterPasswordPrompt = false;
         this.masterPasswordInput = '';
+        this.masterPasswordConfirmInput = '';
         this.masterPasswordError = '';
+        this.masterPasswordAttempt = 0;
+        this.masterPasswordShake = false;
+        this.showForgotPasswordConfirm = false;
         this.showDeleteConfirm = false;
         this.secretToDelete = null;
         void this.initModalState();
@@ -85,16 +89,30 @@ export class SecretsModalComponent {
       this.masterPasswordInput = '';
       this.masterPasswordError = '';
       this.showMasterPasswordPrompt = true;
+      this.focusMasterPasswordField();
     }
   }
 
   // Master password & value reveal state
   showMasterPasswordPrompt = false;
   masterPasswordInput = '';
+  masterPasswordConfirmInput = '';
   masterPasswordMode: 'set' | 'verify' = 'verify';
   masterPasswordError = '';
+  masterPasswordAttempt = 0;
+  masterPasswordShake = false;
+  showForgotPasswordConfirm = false;
   isValuesRevealed = false;
   revealedValues: Record<string, string> = {};
+
+  private readonly masterPasswordField = viewChild<ElementRef<HTMLInputElement>>('masterPasswordField');
+
+  private focusMasterPasswordField(): void {
+    // Defer until after the @if block renders the input.
+    setTimeout(() => {
+      this.masterPasswordField()?.nativeElement.focus();
+    }, 0);
+  }
 
   @HostListener('document:keydown.escape')
   handleEscape(): void {
@@ -104,6 +122,10 @@ export class SecretsModalComponent {
       return;
     }
     if (this.showMasterPasswordPrompt) {
+      if (this.showForgotPasswordConfirm) {
+        this.showForgotPasswordConfirm = false;
+        return;
+      }
       this.showMasterPasswordPrompt = false;
       return;
     }
@@ -241,8 +263,24 @@ export class SecretsModalComponent {
       this.masterPasswordMode = 'set';
     }
     this.masterPasswordInput = '';
+    this.masterPasswordConfirmInput = '';
     this.masterPasswordError = '';
+    this.masterPasswordAttempt = 0;
+    this.masterPasswordShake = false;
+    this.showForgotPasswordConfirm = false;
     this.showMasterPasswordPrompt = true;
+    this.focusMasterPasswordField();
+  }
+
+  onMasterPasswordInput(): void {
+    if (this.masterPasswordError || this.masterPasswordShake) {
+      this.masterPasswordError = '';
+      this.masterPasswordShake = false;
+    }
+  }
+
+  onMasterPasswordShakeEnd(): void {
+    this.masterPasswordShake = false;
   }
 
   hideValues() {
@@ -264,20 +302,48 @@ export class SecretsModalComponent {
     }
   }
 
+  /** Pre-fetch every secret value in the vault so the table renders them
+   *  immediately after the user unlocks, rather than requiring a per-row
+   *  "Load" click. */
+  private async loadAllSecretValues(): Promise<void> {
+    const secrets = this.allSecrets();
+    const tasks: Promise<void>[] = [];
+    for (const [env, keys] of Object.entries(secrets)) {
+      if (!keys) continue;
+      for (const key of keys) {
+        tasks.push(this.loadSecretValue(env, key));
+      }
+    }
+    await Promise.all(tasks);
+  }
+
   async submitMasterPassword(): Promise<void> {
     if (!this.masterPasswordInput) return;
     try {
       if (this.masterPasswordMode === 'set') {
+        if (this.masterPasswordInput !== this.masterPasswordConfirmInput) {
+          this.masterPasswordError = 'Passwords do not match';
+          this.triggerPasswordShake();
+          return;
+        }
         await this.secretService.setMasterPasswordAndRefresh(this.masterPasswordInput);
         this.showMasterPasswordPrompt = false;
         this.isValuesRevealed = true;
+        this.masterPasswordAttempt = 0;
+        this.masterPasswordConfirmInput = '';
+        void this.loadAllSecretValues();
       } else {
         const valid = await this.secretService.verifyMasterPassword(this.masterPasswordInput);
         if (valid) {
           this.showMasterPasswordPrompt = false;
           this.isValuesRevealed = true;
+          this.masterPasswordAttempt = 0;
+          this.masterPasswordShake = false;
+          void this.loadAllSecretValues();
         } else {
-          this.masterPasswordError = 'Incorrect password';
+          this.masterPasswordAttempt += 1;
+          this.masterPasswordError = `Incorrect password${this.masterPasswordAttempt > 1 ? ` (attempt ${this.masterPasswordAttempt})` : ''}`;
+          this.triggerPasswordShake();
         }
       }
     } catch (error) {
@@ -285,6 +351,47 @@ export class SecretsModalComponent {
       this.masterPasswordError = this.masterPasswordMode === 'set'
         ? 'Failed to set password'
         : 'Verification failed';
+      this.triggerPasswordShake();
+    }
+  }
+
+  private triggerPasswordShake(): void {
+    this.masterPasswordShake = false;
+    // Force the animation to replay on repeat failures by toggling the class
+    // on a microtask boundary so Angular applies a true remove → add.
+    queueMicrotask(() => {
+      this.masterPasswordShake = true;
+    });
+  }
+
+  // --- Forgot master password ---
+
+  openForgotPasswordConfirm(): void {
+    this.showForgotPasswordConfirm = true;
+  }
+
+  cancelForgotPassword(): void {
+    this.showForgotPasswordConfirm = false;
+  }
+
+  async confirmForgotPasswordReset(): Promise<void> {
+    try {
+      await this.secretService.resetVaultAndClear();
+      this.toast.info('Vault cleared. Set a new master password.');
+      this.masterPasswordMode = 'set';
+      this.masterPasswordInput = '';
+      this.masterPasswordConfirmInput = '';
+      this.masterPasswordError = '';
+      this.masterPasswordAttempt = 0;
+      this.masterPasswordShake = false;
+      this.showForgotPasswordConfirm = false;
+      this.isValuesRevealed = false;
+      this.revealedValues = {};
+      this.focusMasterPasswordField();
+    } catch (error) {
+      console.error('Failed to reset vault during forgot-password flow', error);
+      this.toast.error('Failed to reset vault');
+      this.showForgotPasswordConfirm = false;
     }
   }
 

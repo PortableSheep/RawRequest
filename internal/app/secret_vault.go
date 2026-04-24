@@ -73,6 +73,7 @@ func (sv *SecretVault) Reset() error {
 
 	_ = os.Remove(sv.dataPath)
 	_ = os.Remove(sv.keyPath)
+	_ = os.Remove(sv.masterPasswordPath())
 	if sv.keyringService != "" && sv.keyringUser != "" {
 		_ = keyring.Delete(sv.keyringService, sv.keyringUser)
 	}

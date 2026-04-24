@@ -63,7 +63,7 @@ describe('SecretService', () => {
       service.refreshSecrets(true);
       await flushPromises();
 
-      expect(service.allSecrets).toEqual(secrets);
+      expect(service.allSecrets()).toEqual(secrets);
     });
 
     it('should populate vaultInfo from backend', async () => {
@@ -74,7 +74,7 @@ describe('SecretService', () => {
       service.refreshSecrets(true);
       await flushPromises();
 
-      expect(service.vaultInfo).toEqual(info);
+      expect(service.vaultInfo()).toEqual(info);
     });
 
     it('should invoke master password warning when secrets exist but no master password', async () => {
@@ -126,7 +126,7 @@ describe('SecretService', () => {
 
       await service.loadVaultInfo(true);
 
-      expect(service.vaultInfo).toEqual(info);
+      expect(service.vaultInfo()).toEqual(info);
     });
 
     it('should return the loaded vault info', async () => {
@@ -162,7 +162,7 @@ describe('SecretService', () => {
       const result = await service.saveSecret('dev', 'NEW_KEY', 'value123');
 
       expect(result).toEqual(snapshot);
-      expect(service.allSecrets).toEqual(snapshot);
+      expect(service.allSecrets()).toEqual(snapshot);
       expect(backend.getVaultInfo).toHaveBeenCalled();
     });
   });
@@ -176,7 +176,7 @@ describe('SecretService', () => {
       const result = await service.removeSecret('dev', 'API_KEY');
 
       expect(result).toEqual(snapshot);
-      expect(service.allSecrets).toEqual(snapshot);
+      expect(service.allSecrets()).toEqual(snapshot);
       expect(backend.getVaultInfo).toHaveBeenCalled();
     });
   });
@@ -209,7 +209,7 @@ describe('SecretService', () => {
       const key = await service.deleteConfirmedSecret();
 
       expect(key).toBe('DB_PASS');
-      expect(service.allSecrets).toEqual(snapshot);
+      expect(service.allSecrets()).toEqual(snapshot);
       expect(service.secretToDelete).toBeNull();
     });
   });
@@ -227,13 +227,13 @@ describe('SecretService', () => {
 
   describe('resetVaultAndClear', () => {
     it('should reset vault, clear allSecrets, and refresh vault info', async () => {
-      service.allSecrets = { dev: ['KEY'] };
+      service.allSecrets.set({ dev: ['KEY'] });
       backend.resetVault.mockResolvedValue({} as any);
       backend.getVaultInfo.mockResolvedValue({ hasMasterPassword: false });
 
       await service.resetVaultAndClear();
 
-      expect(service.allSecrets).toEqual({});
+      expect(service.allSecrets()).toEqual({});
       expect(backend.resetVault).toHaveBeenCalled();
       expect(backend.getVaultInfo).toHaveBeenCalled();
     });
@@ -248,7 +248,7 @@ describe('SecretService', () => {
 
       expect(backend.setMasterPassword).toHaveBeenCalledWith('mypassword');
       expect(backend.getVaultInfo).toHaveBeenCalled();
-      expect(service.vaultInfo).toEqual({ hasMasterPassword: true });
+      expect(service.vaultInfo()).toEqual({ hasMasterPassword: true });
     });
   });
 

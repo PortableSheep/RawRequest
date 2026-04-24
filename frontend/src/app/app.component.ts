@@ -122,7 +122,7 @@ export class AppComponent implements OnInit, OnDestroy {
   get activeRequestInfo() { return this.reqExec.activeRequestInfo; }
   get isCancellingActiveRequest() { return this.reqExec.isCancellingActiveRequest; }
   get serviceStartupError() { return this.startup.serviceStartupError; }
-  get allSecrets() { return this.secretService.allSecrets; }
+  get allSecrets() { return this.secretService.allSecrets(); }
 
   private destroy$ = new Subject<void>();
   private parseDebounceTimer: ReturnType<typeof setTimeout> | null = null;

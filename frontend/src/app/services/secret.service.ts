@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@angular/core';
+import { Inject, Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { BACKEND_CLIENT, BackendClientContract } from './backend-client.contract';
 
@@ -16,9 +16,12 @@ export class SecretService {
   private missingSecretSubject = new Subject<{ env: string; key: string }>();
   private missingSecret$ = this.missingSecretSubject.asObservable();
 
-  /** Vault management state exposed for UI binding. */
-  allSecrets: SecretIndex = {};
-  vaultInfo: VaultInfo | null = null;
+  /** Vault management state exposed for UI binding.
+   *  Signals so consumers (templates, computed(), effect()) reactively update
+   *  when secrets or vault info change — add/remove/reset no longer requires
+   *  a relaunch to see the UI refresh. */
+  readonly allSecrets = signal<SecretIndex>({});
+  readonly vaultInfo = signal<VaultInfo | null>(null);
   secretToDelete: { env: string; key: string } | null = null;
   private masterPasswordCheckDone = false;
   private masterPasswordWarningCallback: (() => void) | null = null;
@@ -196,7 +199,7 @@ export class SecretService {
   refreshSecrets(force = false): void {
     this.list(force)
       .then((secrets) => {
-        this.allSecrets = secrets || {};
+        this.allSecrets.set(secrets || {});
         this.checkMasterPasswordNeeded();
       })
       .catch((error) => console.error('Failed to load secrets', error));
@@ -206,7 +209,7 @@ export class SecretService {
   async loadVaultInfo(force = false): Promise<VaultInfo | null> {
     try {
       const info = await this.getVaultInfo(force);
-      this.vaultInfo = info;
+      this.vaultInfo.set(info);
       this.checkMasterPasswordNeeded();
       return info;
     } catch (error) {
@@ -217,25 +220,26 @@ export class SecretService {
 
   private checkMasterPasswordNeeded(): void {
     if (this.masterPasswordCheckDone) return;
-    const hasSecrets = Object.values(this.allSecrets).some(
+    const hasSecrets = Object.values(this.allSecrets()).some(
       (keys) => keys && keys.length > 0,
     );
     if (!hasSecrets) return;
-    if (!this.vaultInfo || this.vaultInfo.hasMasterPassword) return;
+    const info = this.vaultInfo();
+    if (!info || info.hasMasterPassword) return;
     this.masterPasswordCheckDone = true;
     this.masterPasswordWarningCallback?.();
   }
 
   async saveSecret(env: string, key: string, value: string): Promise<SecretIndex> {
     const snapshot = await this.save(env, key, value);
-    this.allSecrets = snapshot;
+    this.allSecrets.set(snapshot);
     await this.loadVaultInfo(true);
     return snapshot;
   }
 
   async removeSecret(env: string, key: string): Promise<SecretIndex> {
     const snapshot = await this.remove(env, key);
-    this.allSecrets = snapshot;
+    this.allSecrets.set(snapshot);
     await this.loadVaultInfo(true);
     return snapshot;
   }
@@ -264,7 +268,8 @@ export class SecretService {
 
   async resetVaultAndClear(): Promise<void> {
     await this.resetVault();
-    this.allSecrets = {};
+    this.allSecrets.set({});
+    this.masterPasswordCheckDone = false;
     await this.loadVaultInfo(true);
   }
 

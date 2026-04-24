@@ -13,8 +13,8 @@ import { WorkspaceStateService } from '../../services/workspace-state.service';
 
 function createMockSecretService(secrets: any = {}) {
   return {
-    allSecrets: secrets,
-    vaultInfo: null as any,
+    allSecrets: signal(secrets) as any,
+    vaultInfo: signal<any>(null) as any,
     secretToDelete: null as any,
     loadVaultInfo: vi.fn().mockResolvedValue(undefined),
     saveSecret: vi.fn().mockResolvedValue(undefined),
@@ -197,7 +197,7 @@ describe('SecretsModalComponent', () => {
 
   describe('empty state', () => {
     it('should show empty message when no secrets', () => {
-      mockSecretService.allSecrets = {};
+      mockSecretService.allSecrets.set({});
       mockPanels.showSecretsModal.set(true);
       fixture.detectChanges();
 
@@ -390,14 +390,14 @@ describe('SecretsModalComponent', () => {
 
   describe('master password', () => {
     it('should show verify mode when vault has password', () => {
-      mockSecretService.vaultInfo = { hasMasterPassword: true };
+      mockSecretService.vaultInfo.set({ hasMasterPassword: true });
       component.onRevealClick();
       expect(component.showMasterPasswordPrompt).toBe(true);
       expect(component.masterPasswordMode).toBe('verify');
     });
 
     it('should show set mode when vault has no password', () => {
-      mockSecretService.vaultInfo = { hasMasterPassword: false };
+      mockSecretService.vaultInfo.set({ hasMasterPassword: false });
       component.onRevealClick();
       expect(component.masterPasswordMode).toBe('set');
     });
@@ -412,21 +412,76 @@ describe('SecretsModalComponent', () => {
       expect(component.isValuesRevealed).toBe(true);
     });
 
+    it('should auto-load all secret values after successful verify', async () => {
+      component.masterPasswordMode = 'verify';
+      component.masterPasswordInput = 'password';
+      await component.submitMasterPassword();
+      await flushPromises();
+      // Three secrets configured in beforeEach: default/api_key, default/db_password, dev/api_key
+      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('default', 'api_key');
+      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('default', 'db_password');
+      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('dev', 'api_key');
+      expect(component.getRevealedValue('default', 'api_key')).toBe('revealed_value');
+    });
+
     it('should show error on wrong password', async () => {
       mockSecretService.verifyMasterPassword.mockResolvedValueOnce(false);
       component.masterPasswordMode = 'verify';
       component.masterPasswordInput = 'wrong';
       await component.submitMasterPassword();
       expect(component.masterPasswordError).toBe('Incorrect password');
+      expect(component.masterPasswordAttempt).toBe(1);
       expect(component.isValuesRevealed).toBe(false);
+    });
+
+    it('should escalate attempt counter on repeated wrong passwords', async () => {
+      mockSecretService.verifyMasterPassword.mockResolvedValue(false);
+      component.masterPasswordMode = 'verify';
+      component.masterPasswordInput = 'wrong';
+      await component.submitMasterPassword();
+      await component.submitMasterPassword();
+      expect(component.masterPasswordAttempt).toBe(2);
+      expect(component.masterPasswordError).toBe('Incorrect password (attempt 2)');
+    });
+
+    it('should trigger shake animation flag on wrong password', async () => {
+      mockSecretService.verifyMasterPassword.mockResolvedValueOnce(false);
+      component.masterPasswordMode = 'verify';
+      component.masterPasswordInput = 'wrong';
+      await component.submitMasterPassword();
+      // queueMicrotask sets the flag asynchronously; await a microtask tick.
+      await Promise.resolve();
+      expect(component.masterPasswordShake).toBe(true);
+    });
+
+    it('should clear error + shake state when user edits the password input', async () => {
+      mockSecretService.verifyMasterPassword.mockResolvedValueOnce(false);
+      component.masterPasswordMode = 'verify';
+      component.masterPasswordInput = 'wrong';
+      await component.submitMasterPassword();
+      await Promise.resolve();
+      component.onMasterPasswordInput();
+      expect(component.masterPasswordError).toBe('');
+      expect(component.masterPasswordShake).toBe(false);
     });
 
     it('should set password and reveal values', async () => {
       component.masterPasswordMode = 'set';
       component.masterPasswordInput = 'new_pass';
+      component.masterPasswordConfirmInput = 'new_pass';
       await component.submitMasterPassword();
       expect(mockSecretService.setMasterPasswordAndRefresh).toHaveBeenCalledWith('new_pass');
       expect(component.isValuesRevealed).toBe(true);
+    });
+
+    it('should reject mismatched confirm password without calling backend', async () => {
+      component.masterPasswordMode = 'set';
+      component.masterPasswordInput = 'abc123';
+      component.masterPasswordConfirmInput = 'different';
+      await component.submitMasterPassword();
+      expect(mockSecretService.setMasterPasswordAndRefresh).not.toHaveBeenCalled();
+      expect(component.masterPasswordError).toBe('Passwords do not match');
+      expect(component.isValuesRevealed).toBe(false);
     });
 
     it('should not submit when password is empty', async () => {
@@ -434,6 +489,44 @@ describe('SecretsModalComponent', () => {
       await component.submitMasterPassword();
       expect(mockSecretService.verifyMasterPassword).not.toHaveBeenCalled();
       expect(mockSecretService.setMasterPasswordAndRefresh).not.toHaveBeenCalled();
+    });
+
+    describe('forgot password', () => {
+      it('should open confirm from verify prompt', () => {
+        component.masterPasswordMode = 'verify';
+        component.showMasterPasswordPrompt = true;
+        component.openForgotPasswordConfirm();
+        expect(component.showForgotPasswordConfirm).toBe(true);
+      });
+
+      it('should reset vault, switch to set mode, and keep prompt open on confirm', async () => {
+        component.masterPasswordMode = 'verify';
+        component.showMasterPasswordPrompt = true;
+        component.showForgotPasswordConfirm = true;
+        component.masterPasswordInput = 'stale';
+        component.masterPasswordError = 'Incorrect password';
+        component.masterPasswordAttempt = 3;
+        component.isValuesRevealed = true;
+
+        await component.confirmForgotPasswordReset();
+
+        expect(mockSecretService.resetVaultAndClear).toHaveBeenCalled();
+        expect(component.masterPasswordMode).toBe('set');
+        expect(component.showMasterPasswordPrompt).toBe(true);
+        expect(component.showForgotPasswordConfirm).toBe(false);
+        expect(component.masterPasswordInput).toBe('');
+        expect(component.masterPasswordError).toBe('');
+        expect(component.masterPasswordAttempt).toBe(0);
+        expect(component.isValuesRevealed).toBe(false);
+        expect(mockToast.info).toHaveBeenCalled();
+      });
+
+      it('should cancel without resetting', () => {
+        component.showForgotPasswordConfirm = true;
+        component.cancelForgotPassword();
+        expect(component.showForgotPasswordConfirm).toBe(false);
+        expect(mockSecretService.resetVaultAndClear).not.toHaveBeenCalled();
+      });
     });
   });
 
@@ -491,7 +584,7 @@ describe('SecretsModalComponent', () => {
     });
 
     it('should not auto-prompt when no secrets exist', async () => {
-      mockSecretService.allSecrets = {};
+      mockSecretService.allSecrets.set({});
       mockSecretService.loadVaultInfo.mockResolvedValue({ hasMasterPassword: false });
 
       mockPanels.showSecretsModal.set(true);
@@ -539,7 +632,7 @@ describe('SecretsModalComponent', () => {
     });
 
     it('should return 0 for empty secrets', () => {
-      mockSecretService.allSecrets = {};
+      mockSecretService.allSecrets.set({});
       expect(component.getTotalSecretCount()).toBe(0);
     });
   });
