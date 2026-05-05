@@ -10,10 +10,13 @@
 
 .editor__surface {
   height: 100%;
-  overflow: auto;
   font-size: 13px;
   line-height: 1.55;
   background: var(--rr-surface-1);
+
+  ::ng-deep .cm-content {
+    padding-bottom: 30vh !important;
+  }
 }
 
 ::ng-deep .cm-tooltip {

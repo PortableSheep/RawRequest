@@ -1,22 +1,11 @@
 import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect, inject } from '@angular/core';
 
 import { basicSetup, EditorView } from 'codemirror';
-import { EditorState, RangeSetBuilder, Compartment, Prec } from '@codemirror/state';
-import { Decoration, DecorationSet, ViewPlugin, ViewUpdate, keymap } from '@codemirror/view';
-import { oneDark } from '@codemirror/theme-one-dark';
-import { foldKeymap, foldService, syntaxTree, LRLanguage, LanguageSupport } from '@codemirror/language';
+import { EditorState, Compartment, Prec } from '@codemirror/state';
+import { keymap, tooltips } from '@codemirror/view';
+import { LanguageSupport, LRLanguage } from '@codemirror/language';
 import {
-  SearchQuery,
-  findNext,
-  findPrevious,
-  getSearchQuery,
-  openSearchPanel,
-  closeSearchPanel,
-  replaceAll,
-  replaceNext,
   search,
-  selectMatches,
-  setSearchQuery
 } from '@codemirror/search';
 import { EditorSearchService } from './editor-search.service';
 import { EditorSearchPanelComponent } from './editor-search-panel/editor-search-panel.component';
@@ -29,25 +18,27 @@ import { parser as rawRequestHttpParser } from './rawrequest-http-parser';
 import { createVariableHoverTooltipExtension } from './editor.tooltips';
 import {
   computeContextMenuLocalPosition,
-  findRequestNameLineNumber,
   shouldCollapseAccidentalSelection
 } from './editor.component.logic';
-import { getJsDecorationsForSegment, getNonScriptLineDecorations } from './editor.highlighter.logic';
 import {
-  computeRequestBlockIndex,
-  findRequestIndexByPos,
   computeRequestIndexAtPosFallback,
+  findRequestIndexByPos,
   RequestBlock
 } from './editor-request-indexer.logic';
 import { writeClipboardText, readClipboardText } from './editor-clipboard.utils';
+import {
+  buildEditorThemeExtension,
+  createDependsLinker,
+  createRequestBlockIndexer,
+  createRequestFolding,
+  createRequestHighlighter,
+  jumpToRequestByName
+} from './editor.extensions';
 
 import type { SecretIndex } from '../../services/secret.service';
 import { ThemeService } from '../../services/theme.service';
 import {
   extractDependsTarget,
-  extractMethodFromLine,
-  isMethodLine,
-  isSeparatorLine
 } from '../../utils/http-file-analysis';
 
 const rawRequestHttpLanguage = LRLanguage.define({ parser: rawRequestHttpParser });
@@ -234,14 +225,15 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       doc: this.content(),
       extensions: [
         basicSetup,
-        this.themeCompartment.of(this.buildEditorThemeExtension(this.themeService.resolvedTheme())),
+        this.themeCompartment.of(buildEditorThemeExtension(this.themeService.resolvedTheme())),
         rawRequestHttpSupport,
-        this.createRequestBlockIndexer(),
-        this.createRequestFolding(),
+        createRequestBlockIndexer((blocks) => { this.requestBlockIndex = blocks; }),
+        createRequestFolding(),
         search({ top: true }),
-        this.createRequestHighlighter(),
-        this.createDependsLinker(),
+        createRequestHighlighter(),
+        createDependsLinker((name) => jumpToRequestByName(this.editorView, name)),
         this.autocompleteCompartment.of(this.createAutocomplete()),
+        tooltips({ position: 'fixed' }),
         this.createVariableHoverTooltip(),
         this.lintCompartment.of(this.createLintExtensions()),
         this.readOnlyCompartment.of(EditorState.readOnly.of(this.isBusy())),
@@ -301,10 +293,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         EditorView.domEventHandlers({
           mousedown: (event, view) => {
             // Guard against scroll jumps when focus returns to the editor.
-            // This handler fires BEFORE CM6's focusPreventScroll, so
-            // scrollTop is still the correct user-intended position.
-            // After CM6 processes focus + selection, we check via rAF whether
-            // scroll jumped (e.g. WebKit async scroll-to-caret) and revert.
             if (!view.hasFocus) {
               const scrollBefore = view.scrollDOM.scrollTop;
               requestAnimationFrame(() => {
@@ -330,7 +318,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                   const from = line.from + depends.start;
                   const to = line.from + depends.end;
                   if (pos >= from && pos <= to) {
-                    const jumped = this.jumpToRequestByName(view, depends.target);
+                    const jumped = jumpToRequestByName(view, depends.target);
                     if (jumped) {
                       view.dom.closest('.editor-wrapper')?.classList.remove('cm-ctrl-held');
                       event.preventDefault();
@@ -343,28 +331,20 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             }
 
             // Skip accidental-selection prevention for double/triple clicks
-            // (event.detail >= 2) so word/line selection works naturally.
             if (!event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey && event.detail < 2) {
-              const scrollTop = view.scrollDOM.scrollTop;
               const hadSelection = !view.state.selection.main.empty;
               const downX = event.clientX;
               const downY = event.clientY;
-              // Capture the document position the user actually clicked on
               const clickedPos = view.posAtCoords({ x: event.clientX, y: event.clientY });
               
-              // Track whether the user dragged (intentional selection)
               const onMouseUp = (upEvent: MouseEvent) => {
                 document.removeEventListener('mouseup', onMouseUp, true);
                 const dx = Math.abs(upEvent.clientX - downX);
                 const dy = Math.abs(upEvent.clientY - downY);
                 const wasDrag = dx > 4 || dy > 4;
 
-                // Use setTimeout to check after CodeMirror processes the click
                 setTimeout(() => {
                   const selection = view.state.selection.main;
-                  
-                  // If a selection was created but there wasn't one before,
-                  // and user didn't drag, collapse it (accidental scroll+click selection)
                   if (!wasDrag && !hadSelection && !selection.empty) {
                     const fromLine = view.state.doc.lineAt(selection.from).number;
                     const toLine = view.state.doc.lineAt(selection.to).number;
@@ -376,9 +356,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
                         toLineNumber: toLine
                       })
                     ) {
-                      // Use the captured click position so cursor goes where the
-                      // user actually clicked, not selection.to which may be the
-                      // old cursor position if the user scrolled upward.
                       const targetPos = clickedPos ?? selection.head;
                       view.dispatch({
                         selection: { anchor: targetPos },
@@ -390,7 +367,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               };
               document.addEventListener('mouseup', onMouseUp, true);
             }
-            return false; // Don't prevent default handling
+            return false;
           },
 
           keydown: (event, view) => {
@@ -411,7 +388,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           },
 
           contextmenu: (event, view) => {
-            // Many desktop webviews disable the native context menu; provide our own for copy/paste.
             const pos = view.posAtCoords({ x: event.clientX, y: event.clientY });
             if (pos !== null) {
               const sel = view.state.selection.main;
@@ -450,7 +426,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           if (update.docChanged) {
             this.isUpdatingFromInput = true;
             this.contentChange.emit(update.state.doc.toString());
-            // Reset flag after a short delay to allow the change to propagate
             setTimeout(() => {
               this.isUpdatingFromInput = false;
             }, 0);
@@ -473,344 +448,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     this.searchService.openSearchUi(showReplace);
   }
 
-  private buildEditorThemeExtension(theme: 'dark' | 'light') {
-    if (theme === 'dark') {
-      return oneDark;
-    }
-
-    // Lightweight light theme that matches the app’s light surface palette.
-    // (We avoid adding a new dependency for a themed package.)
-    return EditorView.theme(
-      {
-        '&': {
-          backgroundColor: '#ffffff',
-          color: '#0f172a'
-        },
-        '.cm-content': {
-          caretColor: '#2563eb'
-        },
-        '.cm-cursor, .cm-dropCursor': {
-          borderLeftColor: '#2563eb'
-        },
-        '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-          backgroundColor: 'rgba(37, 99, 235, 0.18)'
-        },
-        '.cm-gutters': {
-          backgroundColor: '#f8fafc',
-          color: '#64748b',
-          borderRightColor: '#e2e8f0'
-        },
-        '.cm-activeLine': {
-          backgroundColor: 'rgba(15, 23, 42, 0.04)'
-        },
-        '.cm-activeLineGutter': {
-          backgroundColor: 'rgba(15, 23, 42, 0.04)',
-          color: '#475569'
-        }
-      },
-      { dark: false }
-    );
-  }
-
-  private createDependsLinker() {
-    const linkMark = Decoration.mark({ class: 'cm-depends-link' });
-    return ViewPlugin.fromClass(class {
-      decorations: DecorationSet;
-
-      constructor(view: EditorView) {
-        this.decorations = this.buildDecorations(view);
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.buildDecorations(update.view);
-        }
-      }
-
-      buildDecorations(view: EditorView): DecorationSet {
-        const builder = new RangeSetBuilder<Decoration>();
-
-        // Use the Lezer tree to find AnnotationLine nodes in the viewport.
-        const tree = syntaxTree(view.state);
-        for (const range of view.visibleRanges) {
-          tree.iterate({
-            from: range.from,
-            to: range.to,
-            enter: (node) => {
-              if (node.type.name !== 'AnnotationLine') return;
-              const text = view.state.doc.sliceString(node.from, node.to);
-              const depends = extractDependsTarget(text);
-              if (!depends) return;
-              const from = node.from + depends.start;
-              const to = node.from + depends.end;
-              if (to > from) builder.add(from, to, linkMark);
-            }
-          });
-        }
-
-        return builder.finish();
-      }
-    }, {
-      decorations: v => v.decorations
-    });
-  }
-
-  private jumpToRequestByName(view: EditorView, targetName: string): boolean {
-    const state = view.state;
-    const lines: string[] = [];
-    for (let lineNo = 1; lineNo <= state.doc.lines; lineNo++) {
-      lines.push(state.doc.line(lineNo).text);
-    }
-
-    const matchLineNo = findRequestNameLineNumber(lines, targetName);
-    if (matchLineNo === null) return false;
-
-    const line = state.doc.line(matchLineNo);
-    const anchor = line.from;
-    view.dispatch({
-      selection: { anchor },
-      effects: EditorView.scrollIntoView(anchor, { y: 'center' })
-    });
-    return true;
-  }
-
-  private createRequestHighlighter() {
-    return ViewPlugin.fromClass(class {
-      decorations: DecorationSet;
-
-      constructor(view: EditorView) {
-        this.decorations = this.buildDecorations(view);
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged || update.viewportChanged) {
-          this.decorations = this.buildDecorations(update.view);
-        }
-      }
-
-      buildDecorations(view: EditorView): DecorationSet {
-        // Collect all decorations, then sort, then build
-        const decorations: Array<{ from: number; to: number; cls: string }> = [];
-        const lineDecorations: Array<{ at: number; cls: string }> = [];
-        let inScript = false;
-        let scriptBraceDepth = 0;
-        let inRequestBlock = false;
-
-        const tree = syntaxTree(view.state);
-
-        // Determine viewport range with margin
-        const { from: vpFrom, to: vpTo } = view.viewport;
-        const vpStartLine = view.state.doc.lineAt(vpFrom).number;
-        const vpEndLine = view.state.doc.lineAt(vpTo).number;
-        const margin = 20;
-        const startLine = Math.max(1, vpStartLine - margin);
-        const endLine = Math.min(view.state.doc.lines, vpEndLine + margin);
-
-        // Quick scan lines before viewport to establish inScript/inRequestBlock state
-        for (let i = 1; i < startLine; i++) {
-          const text = view.state.doc.line(i).text;
-          const trimmedText = text.trimStart();
-          if (isSeparatorLine(text)) { inRequestBlock = false; }
-          if (isMethodLine(text) && !inRequestBlock) { inRequestBlock = true; }
-          const scriptStartMatch = trimmedText.match(/^([<>])\s*\{/);
-          if (scriptStartMatch && !inScript) {
-            inScript = true;
-            scriptBraceDepth = 0;
-            for (const char of text) {
-              if (char === '{') scriptBraceDepth++;
-              if (char === '}') scriptBraceDepth--;
-            }
-            if (scriptBraceDepth <= 0) inScript = false;
-            continue;
-          }
-          if (!inScript && (trimmedText === '<' || trimmedText === '>')) continue;
-          if (!inScript && trimmedText.startsWith('{')) {
-            const prevLine = i > 1 ? view.state.doc.line(i - 1).text.trim() : '';
-            if (prevLine === '<' || prevLine === '>') {
-              inScript = true;
-              scriptBraceDepth = 0;
-              for (const char of text) {
-                if (char === '{') scriptBraceDepth++;
-                if (char === '}') scriptBraceDepth--;
-              }
-              if (scriptBraceDepth <= 0) inScript = false;
-              continue;
-            }
-          }
-          if (inScript) {
-            for (const char of text) {
-              if (char === '{') scriptBraceDepth++;
-              if (char === '}') scriptBraceDepth--;
-            }
-            if (scriptBraceDepth <= 0) inScript = false;
-          }
-        }
-
-        // Decorate only lines in the viewport range (with margin)
-
-        for (let i = startLine; i <= endLine; i++) {
-          const line = view.state.doc.line(i);
-          const text = line.text;
-          const trimmedText = text.trimStart();
-          const leadingWhitespace = text.length - trimmedText.length;
-
-          if (isSeparatorLine(text)) {
-            inRequestBlock = false;
-          }
-
-          const resolvePos = line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1));
-          const resolved = tree.resolve(resolvePos, 1);
-          const lineNodeName = resolved.name;
-
-          // Check for script block start: < { or > { (can have content after)
-          const scriptStartMatch = trimmedText.match(/^([<>])\s*\{/);
-          if (scriptStartMatch && !inScript) {
-            inScript = true;
-            const markerIndex = text.indexOf(scriptStartMatch[1]);
-            decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
-            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
-            scriptBraceDepth = 0;
-            for (const char of text) {
-              if (char === '{') scriptBraceDepth++;
-              if (char === '}') scriptBraceDepth--;
-            }
-            const braceIndex = text.indexOf('{', markerIndex);
-            if (braceIndex >= 0 && braceIndex < text.length - 1) {
-                decorations.push(
-                  ...getJsDecorationsForSegment({
-                    lineFrom: line.from,
-                    text,
-                    startOffset: braceIndex + 1
-                  })
-                );
-            }
-            if (scriptBraceDepth <= 0) inScript = false;
-            continue;
-          }
-
-          // Check for standalone < or > (brace on next line)
-          if (!inScript && (trimmedText === '<' || trimmedText === '>')) {
-            const markerIndex = text.indexOf(trimmedText);
-            decorations.push({ from: line.from + markerIndex, to: line.from + markerIndex + 1, cls: 'cm-script-marker' });
-            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
-            continue;
-          }
-
-          // Check for standalone opening brace after < or >
-          if (!inScript && trimmedText.startsWith('{')) {
-            const prevLine = i > 1 ? view.state.doc.line(i - 1).text.trim() : '';
-            if (prevLine === '<' || prevLine === '>') {
-              inScript = true;
-              scriptBraceDepth = 0;
-              for (const char of text) {
-                if (char === '{') scriptBraceDepth++;
-                if (char === '}') scriptBraceDepth--;
-              }
-              lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
-              const braceIndex = text.indexOf('{');
-              if (braceIndex >= 0 && braceIndex < text.length - 1) {
-                decorations.push(
-                  ...getJsDecorationsForSegment({
-                    lineFrom: line.from,
-                    text,
-                    startOffset: braceIndex + 1
-                  })
-                );
-              }
-              if (scriptBraceDepth <= 0) inScript = false;
-              continue;
-            }
-          }
-
-          // Inside a script block
-          if (inScript) {
-            lineDecorations.push({ at: line.from, cls: 'cm-script-line' });
-            let lineOpenBraces = 0;
-            let lineCloseBraces = 0;
-            for (const char of text) {
-              if (char === '{') lineOpenBraces++;
-              if (char === '}') lineCloseBraces++;
-            }
-            scriptBraceDepth += lineOpenBraces - lineCloseBraces;
-
-            if (scriptBraceDepth <= 0) {
-              inScript = false;
-              const closingBraceIdx = text.lastIndexOf('}');
-              if (closingBraceIdx > 0) {
-                decorations.push(
-                  ...getJsDecorationsForSegment({
-                    lineFrom: line.from,
-                    text,
-                    startOffset: 0,
-                    endOffset: closingBraceIdx
-                  })
-                );
-              }
-            } else {
-              decorations.push(
-                ...getJsDecorationsForSegment({
-                  lineFrom: line.from,
-                  text,
-                  startOffset: 0
-                })
-              );
-            }
-            continue;
-          }
-
-          // Look ahead for the next request method when on a separator line
-          let nextRequestMethod: string | undefined;
-          if (lineNodeName === 'SeparatorLine' && isSeparatorLine(text)) {
-            for (let j = i + 1; j <= endLine + 20 && j <= view.state.doc.lines; j++) {
-              const peekText = view.state.doc.line(j).text;
-              if (isSeparatorLine(peekText)) break;
-              const method = extractMethodFromLine(peekText);
-              if (method) { nextRequestMethod = method; break; }
-            }
-          }
-
-          const nonScript = getNonScriptLineDecorations({
-            lineFrom: line.from,
-            text,
-            leadingWhitespace,
-            lineNodeName,
-            nodeText: view.state.doc.sliceString(resolved.from, resolved.to),
-            isRequestStart: isMethodLine(text) && !inRequestBlock,
-            nextRequestMethod
-          });
-          decorations.push(...nonScript.decorations);
-          lineDecorations.push(...nonScript.lineDecorations);
-
-          if (isMethodLine(text) && !inRequestBlock) {
-            inRequestBlock = true;
-          }
-        }
-
-        // Sort by position (required by RangeSetBuilder)
-        decorations.sort((a, b) => a.from - b.from || a.to - b.to);
-
-        // Build the final decoration set (must be added in ascending doc order)
-        const entries: Array<{ from: number; to: number; deco: Decoration }> = [];
-        for (const d of decorations) {
-          entries.push({ from: d.from, to: d.to, deco: Decoration.mark({ class: d.cls }) });
-        }
-        for (const d of lineDecorations) {
-          entries.push({ from: d.at, to: d.at, deco: Decoration.line({ class: d.cls }) });
-        }
-        entries.sort((a, b) => a.from - b.from || a.to - b.to);
-
-        const builder = new RangeSetBuilder<Decoration>();
-        for (const e of entries) {
-          builder.add(e.from, e.to, e.deco);
-        }
-        return builder.finish();
-      }
-
-    }, {
-      decorations: v => v.decorations
-    });
-  }
-
   private createAutocomplete() {
     return createAutocompleteExtension({
       getVariables: () => this.variables(),
@@ -825,30 +462,20 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   updateContent(content: string) {
     if (this.editorView) {
       const scrollPos = this.editorView.scrollDOM.scrollTop;
-      // Clamp cursor to new content length so the native caret doesn't
-      // silently drift to end-of-document after a full replacement.
       const cursor = Math.min(this.editorView.state.selection.main.head, content.length);
       this.editorView.dispatch({
         changes: { from: 0, to: this.editorView.state.doc.length, insert: content },
         selection: { anchor: cursor }
       });
-      // Restore scroll synchronously to avoid racing with CM6's own
-      // requestAnimationFrame-based measure cycle.
       this.editorView.scrollDOM.scrollTop = scrollPos;
     }
   }
 
-  /**
-   * Get the current cursor position in the editor
-   */
   getCursorPosition(): number {
     if (!this.editorView) return 0;
     return this.editorView.state.selection.main.head;
   }
 
-  /**
-   * Insert text at the current cursor position
-   */
   insertAtCursor(text: string): void {
     if (!this.editorView) return;
     
@@ -860,9 +487,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     this.editorView.focus();
   }
 
-  /**
-   * Scroll to a request by its index (0-based).
-   */
   scrollToRequestIndex(requestIndex: number): void {
     if (!this.editorView) return;
     const block = this.requestBlockIndex.find(b => b.index === requestIndex);
@@ -875,9 +499,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  /**
-   * Insert text at a specific position
-   */
   insertAt(position: number, text: string): void {
     if (!this.editorView) return;
     
@@ -917,77 +538,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
     });
   }
 
-  private createRequestFolding() {
-    return foldService.of((state, lineStart, _lineEnd) => {
-      // Prefer folding based on the Lezer syntax tree when available.
-      // This lets us fold an entire request block starting from its method line.
-      const tree = syntaxTree(state);
-      const resolved = tree.resolve(lineStart, 1);
-
-      if (resolved.name === 'MethodLine') {
-        let cur: typeof resolved | null = resolved;
-        while (cur && cur.name !== 'RequestBlock') cur = cur.parent;
-        if (cur && cur.name === 'RequestBlock') {
-          const methodNode = cur.getChild('MethodLine');
-          const from = methodNode ? methodNode.to : cur.from;
-          const to = cur.to;
-          if (to > from) return { from, to };
-        }
-      }
-
-      const line = state.doc.lineAt(lineStart);
-      const text = line.text;
-      const trimmed = text.trimStart();
-      const leadingWhitespace = text.length - trimmed.length;
-      const lineType = tree.resolve(line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1)), 1).name;
-      if (lineType !== 'SeparatorLine') return null;
-
-	  // Guard: only treat strict "### <non-empty>" as a separator.
-	  // This prevents folding on lines like "####" or "######".
-	  if (!isSeparatorLine(text)) return null;
-
-      const start = line.to;
-      for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo++) {
-        const next = state.doc.line(lineNo);
-        const nextText = next.text;
-        const nextTrimmed = nextText.trimStart();
-        const nextLeadingWhitespace = nextText.length - nextTrimmed.length;
-        const nextType = tree.resolve(next.from + Math.min(nextLeadingWhitespace, Math.max(0, nextText.length - 1)), 1).name;
-        if (nextType === 'SeparatorLine' && isSeparatorLine(nextText)) {
-          const end = next.from - 1;
-          if (end <= start) {
-            return null;
-          }
-          return { from: start, to: end };
-        }
-      }
-      if (start >= state.doc.length) return null;
-      return { from: start, to: state.doc.length };
-    });
-  }
-
-  private createRequestBlockIndexer() {
-    const rebuild = (state: EditorState) => {
-      this.requestBlockIndex = this.computeRequestBlockIndexFromTree(state);
-    };
-
-    return ViewPlugin.fromClass(class {
-      constructor(view: EditorView) {
-        rebuild(view.state);
-      }
-
-      update(update: ViewUpdate) {
-        if (update.docChanged) {
-          rebuild(update.state);
-        }
-      }
-    });
-  }
-
-  private computeRequestBlockIndexFromTree(state: EditorState): RequestBlock[] {
-    return computeRequestBlockIndex(state.doc);
-  }
-
   private createLintExtensions() {
     return createEditorLintExtensions({
       getRequests: () => this.requests() || [],
@@ -1000,13 +550,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   }
 
   private getRequestIndexAtPos(state: EditorState, pos: number): number | null {
-    // Fast path: if Lezer parsed this position into a RequestBlock, use the cached range index.
     const fastResult = findRequestIndexByPos(this.requestBlockIndex, pos);
     if (fastResult !== null) return fastResult;
-
-    // Fallback: compute request index by counting method lines up to `pos`.
-    // This is slower (O(lines)) but robust when Lezer doesn't produce RequestBlock ranges
-    // (e.g., when top-level annotations confuse the parser).
     return computeRequestIndexAtPosFallback(state.doc, pos, this.requests().length);
   }
 }
