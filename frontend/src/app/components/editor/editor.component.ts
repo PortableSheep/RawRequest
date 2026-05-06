@@ -13,9 +13,11 @@ import { EditorSearchPanelComponent } from './editor-search-panel/editor-search-
 import { createEditorKeymap } from './editor-keymap';
 import { createRequestGutter } from './editor-request-gutter';
 import { createAutocompleteExtension } from './editor.autocomplete';
+import { createCodeLensesExtension } from './editor.lenses';
 import { createEditorLintExtensions } from './editor.lint';
 import { parser as rawRequestHttpParser } from './rawrequest-http-parser';
 import { createVariableHoverTooltipExtension } from './editor.tooltips';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
 import {
   computeContextMenuLocalPosition,
   shouldCollapseAccidentalSelection
@@ -77,6 +79,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private themeCompartment = new Compartment();
   private readonly themeService = inject(ThemeService);
   private readonly searchService = inject(EditorSearchService);
+  private readonly ws = inject(WorkspaceStateService);
 
   private requestBlockIndex: RequestBlock[] = [];
 
@@ -131,7 +134,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       const theme = this.themeService.resolvedTheme();
       if (this.editorView) {
         this.editorView.dispatch({
-          effects: this.themeCompartment.reconfigure(this.buildEditorThemeExtension(theme))
+          effects: this.themeCompartment.reconfigure(buildEditorThemeExtension(theme))
         });
       }
     });
@@ -232,6 +235,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         search({ top: true }),
         createRequestHighlighter(),
         createDependsLinker((name) => jumpToRequestByName(this.editorView, name)),
+        createCodeLensesExtension((index) => this.requestExecute.emit(index)),
         this.autocompleteCompartment.of(this.createAutocomplete()),
         tooltips({ position: 'fixed' }),
         this.createVariableHoverTooltip(),
@@ -533,6 +537,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       getEnvironments: () => this.environments(),
       getCurrentEnv: () => this.currentEnv(),
       getSecrets: () => this.secrets() || {},
+      getResponseData: () => this.ws.currentFileView().responseData,
       getRequests: () => this.requests(),
       getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos)
     });

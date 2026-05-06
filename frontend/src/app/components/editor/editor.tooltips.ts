@@ -8,6 +8,7 @@ export type TooltipDeps = {
   getEnvironments: () => { [env: string]: { [key: string]: string } };
   getCurrentEnv: () => string;
   getSecrets: () => Partial<Record<string, string[]>>;
+  getResponseData: () => Record<number, any>;
 
   // Optional: enables chain provenance for variables created via setVar(...) in pre/post scripts.
   getRequests?: () => any[];
@@ -36,6 +37,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
       const currentEnvName = deps.getCurrentEnv();
       const secrets = deps.getSecrets() || {};
       const currentEnvVars = currentEnvName ? envs[currentEnvName] || {} : {};
+      const responseData = deps.getResponseData() || [];
 
       const requestIndex = deps.getRequests && deps.getRequestIndexAtPos
         ? deps.getRequestIndexAtPos(view.state as any, start)
@@ -137,8 +139,13 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
       }
 
       // Check if it's a request reference
-      const reqMatch = varName.match(/^(request\d+)\.(response\.(body|status|headers|json|timing|size).*)/);
+      const reqMatch = varName.match(/^(request(\d+))\.(response\.(body|status|headers|json|timing|size).*)/);
       if (reqMatch) {
+        const reqNum = parseInt(reqMatch[2], 10);
+        const reqIdx = reqNum - 1;
+        const resPath = reqMatch[3];
+        const liveValue = resolveResponseValue(responseData[reqIdx], resPath);
+
         return {
           pos: start,
           end: end,
@@ -146,10 +153,14 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
           create() {
             const dom = document.createElement('div');
             dom.className = 'cm-variable-tooltip';
+            const displayValue = liveValue !== undefined ? String(liveValue) : 'Not executed yet';
+            const displayValueTruncated = displayValue.length > 150 ? displayValue.slice(0, 150) + '...' : displayValue;
+
             dom.innerHTML = `
               <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--link"></span>Request Reference</div>
-              <div class="tooltip-name">${escapeHtml(reqMatch[1])}.${escapeHtml(reqMatch[2])}</div>
-              <div class="tooltip-hint">Value resolved at runtime from previous request</div>
+              <div class="tooltip-name">${escapeHtml(reqMatch[1])}.${escapeHtml(reqMatch[3])}</div>
+              <div class="tooltip-value">${escapeHtml(displayValueTruncated)}</div>
+              <div class="tooltip-hint">Value from last execution</div>
             `;
             return { dom };
           }
@@ -204,4 +215,34 @@ function escapeHtml(str: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function resolveResponseValue(responseData: any, path: string): any {
+  if (!responseData) return undefined;
+  
+  const parts = path.split('.');
+  // Shift off 'response' if present (which it should be based on regex)
+  if (parts[0] === 'response') parts.shift();
+  
+  let current = responseData;
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    
+    // Handle 'json' specially if it's a string that needs parsing
+    if (part === 'json' && typeof current.body === 'string' && !current.json) {
+       try {
+         current.json = JSON.parse(current.body);
+       } catch {
+         return undefined;
+       }
+    }
+    
+    current = current[part];
+  }
+  
+  if (typeof current === 'object' && current !== null) {
+    return JSON.stringify(current);
+  }
+  
+  return current;
 }

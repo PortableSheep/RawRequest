@@ -181,46 +181,60 @@
                                         @if (entry.response!.timing) {
                                             <div class="response-entry__block">
                                                 <span class="response-entry__block-title">Timing Breakdown</span>
-                                                <div class="response-entry__timing">
-                                                    @if (entry.response!.timing!.dnsLookup > 0) {
-                                                        <div class="timing-chip" data-tooltip="DNS Lookup - Time to resolve the domain name to an IP address">
-                                                            <span class="timing-chip__dot timing-chip__dot--purple"></span>
-                                                            <span class="timing-chip__label">DNS</span>
-                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.dnsLookup }}ms</span>
+                                                <div class="timing-waterfall">
+                                                    @let t = entry.response!.timing!;
+                                                    @let total = t.total > 0 ? t.total : 1;
+
+                                                    @if (t.dnsLookup > 0) {
+                                                        <div class="timing-waterfall__row" [attr.data-tooltip]="'DNS Lookup: ' + t.dnsLookup + 'ms'">
+                                                            <span class="timing-waterfall__label">DNS</span>
+                                                            <div class="timing-waterfall__track">
+                                                                <div class="timing-waterfall__bar timing-waterfall__bar--dns" [style.left.%]="0" [style.width.%]="(t.dnsLookup / total) * 100"></div>
+                                                            </div>
+                                                            <span class="timing-waterfall__value rr-mono">{{ t.dnsLookup }}ms</span>
                                                         </div>
                                                     }
-                                                    @if (entry.response!.timing!.tcpConnect > 0) {
-                                                        <div class="timing-chip" data-tooltip="TCP Connection - Time to establish a TCP connection with the server">
-                                                            <span class="timing-chip__dot timing-chip__dot--blue"></span>
-                                                            <span class="timing-chip__label">TCP</span>
-                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.tcpConnect }}ms</span>
+
+                                                    @if (t.tcpConnect > 0) {
+                                                        <div class="timing-waterfall__row" [attr.data-tooltip]="'TCP Connect: ' + t.tcpConnect + 'ms'">
+                                                            <span class="timing-waterfall__label">Connect</span>
+                                                            <div class="timing-waterfall__track">
+                                                                <div class="timing-waterfall__bar timing-waterfall__bar--tcp" [style.left.%]="(t.dnsLookup / total) * 100" [style.width.%]="(t.tcpConnect / total) * 100"></div>
+                                                            </div>
+                                                            <span class="timing-waterfall__value rr-mono">{{ t.tcpConnect }}ms</span>
                                                         </div>
                                                     }
-                                                    @if (entry.response!.timing!.tlsHandshake > 0) {
-                                                        <div class="timing-chip" data-tooltip="TLS Handshake - Time to complete the secure connection negotiation">
-                                                            <span class="timing-chip__dot timing-chip__dot--emerald"></span>
-                                                            <span class="timing-chip__label">TLS</span>
-                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.tlsHandshake }}ms</span>
+
+                                                    @if (t.tlsHandshake > 0) {
+                                                        <div class="timing-waterfall__row" [attr.data-tooltip]="'TLS Handshake: ' + t.tlsHandshake + 'ms'">
+                                                            <span class="timing-waterfall__label">TLS</span>
+                                                            <div class="timing-waterfall__track">
+                                                                <div class="timing-waterfall__bar timing-waterfall__bar--tls" [style.left.%]="((t.dnsLookup + t.tcpConnect) / total) * 100" [style.width.%]="(t.tlsHandshake / total) * 100"></div>
+                                                            </div>
+                                                            <span class="timing-waterfall__value rr-mono">{{ t.tlsHandshake }}ms</span>
                                                         </div>
                                                     }
-                                                    @if (entry.response!.timing!.timeToFirstByte > 0) {
-                                                        <div class="timing-chip" data-tooltip="Time to First Byte - Time from request sent until first byte received from server">
-                                                            <span class="timing-chip__dot timing-chip__dot--amber"></span>
-                                                            <span class="timing-chip__label">TTFB</span>
-                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.timeToFirstByte }}ms</span>
+
+                                                    @let waitTime = t.timeToFirstByte - (t.dnsLookup + t.tcpConnect + t.tlsHandshake);
+                                                    @if (waitTime > 0) {
+                                                        <div class="timing-waterfall__row" [attr.data-tooltip]="'Wait (TTFB): ' + waitTime + 'ms'">
+                                                            <span class="timing-waterfall__label">Wait</span>
+                                                            <div class="timing-waterfall__track">
+                                                                <div class="timing-waterfall__bar timing-waterfall__bar--ttfb" [style.left.%]="(t.timeToFirstByte - waitTime) / total * 100" [style.width.%]="(waitTime / total) * 100"></div>
+                                                            </div>
+                                                            <span class="timing-waterfall__value rr-mono">{{ waitTime }}ms</span>
                                                         </div>
                                                     }
-                                                    @if (entry.response!.timing!.contentTransfer > 0) {
-                                                        <div class="timing-chip" data-tooltip="Content Transfer - Time to download the complete response body">
-                                                            <span class="timing-chip__dot timing-chip__dot--rose"></span>
-                                                            <span class="timing-chip__label">Download</span>
-                                                            <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.contentTransfer }}ms</span>
+
+                                                    @if (t.contentTransfer > 0) {
+                                                        <div class="timing-waterfall__row" [attr.data-tooltip]="'Download: ' + t.contentTransfer + 'ms'">
+                                                            <span class="timing-waterfall__label">Download</span>
+                                                            <div class="timing-waterfall__track">
+                                                                <div class="timing-waterfall__bar timing-waterfall__bar--download" [style.left.%]="(t.timeToFirstByte / total) * 100" [style.width.%]="(t.contentTransfer / total) * 100"></div>
+                                                            </div>
+                                                            <span class="timing-waterfall__value rr-mono">{{ t.contentTransfer }}ms</span>
                                                         </div>
                                                     }
-                                                    <div class="timing-chip timing-chip--total" data-tooltip="Total Request Time - Complete round-trip duration">
-                                                        <span class="timing-chip__label">Total</span>
-                                                        <span class="timing-chip__value rr-mono">{{ entry.response!.timing!.total }}ms</span>
-                                                    </div>
                                                 </div>
                                             </div>
                                         }

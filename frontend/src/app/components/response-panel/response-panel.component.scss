@@ -494,6 +494,61 @@
   gap: 8px;
 }
 
+.timing-waterfall {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--rr-surface-3);
+  border-radius: var(--rr-radius-md);
+  border: 1px solid var(--rr-border-color);
+}
+
+.timing-waterfall__row {
+  display: flex;
+  align-items: center;
+  height: 18px;
+  font-size: 11px;
+}
+
+.timing-waterfall__label {
+  width: 70px;
+  flex-shrink: 0;
+  color: var(--rr-text-tertiary);
+  font-weight: 500;
+}
+
+.timing-waterfall__track {
+  flex-grow: 1;
+  height: 100%;
+  position: relative;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 2px;
+}
+
+.timing-waterfall__bar {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  border-radius: 2px;
+  min-width: 1px;
+  transition: all 0.2s ease-out;
+
+  &--dns { background: rgba(168, 85, 247, 0.95); } // purple
+  &--tcp { background: rgba(59, 130, 246, 0.95); } // blue
+  &--tls { background: rgba(16, 185, 129, 0.95); } // emerald
+  &--ttfb { background: rgba(245, 158, 11, 0.95); } // amber
+  &--download { background: rgba(244, 63, 94, 0.95); } // rose
+}
+
+.timing-waterfall__value {
+  margin-left: 8px;
+  color: var(--rr-text-secondary);
+  font-size: 10px;
+}
+
 .timing-chip {
   cursor: default;
   display: inline-flex;
