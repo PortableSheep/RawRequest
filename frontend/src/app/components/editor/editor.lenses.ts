@@ -52,43 +52,47 @@ export function createCodeLensesExtension(onExecute: (index: number) => void) {
     }
 
     buildDecorations(view: EditorView): DecorationSet {
-      const builder = new Array<{from: number, to: number, decoration: Decoration}>();
-      const tree = syntaxTree(view.state);
-      
-      let requestIdx = 0;
-      
-      // We need to count request blocks to know which index we are at.
-      // This is slightly inefficient but necessary for the click handler.
-      const requestStarts: number[] = [];
-      tree.iterate({
-        enter: (node) => {
-          if (node.name === 'MethodLine') {
-            requestStarts.push(node.from);
-          }
-        }
-      });
-
-      for (const range of view.visibleRanges) {
+      try {
+        const builder = new Array<{from: number, to: number, decoration: Decoration}>();
+        const tree = syntaxTree(view.state);
+        
+        // We need to count request blocks to know which index we are at.
+        const requestStarts: number[] = [];
         tree.iterate({
-          from: range.from,
-          to: range.to,
           enter: (node) => {
-            if (node.name !== 'MethodLine') return;
-            
-            const idx = requestStarts.indexOf(node.from);
-            if (idx === -1) return;
-
-            const deco = Decoration.widget({
-              widget: new RunRequestWidget(idx, onExecute),
-              side: -1, // Above the line
-              block: true
-            });
-            builder.push({ from: node.from, to: node.from, decoration: deco });
+            if (node.name === 'MethodLine') {
+              requestStarts.push(node.from);
+            }
           }
         });
-      }
 
-      return Decoration.set(builder.map(b => b.decoration.range(b.from)), true);
+        for (const range of view.visibleRanges) {
+          tree.iterate({
+            from: range.from,
+            to: range.to,
+            enter: (node) => {
+              if (node.name !== 'MethodLine') return;
+              
+              const idx = requestStarts.indexOf(node.from);
+              if (idx === -1) return;
+
+              const deco = Decoration.widget({
+                widget: new RunRequestWidget(idx, onExecute),
+                side: -1, // Above the line
+                block: true
+              });
+              builder.push({ from: node.from, to: node.from, decoration: deco });
+            }
+          });
+        }
+
+        // Let CodeMirror safely handle sorting and tree construction to prevent 
+        // rendering phase crashes caused by tree corruption.
+        return Decoration.set(builder.map(b => b.decoration.range(b.from)));
+      } catch (e) {
+        console.error('Failed to build code lens decorations', e);
+        return Decoration.none;
+      }
     }
   }, {
     decorations: v => v.decorations
