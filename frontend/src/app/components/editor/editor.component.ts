@@ -13,7 +13,6 @@ import { EditorSearchPanelComponent } from './editor-search-panel/editor-search-
 import { createEditorKeymap } from './editor-keymap';
 import { createRequestGutter } from './editor-request-gutter';
 import { createAutocompleteExtension } from './editor.autocomplete';
-import { createCodeLensesExtension } from './editor.lenses';
 import { createEditorLintExtensions } from './editor.lint';
 import { parser as rawRequestHttpParser } from './rawrequest-http-parser';
 import { createVariableHoverTooltipExtension } from './editor.tooltips';
@@ -228,15 +227,18 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       doc: this.content(),
       extensions: [
         basicSetup,
-        this.themeCompartment.of(buildEditorThemeExtension(this.themeService.resolvedTheme())),
         rawRequestHttpSupport,
         createRequestBlockIndexer((blocks) => { this.requestBlockIndex = blocks; }),
+        createRequestGutter(
+          (index) => this.requestExecute.emit(index),
+          () => this.requestBlockIndex
+        ),
         createRequestFolding(),
         search({ top: true }),
         createRequestHighlighter(),
         createDependsLinker((name) => jumpToRequestByName(this.editorView, name)),
-        createCodeLensesExtension((index) => this.requestExecute.emit(index)),
         this.autocompleteCompartment.of(this.createAutocomplete()),
+        this.themeCompartment.of(buildEditorThemeExtension(this.themeService.resolvedTheme())),
         tooltips({ position: 'fixed' }),
         this.createVariableHoverTooltip(),
         this.lintCompartment.of(this.createLintExtensions()),
@@ -289,10 +291,6 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
           getRequestIndexAtPos: (state, pos) => this.getRequestIndexAtPos(state, pos),
           onExecuteRequest: (index) => this.requestExecute.emit(index)
         }),
-        createRequestGutter(
-          (index) => this.requestExecute.emit(index),
-          () => this.requestBlockIndex
-        ),
         
         EditorView.domEventHandlers({
           mousedown: (event, view) => {

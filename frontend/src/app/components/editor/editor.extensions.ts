@@ -14,40 +14,50 @@ import { computeRequestBlockIndex, RequestBlock } from './editor-request-indexer
 import { findRequestNameLineNumber } from './editor.component.logic';
 
 export function buildEditorThemeExtension(theme: 'dark' | 'light') {
-  if (theme === 'dark') {
-    return oneDark;
-  }
+  const isDark = theme === 'dark';
+  return [
+    EditorView.theme({
+      "&": {
+        backgroundColor: "var(--rr-surface-1)",
+        color: "var(--rr-text)"
+      },
+      ".cm-content": {
+        caretColor: "var(--rr-primary)"
+      },
+      ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--rr-primary)" },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--rr-primary-alpha-20)" },
 
-  return EditorView.theme(
-    {
-      '&': {
-        backgroundColor: '#ffffff',
-        color: '#0f172a'
+      ".cm-gutters": {
+        backgroundColor: "var(--rr-surface-1)",
+        color: "var(--rr-text-tertiary)",
+        border: "none"
       },
-      '.cm-content': {
-        caretColor: '#2563eb'
+      ".cm-activeLineGutter": {
+        backgroundColor: "var(--rr-surface-2)"
       },
-      '.cm-cursor, .cm-dropCursor': {
-        borderLeftColor: '#2563eb'
+      ".cm-lineNumbers .cm-gutterElement": {
+        padding: "0 8px 0 4px",
+        minWidth: "32px"
       },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, ::selection': {
-        backgroundColor: 'rgba(37, 99, 235, 0.18)'
+      ".cm-activeLine": { backgroundColor: "var(--rr-surface-2)" },
+      ".cm-foldPlaceholder": {
+        backgroundColor: "transparent",
+        border: "none",
+        color: "var(--rr-text-tertiary)"
       },
-      '.cm-gutters': {
-        backgroundColor: '#f8fafc',
-        color: '#64748b',
-        borderRightColor: '#e2e8f0'
+      ".cm-tooltip": {
+        border: "1px solid var(--rr-border-color)",
+        backgroundColor: "var(--rr-surface-2)"
       },
-      '.cm-activeLine': {
-        backgroundColor: 'rgba(15, 23, 42, 0.04)'
-      },
-      '.cm-activeLineGutter': {
-        backgroundColor: 'rgba(15, 23, 42, 0.04)',
-        color: '#475569'
+      ".cm-tooltip-autocomplete": {
+        "& > ul > li[aria-selected]": {
+          backgroundColor: "var(--rr-primary)",
+          color: "var(--rr-text-on-primary)"
+        }
       }
-    },
-    { dark: false }
-  );
+    }, { dark: isDark }),
+    isDark ? oneDark : []
+  ];
 }
 
 export function createDependsLinker(jumpToRequestByName: (name: string) => boolean) {
@@ -311,10 +321,7 @@ export function createRequestHighlighter() {
           }
         }
 
-        decorations.sort((a, b) => a.from - b.from || a.to - b.to);
         const entries: Array<{ from: number; to: number; deco: Decoration }> = [];
-        
-        // Separate line decorations and mark decorations
         for (const d of decorations) {
           entries.push({ from: d.from, to: d.to, deco: Decoration.mark({ class: d.cls }) });
         }
@@ -322,21 +329,30 @@ export function createRequestHighlighter() {
           entries.push({ from: d.at, to: d.at, deco: Decoration.line({ class: d.cls }) });
         }
 
-        // Sort everything by document position. 
-        // For same position, Decoration.line must come before Decoration.mark (length 0 first).
-        entries.sort((a, b) => a.from - b.from || (a.to - a.from) - (b.to - b.from));
+        // --- THE GOLDEN SORT FOR CODEMIRROR RANGE SET BUILDER ---
+        // 1. Increasing 'from'
+        // 2. Line decorations (length 0) BEFORE mark decorations at same position
+        // 3. Decreasing 'to' (longer marks before shorter nested marks)
+        entries.sort((a, b) => {
+          if (a.from !== b.from) return a.from - b.from;
+          const lenA = a.to - a.from;
+          const lenB = b.to - b.from;
+          if (lenA === 0 && lenB !== 0) return -1;
+          if (lenA !== 0 && lenB === 0) return 1;
+          return b.to - a.to;
+        });
 
         const builder = new RangeSetBuilder<Decoration>();
         for (const e of entries) {
           try {
             builder.add(e.from, e.to, e.deco);
           } catch (err) {
-            console.error('Failed to add decoration:', e, err);
+            // Silently skip problematic overlaps to avoid crashing the whole view
           }
         }
         return builder.finish();
       } catch (e) {
-        console.error('Failed to build request highlighter decorations', e);
+        console.error('Highlighter crashed', e);
         return Decoration.none;
       }
     }
@@ -347,36 +363,15 @@ export function createRequestHighlighter() {
 
 export function createRequestFolding() {
   return foldService.of((state, lineStart, _lineEnd) => {
-    const tree = syntaxTree(state);
-    const resolved = tree.resolve(lineStart, 1);
-
-    if (resolved.name === 'MethodLine') {
-      let cur: typeof resolved | null = resolved;
-      while (cur && cur.name !== 'RequestBlock') cur = cur.parent;
-      if (cur && cur.name === 'RequestBlock') {
-        const methodNode = cur.getChild('MethodLine');
-        const from = methodNode ? methodNode.to : cur.from;
-        const to = cur.to;
-        if (to > from) return { from, to };
-      }
-    }
-
     const line = state.doc.lineAt(lineStart);
     const text = line.text;
-    const trimmed = text.trimStart();
-    const leadingWhitespace = text.length - trimmed.length;
-    const lineType = tree.resolve(line.from + Math.min(leadingWhitespace, Math.max(0, text.length - 1)), 1).name;
-    if (lineType !== 'SeparatorLine') return null;
+
     if (!isSeparatorLine(text)) return null;
 
     const start = line.to;
     for (let lineNo = line.number + 1; lineNo <= state.doc.lines; lineNo++) {
       const next = state.doc.line(lineNo);
-      const nextText = next.text;
-      const nextTrimmed = nextText.trimStart();
-      const nextLeadingWhitespace = nextText.length - nextTrimmed.length;
-      const nextType = tree.resolve(next.from + Math.min(nextLeadingWhitespace, Math.max(0, nextText.length - 1)), 1).name;
-      if (nextType === 'SeparatorLine' && isSeparatorLine(nextText)) {
+      if (isSeparatorLine(next.text)) {
         const end = next.from - 1;
         if (end <= start) return null;
         return { from: start, to: end };
