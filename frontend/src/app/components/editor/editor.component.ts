@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewInit, input, output, OnDestroy, effect, inject, untracked } from '@angular/core';
 
 import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, Compartment, Prec } from '@codemirror/state';
@@ -58,6 +58,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   @ViewChild('wrapper', { static: true }) wrapperContainer!: ElementRef<HTMLElement>;
   @ViewChild('editor', { static: true }) editorContainer!: ElementRef;
 
+  fileId = input.required<string>();
   content = input.required<string>();
   requests = input.required<any[]>();
   variables = input<{ [key: string]: string }>({});
@@ -72,6 +73,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   private editorView!: EditorView;
   private isUpdatingFromInput = false;
+  private lastFileId: string | null = null;
   private autocompleteCompartment = new Compartment();
   private lintCompartment = new Compartment();
   private readOnlyCompartment = new Compartment();
@@ -90,13 +92,64 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   constructor() {
     effect(() => {
+      const newFileId = this.fileId();
       const newContent = this.content();
-      if (this.editorView && !this.isUpdatingFromInput) {
-        const currentContent = this.editorView.state.doc.toString();
-        if (currentContent !== newContent) {
-          this.updateContent(newContent);
+
+      untracked(() => {
+        if (!this.editorView) return;
+
+        // Check if the tab (fileId) actually changed
+        if (this.lastFileId !== newFileId) {
+          // 1. Save scroll & cursor of the previous tab
+          if (this.lastFileId) {
+            const prevScroll = this.editorView.scrollDOM.scrollTop;
+            const prevCursor = this.editorView.state.selection.main.head;
+            this.ws.saveTabEditorState(this.lastFileId, prevScroll, prevCursor);
+          }
+
+          // 2. Load the new tab's content
+          this.isUpdatingFromInput = true;
+          this.editorView.dispatch({
+            changes: { from: 0, to: this.editorView.state.doc.length, insert: newContent }
+          });
+          this.isUpdatingFromInput = false;
+
+          // 3. Restore scroll & cursor for the new tab
+          const savedState = this.ws.getTabEditorState(newFileId);
+          const targetCursor = savedState ? Math.min(savedState.cursor, newContent.length) : 0;
+
+          this.editorView.dispatch({
+            selection: { anchor: targetCursor }
+          });
+
+          // Restore scroll position after a short tick
+          requestAnimationFrame(() => {
+            if (this.editorView && this.fileId() === newFileId) {
+              this.editorView.scrollDOM.scrollTop = savedState ? savedState.scroll : 0;
+            }
+          });
+
+          this.lastFileId = newFileId;
+        } else {
+          // Same tab: only update content if it is different (e.g. external edits or debounced parses)
+          if (!this.isUpdatingFromInput) {
+            const currentContent = this.editorView.state.doc.toString();
+            if (currentContent !== newContent) {
+              const scrollPos = this.editorView.scrollDOM.scrollTop;
+              const cursor = Math.min(this.editorView.state.selection.main.head, newContent.length);
+              
+              this.isUpdatingFromInput = true;
+              this.editorView.dispatch({
+                changes: { from: 0, to: this.editorView.state.doc.length, insert: newContent },
+                selection: { anchor: cursor }
+              });
+              this.isUpdatingFromInput = false;
+              
+              this.editorView.scrollDOM.scrollTop = scrollPos;
+            }
+          }
         }
-      }
+      });
     });
 
     effect(() => {

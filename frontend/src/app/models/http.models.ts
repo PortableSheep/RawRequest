@@ -199,6 +199,7 @@ export interface FileTab {
   selectedEnv?: string;
   displayName?: string;
   filePath?: string;  // Full path to the file on disk (if opened from file system)
+  activeRequestIndex?: number | null;
 }
 
 export interface HistoryItem {

@@ -22,6 +22,16 @@ export class WorkspaceStateService {
 
   readonly LAST_SESSION_KEY = 'rawrequest_last_session';
 
+  private readonly tabEditorStates = new Map<string, { scroll: number; cursor: number }>();
+
+  saveTabEditorState(fileId: string, scroll: number, cursor: number): void {
+    this.tabEditorStates.set(fileId, { scroll, cursor });
+  }
+
+  getTabEditorState(fileId: string): { scroll: number; cursor: number } | undefined {
+    return this.tabEditorStates.get(fileId);
+  }
+
   // --- Core writable signals ---
   readonly files = signal<FileTab[]>([]);
   readonly currentFileIndex = signal<number>(0);
@@ -78,6 +88,19 @@ export class WorkspaceStateService {
   replaceFileAtIndex(index: number, newFile: FileTab): void {
     const updated = this.workspace.replaceFileAtIndex(this.files(), index, newFile);
     this.files.set(updated);
+  }
+
+  /** Update the active request index of the current tab. */
+  setActiveRequestIndex(index: number | null): void {
+    const files = this.files();
+    const currentIdx = this.currentFileIndex();
+    const activeFile = files[currentIdx];
+    if (activeFile) {
+      const updated = [...files];
+      updated[currentIdx] = { ...activeFile, activeRequestIndex: index };
+      this.files.set(updated);
+      this.httpService.saveFiles(updated);
+    }
   }
 
   // --- High-level workspace operations ---

@@ -33,15 +33,17 @@ export class ResponsePanelComponent implements OnDestroy {
   private readonly reqExec = inject(RequestExecutionService);
 
   readonly responseData = computed(() => {
-    const idx = this.reqExec.lastExecutedRequestIndexSignal();
-    if (idx === null) return null;
-    return this.ws.currentFileView().responseData[idx] ?? null;
+    const activeFile = this.ws.currentFileView();
+    const idx = activeFile?.activeRequestIndex;
+    if (idx === undefined || idx === null) return null;
+    return activeFile.responseData[idx] ?? null;
   });
 
   readonly request = computed(() => {
-    const idx = this.reqExec.lastExecutedRequestIndexSignal();
-    if (idx === null) return null;
-    return this.ws.currentFileView().requests[idx] ?? null;
+    const activeFile = this.ws.currentFileView();
+    const idx = activeFile?.activeRequestIndex;
+    if (idx === undefined || idx === null) return null;
+    return activeFile.requests[idx] ?? null;
   });
 
   readonly isLoading = this.reqExec.isRequestRunningSignal;

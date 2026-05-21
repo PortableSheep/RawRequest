@@ -53,14 +53,47 @@ function makeResponseData(overrides: Partial<ResponseData> = {}): ResponseData {
 // Mock services (using signals for reactive tracking)
 // ---------------------------------------------------------------------------
 
-const emptyFile = { requests: [] as any[], responseData: {} as Record<number, ResponseData> };
+const emptyFile = { requests: [] as any[], responseData: {} as Record<number, ResponseData>, activeRequestIndex: null as number | null };
 
 function createMockWs(fileData: any = {}) {
   const fileValue = { ...emptyFile, ...fileData };
+  if (fileValue.activeRequestIndex === undefined || fileValue.activeRequestIndex === null) {
+    const keys = Object.keys(fileValue.responseData || {});
+    fileValue.activeRequestIndex = keys.length > 0 ? Number(keys[0]) : null;
+  }
   const fileSignal = signal(fileValue);
+
+  const originalSet = fileSignal.set.bind(fileSignal);
+  const customSet = (val: any) => {
+    if (val && val.activeRequestIndex === undefined) {
+      const keys = Object.keys(val.responseData || {});
+      const index = keys.length > 0 ? Number(keys[0]) : null;
+      val = { ...val, activeRequestIndex: index };
+    }
+    originalSet(val);
+  };
+  fileSignal.set = customSet;
+
+  const originalUpdate = fileSignal.update.bind(fileSignal);
+  const customUpdate = (updateFn: (value: any) => any) => {
+    fileSignal.update(val => {
+      let updated = updateFn(val);
+      if (updated && updated.activeRequestIndex === undefined) {
+        const keys = Object.keys(updated.responseData || {});
+        const index = keys.length > 0 ? Number(keys[0]) : null;
+        updated = { ...updated, activeRequestIndex: index };
+      }
+      return updated;
+    });
+  };
+  fileSignal.update = customUpdate;
+
   return {
     currentFileView: fileSignal as WritableSignal<any>,
     getCurrentFile: vi.fn(() => fileSignal()),
+    setActiveRequestIndex: vi.fn((index: number | null) => {
+      fileSignal.update(val => ({ ...val, activeRequestIndex: index }));
+    }),
   };
 }
 
