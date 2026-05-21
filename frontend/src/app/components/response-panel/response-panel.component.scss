@@ -696,3 +696,181 @@
   }
 }
 
+// ---------------------------------------------------------------------------
+// Chained Execution Pipeline (Horizontal Timeline)
+// ---------------------------------------------------------------------------
+
+.chain-pipeline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--rr-surface-2);
+  border: 1px solid var(--rr-border-color);
+  border-radius: var(--rr-radius-md);
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  
+  &::-webkit-scrollbar {
+    height: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--rr-border-hover-color);
+    border-radius: 4px;
+  }
+}
+
+.chain-pipeline__node {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: var(--rr-radius-sm);
+  cursor: pointer;
+  outline: none;
+  text-align: left;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--rr-surface-hover);
+    border-color: var(--rr-border-hover-color);
+    transform: translateY(-1px);
+  }
+
+  &--active {
+    background: var(--rr-surface-3);
+    border-color: var(--rr-primary);
+    box-shadow: 0 0 6px rgba(99, 102, 241, 0.2);
+  }
+}
+
+.chain-pipeline__circle {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--rr-surface-3);
+  border: 1px solid var(--rr-text-subtle);
+  transition: all 0.2s ease;
+}
+
+.chain-pipeline__circle-text {
+  font-size: 10px;
+  font-family: var(--rr-font-mono);
+  font-weight: 600;
+  color: var(--rr-text-muted);
+}
+
+.chain-pipeline__node--success {
+  .chain-pipeline__circle {
+    border-color: var(--rr-success);
+    background: rgba(34, 197, 94, 0.08);
+    
+    .chain-pipeline__circle-text {
+      color: var(--rr-success);
+    }
+  }
+}
+
+.chain-pipeline__node--error {
+  .chain-pipeline__circle {
+    border-color: var(--rr-error);
+    background: rgba(239, 68, 68, 0.08);
+    
+    .chain-pipeline__circle-text {
+      color: var(--rr-error);
+    }
+  }
+}
+
+.chain-pipeline__label {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.chain-pipeline__method {
+  font-size: 8px;
+  font-weight: 700;
+  font-family: var(--rr-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  
+  &[data-method="GET"] { color: var(--rr-http-get); }
+  &[data-method="POST"] { color: var(--rr-http-post); }
+  &[data-method="PUT"] { color: var(--rr-http-put); }
+  &[data-method="PATCH"] { color: var(--rr-http-patch); }
+  &[data-method="DELETE"] { color: var(--rr-http-delete); }
+}
+
+.chain-pipeline__name {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--rr-text);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chain-pipeline__connector {
+  flex-shrink: 0;
+  width: 16px;
+  height: 2px;
+  background: var(--rr-border-color);
+  border-radius: 999px;
+  transition: all 0.2s ease;
+
+  &--success {
+    background: var(--rr-success);
+  }
+
+  &--error {
+    background: var(--rr-error);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Assertion Badge Summary Badge
+// ---------------------------------------------------------------------------
+
+.assertion-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: var(--rr-radius-sm);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin-right: 8px;
+}
+
+.assertion-badge__pass {
+  padding: 2px 6px;
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--rr-success);
+}
+
+.assertion-badge__fail {
+  padding: 2px 6px;
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--rr-error);
+}
+
+.assertion-badge--all-passed {
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  
+  .assertion-badge__pass {
+    background: rgba(34, 197, 94, 0.12);
+  }
+}
+
+.assertion-badge--has-failed {
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+

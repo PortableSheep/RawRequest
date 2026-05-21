@@ -231,86 +231,100 @@
 }
 
 ::ng-deep .cm-gutter-play {
-  width: 56px;
+  width: 72px !important;
   flex-shrink: 0;
 
   .cm-gutterElement {
-    padding: 2px 4px 0 !important;
+    padding: 2px 6px 0 !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
   }
 }
 
 ::ng-deep .gutter-play-btn {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  background: transparent;
-  border: none;
-  border-radius: 3px;
+  width: 20px;
+  height: 20px;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 50%;
   padding: 0;
   margin: 0;
   cursor: pointer;
-  color: var(--rr-text-secondary);
-  transition: color 0.1s ease, background-color 0.1s ease;
+  color: var(--rr-success);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 
   &:hover {
-    color: var(--rr-primary);
-    background: var(--rr-surface-3);
+    color: var(--rr-text-on-primary);
+    background: var(--rr-success);
+    border-color: var(--rr-success);
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.45);
+    transform: scale(1.2);
+  }
+
+  &:active {
+    transform: scale(0.9);
   }
 
   &.loading {
     color: var(--rr-primary);
     opacity: 0.6;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
   }
 
   svg {
+    width: 10px !important;
+    height: 10px !important;
     display: block;
   }
 }
+
 ::ng-deep .gutter-chain-icon,
 ::ng-deep .gutter-lightning-icon {
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  background: var(--rr-surface-3);
+  border: 1px solid var(--rr-border-color);
+  transition: all 0.2s ease;
 
   svg {
-    width: 16px;
-    height: 16px;
-  }
-}
-
-
-::ng-deep .gutter-play-btn {
-  display: flex !important;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  padding: 0;
-  margin: 0;
-  cursor: pointer;
-  color: var(--rr-success);
-  transition: all 0.1s ease;
-
-  &:hover {
-    color: var(--rr-primary);
-    transform: scale(1.1);
-  }
-
-  svg {
+    width: 11px !important;
+    height: 11px !important;
     display: block;
   }
 }
 
 ::ng-deep .gutter-chain-icon {
-  color: var(--rr-primary);
+  color: var(--rr-primary) !important;
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+  
+  &:hover {
+    background: rgba(99, 102, 241, 0.15);
+    transform: scale(1.1);
+  }
 }
 
 ::ng-deep .gutter-lightning-icon {
-  color: var(--rr-warning);
+  color: var(--rr-warning) !important;
+  background: rgba(234, 179, 8, 0.08);
+  border-color: rgba(234, 179, 8, 0.25);
+  
+  &:hover {
+    background: rgba(234, 179, 8, 0.15);
+    transform: scale(1.1);
+  }
 }
 
 ::ng-deep .cm-gutters {
