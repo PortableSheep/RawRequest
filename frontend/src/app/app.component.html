@@ -63,6 +63,7 @@
                     <app-editor
                         #editorComponent
                         class="rr-panel__body"
+                        [fileId]="currentFileView().id"
                         [content]="currentFileView().content"
                         [requests]="currentFileView().requests"
                         [variables]="currentFileView().variables"

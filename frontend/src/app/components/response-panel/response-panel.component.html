@@ -52,6 +52,40 @@
             </div>
         } @else if (chainItems.length) {
             <div class="response-panel__list">
+                @if (chainItems.length > 1) {
+                    <div class="chain-pipeline">
+                        @for (entry of chainItems; track entry.id; let idx = $index) {
+                            <button
+                                type="button"
+                                class="chain-pipeline__node"
+                                [class.chain-pipeline__node--active]="expandedEntryId() === entry.id"
+                                [class.chain-pipeline__node--success]="entry.response && entry.response.status < 400"
+                                [class.chain-pipeline__node--error]="entry.response && entry.response.status >= 400"
+                                (click)="toggleEntry(entry.id)"
+                                [title]="'Jump to: ' + (entry.request.name || entry.label)"
+                            >
+                                <span class="chain-pipeline__circle">
+                                    <span class="chain-pipeline__circle-text">{{ idx + 1 }}</span>
+                                </span>
+                                <span class="chain-pipeline__label">
+                                    <span class="chain-pipeline__method" [attr.data-method]="entry.request.method">
+                                        {{ entry.request.method }}
+                                    </span>
+                                    <span class="chain-pipeline__name">{{ entry.request.name || entry.label }}</span>
+                                </span>
+                            </button>
+                            @if (idx < chainItems.length - 1) {
+                                <div
+                                    class="chain-pipeline__connector"
+                                    [class.chain-pipeline__connector--success]="entry.response && entry.response.status < 400"
+                                    [class.chain-pipeline__connector--error]="entry.response && entry.response.status >= 400"
+                                    aria-hidden="true"
+                                ></div>
+                            }
+                        }
+                    </div>
+                }
+
                 @for (entry of chainItems; track entry.id; let idx = $index) {
                     <article class="response-entry" [class.response-entry--open]="expandedEntryId() === entry.id">
                         <div class="response-entry__header" (click)="toggleEntry(entry.id)">
@@ -82,6 +116,17 @@
                                     >
                                         Replay
                                     </button>
+                                }
+
+                                @if (entry.response && entry.response.assertions?.length) {
+                                    @let passedCount = countAssertionsPassed(entry.response.assertions);
+                                    @let failedCount = countAssertionsFailed(entry.response.assertions);
+                                    <div class="assertion-badge rr-mono" [class.assertion-badge--all-passed]="failedCount === 0" [class.assertion-badge--has-failed]="failedCount > 0">
+                                        <span class="assertion-badge__pass" title="Passed assertions">✓ {{ passedCount }}</span>
+                                        @if (failedCount > 0) {
+                                            <span class="assertion-badge__fail" title="Failed assertions">✗ {{ failedCount }}</span>
+                                        }
+                                    </div>
                                 }
 
                                 <span [ngClass]="getStatusClass(entry)">{{ getStatusLabel(entry) }}</span>

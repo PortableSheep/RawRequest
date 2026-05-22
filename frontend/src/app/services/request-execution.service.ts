@@ -1,4 +1,4 @@
-import { Injectable, ChangeDetectorRef, signal, inject } from '@angular/core';
+import { Injectable, ChangeDetectorRef, signal, inject, effect, untracked } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import type {
   FileTab,
@@ -12,6 +12,7 @@ import { SecretService } from './secret.service';
 import { ToastService } from './toast.service';
 import { LoadTestVisualizationService } from './load-test-visualization.service';
 import { PanelVisibilityService } from './panel-visibility.service';
+import { WorkspaceStateService } from './workspace-state.service';
 import {
   buildActiveRequestMeta,
   buildActiveRequestPreview,
@@ -46,6 +47,18 @@ export class RequestExecutionService {
   private readonly toast = inject(ToastService);
   readonly loadTestViz = inject(LoadTestVisualizationService);
   private readonly panels = inject(PanelVisibilityService);
+  private readonly ws = inject(WorkspaceStateService);
+
+  constructor() {
+    effect(() => {
+      const activeFile = this.ws.currentFileView();
+      const tabActiveIdx = activeFile?.activeRequestIndex ?? null;
+      untracked(() => {
+        this.lastExecutedRequestIndex = tabActiveIdx;
+        this.lastExecutedRequestIndexSignal.set(tabActiveIdx);
+      });
+    });
+  }
 
   // --- Signals (reactive state exposed to templates) ---
   readonly isRequestRunningSignal = signal<boolean>(false);
@@ -109,6 +122,7 @@ export class RequestExecutionService {
     // Clear the response panel so stale results don't linger.
     this.lastExecutedRequestIndex = null;
     this.lastExecutedRequestIndexSignal.set(null);
+    this.ws.setActiveRequestIndex(null);
 
     this.isRequestRunning = true;
     this.isRequestRunningSignal.set(true);
@@ -211,6 +225,7 @@ export class RequestExecutionService {
   onRequestExecuted(result: { requestIndex: number; response: ResponseData }): void {
     this.lastExecutedRequestIndex = result.requestIndex;
     this.lastExecutedRequestIndexSignal.set(result.requestIndex);
+    this.ws.setActiveRequestIndex(result.requestIndex);
     this.resetPendingRequestState();
 
     if ((result.response as any).loadTestMetrics) {
