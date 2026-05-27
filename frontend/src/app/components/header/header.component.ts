@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, HostListener, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, inject, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ThemeService } from '../../services/theme.service';
@@ -7,6 +7,7 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { FileSaveService } from '../../services/file-save.service';
 import { ToastService } from '../../services/toast.service';
 import { StartupService } from '../../services/startup.service';
+import { MockServerService } from '../../services/mock-server.service';
 import { shortcutHint, getVisibleShortcuts, formatKeyCombo } from '../../logic/app/shortcut-catalog';
 
 @Component({
@@ -23,6 +24,9 @@ export class HeaderComponent {
   private readonly fileSave = inject(FileSaveService);
   private readonly toast = inject(ToastService);
   readonly startup = inject(StartupService);
+  private readonly mockServer = inject(MockServerService);
+
+  readonly mockServerRunning = computed(() => this.mockServer.status().running);
 
   readonly shortcutHint = shortcutHint;
 
@@ -198,6 +202,11 @@ export class HeaderComponent {
     this.closeMoreMenu();
   }
 
+  handleOpenMockDemoClick(): void {
+    void this.openMockDemoFile();
+    this.closeMoreMenu();
+  }
+
   handleDonateClick(): void {
     this.panels.showDonationModal.set(true);
     this.closeMoreMenu();
@@ -216,6 +225,11 @@ export class HeaderComponent {
   handleToggleThemeClick(): void {
     this.toggleTheme();
     this.closeMoreMenu();
+  }
+
+  handleMockServerClick(): void {
+    this.panels.consoleActiveTab.set('mock');
+    this.panels.consoleOpen.set(true);
   }
 
   handleSecretsClick(): void {
@@ -427,6 +441,15 @@ export class HeaderComponent {
     } catch (error) {
       console.error("Failed to open examples file:", error);
       this.toast.error("Failed to open examples file.");
+    }
+  }
+
+  async openMockDemoFile(): Promise<void> {
+    try {
+      await this.ws.openMockDemoFile();
+    } catch (error) {
+      console.error("Failed to open mock demo file:", error);
+      this.toast.error("Failed to open mock demo file.");
     }
   }
 

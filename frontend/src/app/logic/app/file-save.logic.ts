@@ -16,7 +16,8 @@ export function buildFileAfterSave(file: FileTab, path: string): FileTab {
     ...file,
     filePath: path,
     id: path,
-    name: basename(path)
+    name: basename(path),
+    savedContent: file.content
   } as any;
 }
 

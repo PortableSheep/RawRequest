@@ -291,6 +291,39 @@ export class WorkspaceFacadeService {
     };
   }
 
+  upsertMockDemoTab(lastSessionKey: string, files: FileTab[], content: string, name: string): WorkspaceStateUpdate {
+    const parsed = parseHttpFile(content);
+    const examplesId = '__mock_demo__';
+
+    const examplesTab: FileTab = normalizeFileTab(
+      buildExamplesTabFromParsed({
+        name,
+        content,
+        parsed,
+        examplesId,
+        defaultDisplayName: 'Mock Demo'
+      }) as any
+    );
+
+    const existingIndex = files.findIndex(file => file.id === examplesId);
+    const nextFiles = existingIndex >= 0
+      ? this.replaceFileAtIndex(files, existingIndex, examplesTab)
+      : [...files, examplesTab];
+
+    const nextCurrentIndex = existingIndex >= 0 ? existingIndex : nextFiles.length - 1;
+
+    this.historyStore.set(examplesId, []);
+    this.http.saveFiles(nextFiles);
+    this.persistSessionState(lastSessionKey, nextFiles, nextCurrentIndex);
+
+    return {
+      files: nextFiles,
+      currentFileIndex: nextCurrentIndex,
+      activeFileId: examplesId,
+      currentEnv: examplesTab.selectedEnv || ''
+    };
+  }
+
   // --- Higher-level methods that combine workspace operations with env sync / derive ---
 
   deriveWithEnvSync(update: WorkspaceStateUpdate): DerivedAppStateFromWorkspaceUpdate {

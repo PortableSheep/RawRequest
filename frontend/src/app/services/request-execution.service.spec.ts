@@ -66,6 +66,24 @@ describe('RequestExecutionService', () => {
   beforeEach(() => {
     const downloadProgress$ = new Subject<any>();
 
+    const mockLoadTestViz = {
+      initializeLoadRun: vi.fn(),
+      startActiveRunTick: vi.fn(),
+      stopActiveRunTick: vi.fn(),
+      applyResetPatch: vi.fn(),
+      pushLoadUsersSample: vi.fn(),
+      notifyRegisteredViews: vi.fn(),
+      updateProgress: vi.fn().mockImplementation((p) => {
+        mockLoadTestViz.activeRunProgress = p;
+        if (p.type === 'load') {
+          mockLoadTestViz.pushLoadUsersSample(p.activeUsers ?? 0);
+        }
+      }),
+      activeRunNowMs: Date.now(),
+      activeRunProgress: null,
+      loadTestMetrics: null,
+    };
+
     TestBed.configureTestingModule({
       providers: [
         RequestExecutionService,
@@ -83,17 +101,7 @@ describe('RequestExecutionService', () => {
         },
         {
           provide: LoadTestVisualizationService,
-          useValue: {
-            initializeLoadRun: vi.fn(),
-            startActiveRunTick: vi.fn(),
-            stopActiveRunTick: vi.fn(),
-            applyResetPatch: vi.fn(),
-            pushLoadUsersSample: vi.fn(),
-            notifyRegisteredViews: vi.fn(),
-            activeRunNowMs: Date.now(),
-            activeRunProgress: null,
-            loadTestMetrics: null,
-          },
+          useValue: mockLoadTestViz,
         },
         PanelVisibilityService,
       ],

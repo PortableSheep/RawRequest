@@ -10,6 +10,7 @@ export interface Request {
   depends?: string;  // Name of request to execute first
   loadTest?: LoadTestConfig;
   noHistory?: boolean;
+  isMock?: boolean;
   options?: {
     timeout?: number;
     noRedirect?: boolean;
@@ -167,6 +168,13 @@ export interface ActiveRunProgress {
   cancelled?: boolean;
   aborted?: boolean;
   abortReason?: string;
+  p50?: number;
+  p90?: number;
+  p95?: number;
+  p99?: number;
+  avg?: number;
+  min?: number;
+  max?: number;
 }
 
 export interface ResponseData {
@@ -199,6 +207,7 @@ export interface FileTab {
   selectedEnv?: string;
   displayName?: string;
   filePath?: string;  // Full path to the file on disk (if opened from file system)
+  savedContent?: string; // Content of the file as saved on disk (used to track dirty state)
   activeRequestIndex?: number | null;
 }
 

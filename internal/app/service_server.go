@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"rawrequest/internal/cli"
+	"rawrequest/internal/secretvaultlogic"
 )
 
 const defaultServiceAddr = "127.0.0.1:7345"
@@ -33,6 +34,19 @@ func StartServiceServer(opts *cli.Options) error {
 		Handler:           withServiceCORS(mux),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
+
+	// Background parent-death detection loop to ensure child service exits if the GUI app dies/exits
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			if os.Getppid() == 1 {
+				fmt.Println("Parent process died. Terminating RawRequest service...")
+				os.Exit(0)
+			}
+		}
+	}()
+
 	fmt.Fprintf(os.Stderr, "RawRequest service listening on http://%s\n", addr)
 	return server.ListenAndServe()
 }
@@ -72,6 +86,10 @@ func (s *httpService) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/verify-master-password", s.handleVerifyMasterPassword)
 	mux.HandleFunc("/v1/reset-vault", s.handleResetVault)
 	mux.HandleFunc("/v1/export-secrets", s.handleExportSecrets)
+	mux.HandleFunc("/v1/get-enterprise-config", s.handleGetEnterpriseConfig)
+	mux.HandleFunc("/v1/save-enterprise-config", s.handleSaveEnterpriseConfig)
+	mux.HandleFunc("/v1/test-enterprise-secret", s.handleTestEnterpriseSecret)
+	mux.HandleFunc("/v1/open-enterprise-config", s.handleOpenEnterpriseConfig)
 
 	// Environment management
 	mux.HandleFunc("/v1/get-environments", s.handleGetEnvironments)
@@ -677,6 +695,76 @@ func (s *httpService) handleExportSecrets(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeServiceJSON(w, result)
+}
+
+func (s *httpService) handleGetEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePost(w, r) {
+		return
+	}
+	var payload struct{}
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return
+	}
+	result, err := s.app.GetEnterpriseConfig()
+	if err != nil {
+		writeServiceError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeServiceJSON(w, result)
+}
+
+func (s *httpService) handleSaveEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePost(w, r) {
+		return
+	}
+	var payload secretvaultlogic.EnterpriseConfig
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.app.SaveEnterpriseConfig(&payload); err != nil {
+		writeServiceError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type testEnterpriseSecretPayload struct {
+	Key string `json:"key"`
+}
+
+func (s *httpService) handleTestEnterpriseSecret(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePost(w, r) {
+		return
+	}
+	var payload testEnterpriseSecretPayload
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return
+	}
+	result, err := s.app.TestEnterpriseSecret(payload.Key)
+	if err != nil {
+		writeServiceError(w, http.StatusInternalServerError, err)
+		return
+	}
+	writeServiceJSON(w, map[string]string{"result": result})
+}
+
+func (s *httpService) handleOpenEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
+	if !s.requirePost(w, r) {
+		return
+	}
+	var payload struct{}
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := s.app.OpenEnterpriseConfig(); err != nil {
+		writeServiceError(w, http.StatusInternalServerError, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- Environment management handlers ---

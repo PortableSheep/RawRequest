@@ -31,6 +31,8 @@ export class FileSaveService {
 
       if (file.filePath && file.filePath.length) {
         await SaveFileContents(file.filePath, file.content);
+        const idx = this.state.currentFileIndex();
+        this.state.replaceFileAtIndex(idx, { ...file, savedContent: file.content });
       } else {
         const previousId = file.id;
         const defaultName = buildFirstSaveDefaultName(file);

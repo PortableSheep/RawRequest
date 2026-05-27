@@ -185,4 +185,21 @@ export class ServiceBackendClientService implements BackendClientContract {
   exportSecrets(): Promise<Record<string, Record<string, string>>> {
     return this.postJSON('/v1/export-secrets', {});
   }
+
+  getEnterpriseConfig(): Promise<any> {
+    return this.postJSON('/v1/get-enterprise-config', {});
+  }
+
+  saveEnterpriseConfig(config: any): Promise<void> {
+    return this.postVoid('/v1/save-enterprise-config', config as any);
+  }
+
+  async testEnterpriseSecret(key: string): Promise<string> {
+    const res = await this.postJSON<{ result: string }>('/v1/test-enterprise-secret', { key });
+    return res.result;
+  }
+
+  openEnterpriseConfig(): Promise<void> {
+    return this.postVoid('/v1/open-enterprise-config', {});
+  }
 }

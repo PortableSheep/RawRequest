@@ -9,6 +9,7 @@ import (
 	"maps"
 	"strings"
 	"sync"
+	"time"
 
 	"rawrequest/internal/importers"
 	rc "rawrequest/internal/requestchain"
@@ -18,6 +19,8 @@ import (
 	sr "rawrequest/internal/scriptruntime"
 	tpl "rawrequest/internal/templating"
 	vj "rawrequest/internal/varsjson"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type TimingBreakdown struct {
@@ -65,6 +68,10 @@ type App struct {
 	examplesFS        fs.FS
 	binaryBodies      map[string][]byte
 	binaryBodiesMu    sync.Mutex
+	windowStateMu     sync.Mutex
+	cachedWindowState WindowState
+	watchedFiles      map[string]time.Time
+	watchedFilesMu    sync.Mutex
 }
 
 const (
@@ -89,6 +96,7 @@ func NewApp(examplesFS ...fs.FS) *App {
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
 		binaryBodies:   make(map[string][]byte),
+		watchedFiles:   make(map[string]time.Time),
 	}
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]
@@ -106,9 +114,16 @@ func (a *App) OnDomReady(ctx context.Context) {
 	if a.IsFirstRun() {
 		fmt.Println("First run detected")
 	}
+
+	go a.trackWindowState(ctx)
+	go a.startFileWatcher(ctx)
+
+	// Show window once assets are loaded to prevent blank startup flashes
+	runtime.WindowShow(ctx)
 }
 
 func (a *App) OnBeforeClose(ctx context.Context) bool {
+	_ = a.StopMockServer()
 	_ = a.stopManagedService()
 	_ = a.SaveWindowState()
 	return false

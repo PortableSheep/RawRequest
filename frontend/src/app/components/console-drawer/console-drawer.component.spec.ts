@@ -4,6 +4,8 @@ import { ConsoleDrawerComponent } from './console-drawer.component';
 import { ScriptLogEntry } from '../../models/http.models';
 import { PanelVisibilityService } from '../../services/panel-visibility.service';
 import { ScriptConsoleService } from '../../services/script-console.service';
+import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { MockServerService } from '../../services/mock-server.service';
 
 // Mock GSAP so animation calls don't break in JSDOM
 vi.mock('gsap', () => {
@@ -35,19 +37,44 @@ describe('ConsoleDrawerComponent', () => {
 
   const mockLogs = signal<ScriptLogEntry[]>([]);
   const mockConsoleOpen = signal(false);
+  const mockConsoleActiveTab = signal<string>('logs');
+  const mockFiles = signal<any[]>([]);
+  const mockCurrentIndex = signal<number>(0);
+  const mockMockLogs = signal<any[]>([]);
+  const mockMockStatus = signal({ running: false, port: 8080, dbPath: '' });
 
   const mockPanels = {
     consoleOpen: mockConsoleOpen,
+    consoleActiveTab: mockConsoleActiveTab,
     toggleConsole: vi.fn(),
   };
   const mockScriptConsole = {
     logs: mockLogs,
     clear: vi.fn(),
+    init: vi.fn().mockResolvedValue(undefined),
+  };
+  const mockWorkspaceState = {
+    files: mockFiles,
+    currentFileIndex: mockCurrentIndex,
+    openMockDemoFile: vi.fn().mockResolvedValue(undefined),
+  };
+  const mockMockServer = {
+    status: mockMockStatus,
+    logs: mockMockLogs,
+    syncStatus: vi.fn().mockResolvedValue(undefined),
+    start: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
+    clearLogs: vi.fn()
   };
 
   beforeEach(async () => {
     mockLogs.set([]);
     mockConsoleOpen.set(false);
+    mockConsoleActiveTab.set('logs');
+    mockFiles.set([]);
+    mockCurrentIndex.set(0);
+    mockMockLogs.set([]);
+    mockMockStatus.set({ running: false, port: 8080, dbPath: '' });
     vi.clearAllMocks();
 
     await TestBed.configureTestingModule({
@@ -55,6 +82,8 @@ describe('ConsoleDrawerComponent', () => {
       providers: [
         { provide: PanelVisibilityService, useValue: mockPanels },
         { provide: ScriptConsoleService, useValue: mockScriptConsole },
+        { provide: WorkspaceStateService, useValue: mockWorkspaceState },
+        { provide: MockServerService, useValue: mockMockServer },
       ],
     })
     .overrideComponent(ConsoleDrawerComponent, { set: { changeDetection: ChangeDetectionStrategy.Default } })
@@ -229,7 +258,7 @@ describe('ConsoleDrawerComponent', () => {
       mockLogs.set([makeLog(), makeLog(), makeLog()]);
       fixture.detectChanges();
 
-      const count = fixture.nativeElement.querySelector('.console-panel__count');
+      const count = fixture.nativeElement.querySelector('.console-tab-badge');
       expect(count?.textContent?.trim()).toBe('3');
     });
 
@@ -307,8 +336,8 @@ describe('ConsoleDrawerComponent', () => {
       expect(handle).toBeTruthy();
     });
 
-    it('should have default panel height of 256', () => {
-      expect(component.panelHeight()).toBe(256);
+    it('should have default panel height of 380', () => {
+      expect(component.panelHeight()).toBe(380);
     });
 
     it('should not be resizing initially', () => {
@@ -328,7 +357,7 @@ describe('ConsoleDrawerComponent', () => {
       // Drag up by 100px → height increases by 100
       component.onMouseMove(new MouseEvent('mousemove', { clientY: 400 }));
 
-      expect(component.panelHeight()).toBe(356);
+      expect(component.panelHeight()).toBe(480);
     });
 
     it('should not go below minimum height', () => {
@@ -373,7 +402,7 @@ describe('ConsoleDrawerComponent', () => {
 
     it('should apply panel height to viewport style', () => {
       const viewport: HTMLElement = fixture.nativeElement.querySelector('.console-panel__viewport');
-      expect(viewport?.style.height).toBe('256px');
+      expect(viewport?.style.height).toBe('380px');
 
       component.panelHeight.set(400);
       fixture.detectChanges();

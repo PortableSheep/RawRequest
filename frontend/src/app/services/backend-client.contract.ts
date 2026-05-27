@@ -44,6 +44,10 @@ export interface BackendClientContract {
   verifyMasterPassword(password: string): Promise<boolean>;
   resetVault(): Promise<Record<string, string[]>>;
   exportSecrets(): Promise<Record<string, Record<string, string>>>;
+  getEnterpriseConfig(): Promise<any>;
+  saveEnterpriseConfig(config: any): Promise<void>;
+  testEnterpriseSecret(key: string): Promise<string>;
+  openEnterpriseConfig(): Promise<void>;
 }
 
 export const BACKEND_CLIENT = new InjectionToken<BackendClientContract>('BACKEND_CLIENT', {

@@ -12,14 +12,18 @@ export interface FuzzyMatch {
   highlights: number[];
 }
 
-export function buildPaletteItems(requests: { method: string; url: string; name?: string; group?: string }[]): PaletteItem[] {
-  return requests.map((r, i) => ({
-    requestIndex: i,
-    method: (r.method || 'GET').toUpperCase(),
-    label: r.name || '',
-    group: r.group || null,
-    url: r.url || ''
-  }));
+export function buildPaletteItems(requests: { method: string; url: string; name?: string; group?: string; isMock?: boolean }[]): PaletteItem[] {
+  return requests
+    .map((r, i) => ({
+      requestIndex: i,
+      method: (r.method || 'GET').toUpperCase(),
+      label: r.name || '',
+      group: r.group || null,
+      url: r.url || '',
+      isMock: !!r.isMock
+    }))
+    .filter(item => !item.isMock)
+    .map(({ isMock, ...rest }) => rest);
 }
 
 export function fuzzyMatch(text: string, query: string): { score: number; highlights: number[] } | null {

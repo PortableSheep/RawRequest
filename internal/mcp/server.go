@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"rawrequest/internal/cli"
+	"rawrequest/internal/parsehttp"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
@@ -52,6 +53,9 @@ func Serve(opts Options) error {
 	s.AddTool(runRequestTool(), h.handleRunRequest)
 	s.AddTool(listEnvironmentsTool(), h.handleListEnvironments)
 	s.AddTool(setVariableTool(), h.handleSetVariable)
+	s.AddTool(createRequestTool(), h.handleCreateRequest)
+	s.AddTool(updateRequestTool(), h.handleUpdateRequest)
+	s.AddTool(saveVariableTool(), h.handleSaveVariable)
 
 	// Resources
 	s.AddResource(
@@ -127,6 +131,111 @@ func setVariableTool() mcp.Tool {
 		mcp.WithString("value",
 			mcp.Required(),
 			mcp.Description("Variable value"),
+		),
+	)
+}
+
+func createRequestTool() mcp.Tool {
+	return mcp.NewTool("create_request",
+		mcp.WithDescription("Create a new HTTP request in a .http file or update an existing one by name."),
+		mcp.WithString("file",
+			mcp.Description("Path to the .http file. If omitted, auto-discovers or defaults to 'requests.http'."),
+		),
+		mcp.WithString("name",
+			mcp.Required(),
+			mcp.Description("Request name (used for @name)"),
+		),
+		mcp.WithString("method",
+			mcp.Required(),
+			mcp.Description("HTTP method (e.g. GET, POST, PUT, DELETE)"),
+		),
+		mcp.WithString("url",
+			mcp.Required(),
+			mcp.Description("Target URL"),
+		),
+		mcp.WithObject("headers",
+			mcp.Description("Optional key-value object of HTTP headers"),
+		),
+		mcp.WithString("body",
+			mcp.Description("Optional raw request body content"),
+		),
+		mcp.WithString("preScript",
+			mcp.Description("Optional JavaScript pre-request script"),
+		),
+		mcp.WithString("postScript",
+			mcp.Description("Optional JavaScript post-request script"),
+		),
+		mcp.WithString("group",
+			mcp.Description("Optional group name"),
+		),
+		mcp.WithString("depends",
+			mcp.Description("Optional request name dependency"),
+		),
+		mcp.WithNumber("timeout",
+			mcp.Description("Optional request execution timeout in seconds"),
+		),
+	)
+}
+
+func updateRequestTool() mcp.Tool {
+	return mcp.NewTool("update_request",
+		mcp.WithDescription("Modify an existing HTTP request in a .http file by name. Preserves developer comments and spacing."),
+		mcp.WithString("file",
+			mcp.Description("Path to the .http file. If omitted, auto-discovers."),
+		),
+		mcp.WithString("name",
+			mcp.Required(),
+			mcp.Description("The current name of the request to modify"),
+		),
+		mcp.WithString("newName",
+			mcp.Description("New name for the request"),
+		),
+		mcp.WithString("method",
+			mcp.Description("New HTTP method"),
+		),
+		mcp.WithString("url",
+			mcp.Description("New URL"),
+		),
+		mcp.WithObject("headers",
+			mcp.Description("New/updated key-value object of HTTP headers"),
+		),
+		mcp.WithString("body",
+			mcp.Description("New request body content"),
+		),
+		mcp.WithString("preScript",
+			mcp.Description("New JavaScript pre-request script"),
+		),
+		mcp.WithString("postScript",
+			mcp.Description("New JavaScript post-request script"),
+		),
+		mcp.WithString("group",
+			mcp.Description("New group name"),
+		),
+		mcp.WithString("depends",
+			mcp.Description("New request name dependency"),
+		),
+		mcp.WithNumber("timeout",
+			mcp.Description("New request execution timeout in seconds"),
+		),
+	)
+}
+
+func saveVariableTool() mcp.Tool {
+	return mcp.NewTool("save_variable",
+		mcp.WithDescription("Add or update a variable or environment variable in a .http file."),
+		mcp.WithString("file",
+			mcp.Description("Path to the .http file. If omitted, auto-discovers or defaults to 'requests.http'."),
+		),
+		mcp.WithString("key",
+			mcp.Required(),
+			mcp.Description("Variable name"),
+		),
+		mcp.WithString("value",
+			mcp.Required(),
+			mcp.Description("Variable value"),
+		),
+		mcp.WithString("environment",
+			mcp.Description("Target environment name (e.g. dev, staging) to scope this variable. If omitted, sets a global variable."),
 		),
 	)
 }
@@ -342,6 +451,206 @@ func (h *handlers) handleSetVariable(_ context.Context, req mcp.CallToolRequest)
 
 	h.sessionVars[key] = value
 	return mcp.NewToolResultText(fmt.Sprintf("Variable '%s' set to '%s'", key, value)), nil
+}
+
+func getArguments(req mcp.CallToolRequest) map[string]interface{} {
+	if req.Params.Arguments == nil {
+		return nil
+	}
+	if args, ok := req.Params.Arguments.(map[string]interface{}); ok {
+		return args
+	}
+	if args, ok := req.Params.Arguments.(map[string]any); ok {
+		res := make(map[string]interface{})
+		for k, v := range args {
+			res[k] = v
+		}
+		return res
+	}
+	return nil
+}
+
+func (h *handlers) handleCreateRequest(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	file, err := h.resolveFile(req)
+	if err != nil {
+		if strings.Contains(err.Error(), "no .http files found") {
+			file = ResolveFilePath(h.workspace, "requests.http")
+		} else {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+	}
+
+	name, err := req.RequireString("name")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	method, err := req.RequireString("method")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	url, err := req.RequireString("url")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	body := req.GetString("body", "")
+	preScript := req.GetString("preScript", "")
+	postScript := req.GetString("postScript", "")
+	group := req.GetString("group", "")
+	depends := req.GetString("depends", "")
+
+	args := getArguments(req)
+
+	var timeout int
+	if args != nil {
+		if timeoutArg, ok := args["timeout"]; ok && timeoutArg != nil {
+			if f, ok := timeoutArg.(float64); ok {
+				timeout = int(f)
+			} else if i, ok := timeoutArg.(int); ok {
+				timeout = i
+			}
+		}
+	}
+
+	var headers map[string]string
+	if args != nil {
+		if headersArg, ok := args["headers"]; ok && headersArg != nil {
+			if hMap, ok := headersArg.(map[string]interface{}); ok {
+				headers = make(map[string]string)
+				for k, v := range hMap {
+					headers[k] = fmt.Sprintf("%v", v)
+				}
+			} else if hMap, ok := headersArg.(map[string]any); ok {
+				headers = make(map[string]string)
+				for k, v := range hMap {
+					headers[k] = fmt.Sprintf("%v", v)
+				}
+			}
+		}
+	}
+
+	reqData := parsehttp.RequestData{
+		Name:       name,
+		Method:     method,
+		URL:        url,
+		Headers:    headers,
+		Body:       body,
+		PreScript:  preScript,
+		PostScript: postScript,
+		Group:      group,
+		Depends:    depends,
+		Timeout:    timeout,
+	}
+
+	err = parsehttp.WriteRequestToFile(file, reqData)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to write request: %s", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully created/updated request '%s' in %s", name, file)), nil
+}
+
+func (h *handlers) handleUpdateRequest(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	file, err := h.resolveFile(req)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	name, err := req.RequireString("name")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	newName := req.GetString("newName", "")
+	method := req.GetString("method", "")
+	url := req.GetString("url", "")
+	body := req.GetString("body", "")
+	preScript := req.GetString("preScript", "")
+	postScript := req.GetString("postScript", "")
+	group := req.GetString("group", "")
+	depends := req.GetString("depends", "")
+
+	args := getArguments(req)
+
+	var timeout int
+	if args != nil {
+		if timeoutArg, ok := args["timeout"]; ok && timeoutArg != nil {
+			if f, ok := timeoutArg.(float64); ok {
+				timeout = int(f)
+			} else if i, ok := timeoutArg.(int); ok {
+				timeout = i
+			}
+		}
+	}
+
+	var headers map[string]string
+	if args != nil {
+		if headersArg, ok := args["headers"]; ok && headersArg != nil {
+			if hMap, ok := headersArg.(map[string]interface{}); ok {
+				headers = make(map[string]string)
+				for k, v := range hMap {
+					headers[k] = fmt.Sprintf("%v", v)
+				}
+			} else if hMap, ok := headersArg.(map[string]any); ok {
+				headers = make(map[string]string)
+				for k, v := range hMap {
+					headers[k] = fmt.Sprintf("%v", v)
+				}
+			}
+		}
+	}
+
+	reqData := parsehttp.RequestData{
+		Name:       newName,
+		Method:     method,
+		URL:        url,
+		Headers:    headers,
+		Body:       body,
+		PreScript:  preScript,
+		PostScript: postScript,
+		Group:      group,
+		Depends:    depends,
+		Timeout:    timeout,
+	}
+
+	err = parsehttp.UpdateRequestInFile(file, name, reqData)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to update request: %s", err)), nil
+	}
+
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully updated request '%s' in %s", name, file)), nil
+}
+
+func (h *handlers) handleSaveVariable(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	file, err := h.resolveFile(req)
+	if err != nil {
+		if strings.Contains(err.Error(), "no .http files found") {
+			file = ResolveFilePath(h.workspace, "requests.http")
+		} else {
+			return mcp.NewToolResultError(err.Error()), nil
+		}
+	}
+
+	key, err := req.RequireString("key")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	value, err := req.RequireString("value")
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+	environment := req.GetString("environment", "")
+
+	err = parsehttp.SaveVariableInFile(file, key, value, environment)
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Failed to save variable: %s", err)), nil
+	}
+
+	scope := "global"
+	if environment != "" {
+		scope = fmt.Sprintf("environment '%s'", environment)
+	}
+	return mcp.NewToolResultText(fmt.Sprintf("Successfully saved %s variable '%s' to %s", scope, key, file)), nil
 }
 
 // --- Resource handlers ---

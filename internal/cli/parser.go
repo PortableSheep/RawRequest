@@ -24,6 +24,7 @@ type Request struct {
 	Group      string
 	Depends    string
 	Timeout    int
+	IsMock     bool
 }
 
 var (
@@ -48,6 +49,7 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 	inHeaders := false
 	var pendingName, pendingGroup, pendingDepends string
 	pendingTimeout := 0
+	pendingIsMock := false
 
 	// Script block tracking
 	inPreScript := false
@@ -219,6 +221,33 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 			continue
 		}
 
+		// @mockinit directive
+		if trimmed == "@mockinit" || strings.HasPrefix(trimmed, "@mockinit ") {
+			if currentRequest == nil {
+				currentRequest = &Request{
+					Headers: make(map[string]string),
+				}
+			}
+			currentRequest.Name = pendingName
+			currentRequest.Group = pendingGroup
+			currentRequest.IsMock = true
+			currentRequest.Method = "MOCKINIT"
+			currentRequest.URL = "@mockinit"
+			pendingName = ""
+			pendingGroup = ""
+			pendingDepends = ""
+			pendingTimeout = 0
+			pendingIsMock = false
+			continue
+		}
+
+		// @mock directive
+		if trimmed == "@mock" || strings.HasPrefix(trimmed, "@mock ") {
+			pendingIsMock = true
+			continue
+		}
+
+
 		// Global variables: @varName = value
 		if strings.HasPrefix(trimmed, "@") {
 			if match := globalVarRegex.FindStringSubmatch(trimmed); match != nil {
@@ -280,11 +309,13 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 				Group:   pendingGroup,
 				Depends: pendingDepends,
 				Timeout: pendingTimeout,
+				IsMock:  pendingIsMock,
 			}
 			pendingName = ""
 			pendingGroup = ""
 			pendingDepends = ""
 			pendingTimeout = 0
+			pendingIsMock = false
 			inHeaders = true
 			inBody = false
 			requestBody.Reset()

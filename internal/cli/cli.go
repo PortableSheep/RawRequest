@@ -18,6 +18,7 @@ const (
 	CommandMCP     Command = "mcp"
 	CommandService Command = "service"
 	CommandLoad    Command = "load"
+	CommandMock    Command = "mock"
 	CommandVersion Command = "version"
 	CommandHelp    Command = "help"
 )
@@ -53,6 +54,12 @@ type Options struct {
 	LoadFailRate float64
 	LoadAdaptive bool
 	Workspace    string  // MCP workspace root
+	// Mock options
+	MockPort     int
+	MockDB       string
+
+	// Secret vault resolver
+	SecretResolver SecretResolver
 }
 
 // Parse parses command line arguments and returns Options.
@@ -65,7 +72,7 @@ func Parse(args []string) *Options {
 	// Check if first argument is a command
 	cmd := strings.ToLower(args[1])
 	switch cmd {
-	case "run", "list", "envs", "mcp", "service", "load", "version", "help", "--help", "-h", "--version", "-v":
+	case "run", "list", "envs", "mcp", "service", "load", "mock", "version", "help", "--help", "-h", "--version", "-v":
 		// CLI mode
 	default:
 		return nil // Unknown command, run GUI
@@ -151,6 +158,30 @@ func Parse(args []string) *Options {
 			}
 		}
 
+		return opts
+	}
+
+	if opts.Command == CommandMock {
+		// Need at least a file argument
+		if len(args) < 3 {
+			opts.ShowHelp = true
+			return opts
+		}
+		opts.File = args[2]
+
+		fs := flag.NewFlagSet("rawrequest-mock", flag.ContinueOnError)
+		fs.SetOutput(os.Stderr)
+
+		fs.IntVar(&opts.MockPort, "port", 8080, "Port to run the mock server on")
+		fs.IntVar(&opts.MockPort, "p", 8080, "Port (shorthand)")
+		fs.StringVar(&opts.MockDB, "db", "", "Path to SQLite database for dynamic CRUD/persistence")
+
+		if len(args) > 3 {
+			if err := fs.Parse(args[3:]); err != nil {
+				opts.ShowHelp = true
+				return opts
+			}
+		}
 		return opts
 	}
 
@@ -240,6 +271,7 @@ Usage:
   rawrequest                          Launch GUI
   rawrequest run <file> [options]     Execute requests from an .http file
   rawrequest load <file> [options]    Run load tests against requests
+  rawrequest mock <file> [options]    Start an instant dynamic mock server from an .http file
   rawrequest list <file>              List all named requests in a file
   rawrequest envs <file>              List environments defined in a file
   rawrequest mcp [options]            Start MCP server for AI assistant integration
@@ -269,6 +301,10 @@ Load Test Options:
   --adaptive             Enable adaptive load control
   -o, --output <format>  Output: full|json|quiet (default: full)
   --service <url>        Service URL (default: auto-start on 127.0.0.1:7345)
+
+Mock Options:
+  -p, --port <n>         Port to run the mock server on (default: 8080)
+  --db <path>            Path to SQLite database for dynamic CRUD/persistence
 
 Service Options:
   --addr <host:port>     Address to bind (default: 127.0.0.1:7345)
@@ -310,6 +346,12 @@ Examples:
 
   # Load test with adaptive control
   rawrequest load api.http -n "search" --users 100 --duration 2m --adaptive
+
+  # Start an instant mock server on port 8080
+  rawrequest mock api.http -p 8080
+
+  # Start a mock server backed by SQLite for dynamic state/CRUD
+  rawrequest mock api.http -p 3000 --db users.db
 
   # Start MCP server for AI assistants (Copilot, Claude, etc.)
   rawrequest mcp

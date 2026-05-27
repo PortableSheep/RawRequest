@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="RawRequest Developer Syntax Reference. A comprehensive syntax spec sheet for .http directives, Goja JS VM pre/post script sandbox, and SQLite database query APIs." />
+  <meta name="keywords" content="RawRequest, HTTP client, .http file syntax, Developer Reference, SQLite Mocking, MCP documentation, Wails Angular" />
+  <meta name="author" content="RawRequest" />
+  <meta name="theme-color" content="#6366f1" />
+  <title>Developer Reference — RawRequest Syntax Spec Sheet</title>
+
+  <!-- Canonical URL & Favicon -->
+  <link rel="canonical" href="https://rawrequest.com/reference.html" />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="docs-body">
+  <div class="page">
+    <!-- Header/Navigation -->
+    <header class="nav" id="navbar">
+      <div class="logo">
+        <a href="index.html"><span class="logo-accent">Raw</span>Request</a>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">Home</a>
+        <a href="#syntax">Directives</a>
+        <a href="#variables">Variables</a>
+        <a href="#js-sandbox">JS VM Sandbox</a>
+        <a href="#sqlite-api">SQLite DB</a>
+      </nav>
+      <div class="nav-actions">
+        <a class="btn ghost btn-sm" href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">
+          <svg class="icon" viewBox="0 0 16 16" width="16" height="16"><path fill="currentColor" fill-rule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
+          GitHub
+        </a>
+        <a class="btn primary btn-sm" href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Download</a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu" aria-expanded="false">☰</button>
+    </header>
+
+    <main class="docs-main">
+      <div class="docs-container">
+        <!-- Sidebar Navigation -->
+        <aside class="docs-sidebar">
+          <div class="sidebar-group">
+            <h4>Reference Guide</h4>
+            <ul>
+              <li><a href="#syntax" class="active">Annotations & Directives</a></li>
+              <li><a href="#variables">Variables & Secrets</a></li>
+              <li><a href="#js-sandbox">Goja JS VM Sandbox</a></li>
+              <li><a href="#sqlite-api">SQLite Database API</a></li>
+              <li><a href="#mcp-spec">MCP stdio Specification</a></li>
+              <li><a href="#cli-ref">CLI Command Reference</a></li>
+            </ul>
+          </div>
+        </aside>
+
+        <!-- Main Documentation Content -->
+        <article class="docs-content">
+          <header class="docs-content__header">
+            <h1 class="gradient-text">Developer Syntax Reference</h1>
+            <p class="lead">A complete specifications manual for authoring <code>.http</code> requests, utilizing environments, script VMs, and the stateful local SQLite DB engine in RawRequest.</p>
+          </header>
+
+          <hr class="docs-divider" />
+
+          <!-- Section 1: Directives & Annotations -->
+          <section id="syntax" class="docs-section">
+            <h2>Annotations &amp; Directives</h2>
+            <p>RawRequest implements an extended JetBrains/VS Code compatible <code>.http</code> format. Request blocks are separated by <code>###</code>, and directives utilize <code>@</code> prefixes to manage state, chaining, and mock server routing.</p>
+
+            <table class="tech-table">
+              <thead>
+                <tr>
+                  <th>Directive</th>
+                  <th>Syntax / Pattern</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>@name</code></td>
+                  <td><code>@name nameOfRequest</code></td>
+                  <td>Identifies a request block. Mandatory for references in <code>@depends</code> or variables chaining.</td>
+                </tr>
+                <tr>
+                  <td><code>@depends</code></td>
+                  <td><code>@depends name1, name2</code></td>
+                  <td>Specifies request execution order. Dependees execute completely and populate active variables before this request fires.</td>
+                </tr>
+                <tr>
+                  <td><code>@env</code></td>
+                  <td><code>@env.profile.var = value</code></td>
+                  <td>Defines a environment-specific variable, resolved when the corresponding profile is activated.</td>
+                </tr>
+                <tr>
+                  <td><code>@load</code></td>
+                  <td><code>@load \n duration: 30s \n users: 50</code></td>
+                  <td>Configures a request as a high-concurrency performance benchmark. Set users, targetRPS, fail-rate, and rampUp.</td>
+                </tr>
+                <tr>
+                  <td><code>@timeout</code></td>
+                  <td><code>@timeout 5000</code></td>
+                  <td>Defines request network timeout in milliseconds. Defaults to system settings.</td>
+                </tr>
+                <tr>
+                  <td><code>@no-history</code></td>
+                  <td><code>@no-history</code></td>
+                  <td>Flag to instruct the system NEVER to log the responses or bodies to disk (useful for sensitive API keys or PHI).</td>
+                </tr>
+                <tr>
+                  <td><code>@mock</code></td>
+                  <td><code>@mock</code></td>
+                  <td>Flags a request as a local API mock endpoint definition rather than an outgoing client request. Stops play buttons from appearing.</td>
+                </tr>
+                <tr>
+                  <td><code>@mockinit</code></td>
+                  <td><code>@mockinit</code></td>
+                  <td>Declares a one-shot startup script. Executed exactly once when the mock server starts, perfect for DB schema setup.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!-- Section 2: Variables & Secrets -->
+          <section id="variables" class="docs-section">
+            <h2>Variables &amp; Secrets Resolvers</h2>
+            <p>RawRequest resolves dynamic variable placeholders at compile time before outgoing client network requests or mock routes are processed.</p>
+
+            <h3>1. Interpolation Precedence</h3>
+            <p>Placeholder interpolation utilizes the double-brace syntax <code>{{variableName}}</code>. Variables resolve according to the following strict order of priority:</p>
+            <ol>
+              <li><strong>Local Route Variables:</strong> Path parameters extracted from active mock endpoints (e.g. <code>{{id}}</code> parsed from <code>/users/:id</code>).</li>
+              <li><strong>Environment Profiles:</strong> Variables defined with <code>@env.[activeProfile].varName = value</code>.</li>
+              <li><strong>Global File-Level Variables:</strong> Variables defined globally at the top of the file as <code>@varName = value</code>.</li>
+              <li><strong>System Environment Variables:</strong> Prefixed with <code>env.</code> (e.g. <code>{{env.USER}}</code>) referencing local OS environment strings.</li>
+              <li><strong>Secure Vault Secrets:</strong> Securely stored credentials resolved from OS Keychain/Keyring services.</li>
+            </ol>
+
+            <h3>2. Encrypted Secrets Vault</h3>
+            <p>To store sensitive credentials without committing them to git, use the system keyring resolver:</p>
+            <pre class="code"><code>Authorization: Bearer {{secret:myApiKey}}</code></pre>
+            <div class="alert-box note">
+              <strong>Security Note:</strong> RawRequest desktop GUI integrates with macOS Keychain, Windows Credential Manager, and Linux Secret Service. Values remain encrypted and are never written to the local project text files.
+            </div>
+
+            <h3>3. Request Chaining (Chained Context)</h3>
+            <p>If a request uses <code>@depends authRequest</code>, you can dynamically reference parts of its completed response directly in the headers or body of subsequent blocks:</p>
+            <pre class="code"><code>### Chained Request
+GET {{baseUrl}}/profile
+Authorization: Bearer {{authRequest.response.body.token}}</code></pre>
+          </section>
+
+          <!-- Section 3: Goja JS VM Sandbox -->
+          <section id="js-sandbox" class="docs-section">
+            <h2>Pre &amp; Post Script VM Sandbox</h2>
+            <p>RawRequest embeds an isolated ECMA5 JavaScript runtime (Goja VM) to support scripting before sending a request (<code>&lt; { ... }</code>) or after receiving a response (<code>&gt; { ... }</code>).</p>
+
+            <h3>1. The Script Block Syntax</h3>
+            <ul>
+              <li><strong>Pre-Request Block (<code>&lt; { ... }</code>):</strong> Executes before network dispatching. Can modify request properties or initialize mock route actions.</li>
+              <li><strong>Post-Response Block (<code>&gt; { ... }</code>):</strong> Executes after response reception. Used to execute test assertions and save session states.</li>
+            </ul>
+
+            <h3>2. Runtime Sandbox Schema</h3>
+            <p>Inside the JS VM enclosure, the following global structures are automatically populated:</p>
+
+            <table class="tech-table">
+              <thead>
+                <tr>
+                  <th>Object</th>
+                  <th>Key / Property</th>
+                  <th>Type</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td rowspan="6"><strong>`request`</strong><br><small>(Available in Pre &amp; Mock scripts)</small></td>
+                  <td><code>request.method</code></td>
+                  <td><code>string</code></td>
+                  <td>HTTP Method (e.g. <code>"GET"</code>, <code>"POST"</code>)</td>
+                </tr>
+                <tr>
+                  <td><code>request.path</code></td>
+                  <td><code>string</code></td>
+                  <td>Matched endpoint path (e.g. <code>"/users/42"</code>)</td>
+                </tr>
+                <tr>
+                  <td><code>request.body</code></td>
+                  <td><code>string</code></td>
+                  <td>Raw incoming request body string</td>
+                </tr>
+                <tr>
+                  <td><code>request.params</code></td>
+                  <td><code>object</code></td>
+                  <td>Parsed route wildcards key-map (e.g. <code>{ id: "42" }</code>)</td>
+                </tr>
+                <tr>
+                  <td><code>request.query</code></td>
+                  <td><code>object</code></td>
+                  <td>Query params key-map (e.g. <code>{ search: "Alice" }</code>)</td>
+                </tr>
+                <tr>
+                  <td><code>request.headers</code></td>
+                  <td><code>object</code></td>
+                  <td>Headers key-map from incoming HTTP request</td>
+                </tr>
+                <tr class="table-separator-row">
+                  <td colspan="4"></td>
+                </tr>
+                <tr>
+                  <td rowspan="3"><strong>`response`</strong><br><small>(Available in Post &amp; Mock scripts)</small></td>
+                  <td><code>response.status</code></td>
+                  <td><code>number</code></td>
+                  <td>HTTP response status integer (e.g. <code>200</code>)</td>
+                </tr>
+                <tr>
+                  <td><code>response.body</code></td>
+                  <td><code>string | object</code></td>
+                  <td>Body string or structured JSON payload returned by routes</td>
+                </tr>
+                <tr>
+                  <td><code>response.headers</code></td>
+                  <td><code>object</code></td>
+                  <td>Headers key-map for outgoing or received values</td>
+                </tr>
+              </tbody>
+            </table>
+
+            <h3>3. Predefined Global Methods</h3>
+            <ul>
+              <li><code>assert(condition: boolean, message?: string)</code>: Evaluates truthiness. If false, throws an assertion error, stopping chains and logging failures.</li>
+              <li><code>setVar(name: string, value: any)</code>: Binds a variable in the active session, making it available to subsequent chained requests in the file.</li>
+              <li><code>console.log(...args: any[])</code>: Prints formatted logs. Routed directly to Wails Console Drawer log frames or CLI outputs.</li>
+            </ul>
+          </section>
+
+          <!-- Section 4: SQLite Database API -->
+          <section id="sqlite-api" class="docs-section">
+            <h2>Stateful SQLite Database Driver API</h2>
+            <p>Mock scripts (decorated with <code>@mock</code> or <code>@mockinit</code>) can leverage our embedded persistent SQLite client via the global <code>db</code> object.</p>
+
+            <div class="alert-box tip">
+              <strong>Best Practice:</strong> Use the <code>@mockinit</code> block to define database tables once at startup. This keeps your regular route pre-scripts dry and performant.
+            </div>
+
+            <h3>1. SQLite Driver Methods Catalog</h3>
+
+            <div class="api-method">
+              <h4><code>db.exec(sql: string, ...params: any[]): DbExecResult</code></h4>
+              <p>Executes write or schema queries (e.g. <code>CREATE</code>, <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>) using prepared statements to prevent SQL injections.</p>
+              <h5>Returns <code>DbExecResult</code> Object:</h5>
+              <ul>
+                <li><code>lastInsertId</code> (number): The auto-incremented primary key of the last inserted row.</li>
+                <li><code>rowsAffected</code> (number): The count of database rows modified by the command.</li>
+              </ul>
+              <pre class="code"><code>const res = db.exec("INSERT INTO logs (level, msg) VALUES (?, ?)", "info", "App started");
+console.log("Logged ID:", res.lastInsertId);</code></pre>
+            </div>
+
+            <div class="api-method">
+              <h4><code>db.query(sql: string, ...params: any[]): object[]</code></h4>
+              <p>Executes a read query (e.g. <code>SELECT</code>). Returns a full array of objects representing matching rows.</p>
+              <pre class="code"><code>const users = db.query("SELECT * FROM users ORDER BY id DESC");
+response.body = users; // Automatically serialized as JSON!</code></pre>
+            </div>
+
+            <div class="api-method">
+              <h4><code>db.get(sql: string, ...params: any[]): object | null</code></h4>
+              <p>Convenience read query that returns the first matched row as an object, or <code>null</code> if no rows match.</p>
+              <pre class="code"><code>const user = db.get("SELECT * FROM users WHERE email = ?", email);
+if (!user) {
+  response.status = 404;
+  response.body = { error: "Not found" };
+}</code></pre>
+            </div>
+          </section>
+
+          <!-- Section 5: MCP Specification -->
+          <section id="mcp-spec" class="docs-section">
+            <h2>Model Context Protocol stdio Specification</h2>
+            <p>RawRequest implements a direct zero-port Model Context Protocol (MCP) server over standard input/output (stdio), allowing AI assistants to query your workspace.</p>
+
+            <h3>Exposed stdio AI Tools</h3>
+            <ul>
+              <li><strong><code>list_files</code>:</strong> Discovers all <code>.http</code> documents recursively inside the registered AI workspace.</li>
+              <li><strong><code>list_requests</code>:</strong> Dissects the requests, parameters, named blocks, timeouts, and chains inside a target file.</li>
+              <li><strong><code>run_request</code>:</strong> Runs a specific named request in the file, automatically resolving dependencies, environment variables, pre/post scripts, and secure vault credentials. Returns timing, status, headers, and body.</li>
+              <li><strong><code>list_environments</code>:</strong> Inspects all environment keys defined in the file.</li>
+              <li><strong><code>set_variable</code>:</strong> Injects temporary runtime variable mappings into the active execution context.</li>
+            </ul>
+          </section>
+
+          <!-- Section 6: CLI Reference -->
+          <section id="cli-ref" class="docs-section">
+            <h2>CLI Command Reference</h2>
+            <p>Compile RawRequest to run headless in terminal shell processes, scheduling suites, or triggering stress tests in pipelines.</p>
+
+            <pre class="code"><code># Run specific request
+rawrequest run api.http -n login
+
+# Target prod environment with custom variables
+rawrequest run api.http -n getProfile -e prod -V "apiKey=custom_token"
+
+# Stream body output only (ideal for jq parsing)
+rawrequest run api.http -n getProfile -o body | jq .
+
+# Trigger load test benchmark on named request
+rawrequest load api.http -n stressTest --users 100 --duration 1m --fail-rate 0.02</code></pre>
+          </section>
+        </article>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <div class="footer-left">
+        <div class="logo"><span class="logo-accent">Raw</span>Request</div>
+        <p class="footer-meta">PolyForm Noncommercial License 1.0.0. Built with Wails, Go, and Angular.</p>
+      </div>
+      <div class="footer-links">
+        <a href="index.html">Back to Home</a>
+        <a href="https://github.com/portablesheep/RawRequest" target="_blank" rel="noreferrer">GitHub Project</a>
+        <a href="https://github.com/portablesheep/RawRequest/releases" target="_blank" rel="noreferrer">Releases</a>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Manage sidebar scrolling highlight synchronization
+      const sections = document.querySelectorAll('.docs-section');
+      const sidebarLinks = document.querySelectorAll('.docs-sidebar ul li a');
+
+      window.addEventListener('scroll', () => {
+        let currentSectionId = '';
+        sections.forEach(sec => {
+          const rect = sec.getBoundingClientRect();
+          if (rect.top <= 120 && rect.bottom >= 120) {
+            currentSectionId = sec.getAttribute('id');
+          }
+        });
+
+        if (currentSectionId) {
+          sidebarLinks.forEach(link => {
+            if (link.getAttribute('href') === `#${currentSectionId}`) {
+              link.classList.add('active');
+            } else {
+              link.classList.remove('active');
+            }
+          });
+        }
+      }, { passive: true });
+
+      // Mobile nav drawer trigger
+      const toggle = document.querySelector('.nav-toggle');
+      const links = document.querySelector('.nav-links');
+      if (toggle && links) {
+        toggle.addEventListener('click', () => {
+          const open = links.classList.toggle('open');
+          toggle.setAttribute('aria-expanded', open);
+          toggle.textContent = open ? '✕' : '☰';
+        });
+      }
+    });
+  </script>
+</body>
+</html>

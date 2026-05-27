@@ -1,7 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { signal } from '@angular/core';
 import { RequestManagerComponent } from './request-manager.component';
 import { HttpService } from '../../services/http.service';
 import { NotificationService } from '../../services/notification.service';
+import { MockServerService } from '../../services/mock-server.service';
 import {
   Request,
   FileTab,
@@ -128,10 +130,15 @@ describe('RequestManagerComponent', () => {
   let component: RequestManagerComponent;
   let mockHttp: ReturnType<typeof createMockHttpService>;
   let mockNotification: ReturnType<typeof createMockNotificationService>;
+  let mockMockServer: any;
 
   beforeEach(async () => {
     mockHttp = createMockHttpService();
     mockNotification = createMockNotificationService();
+    mockMockServer = {
+      status: signal({ running: false, port: 8080, dbPath: '' }),
+      logs: signal([])
+    };
 
     await TestBed.configureTestingModule({
       imports: [RequestManagerComponent]
@@ -140,7 +147,8 @@ describe('RequestManagerComponent', () => {
         set: {
           providers: [
             { provide: HttpService, useValue: mockHttp },
-            { provide: NotificationService, useValue: mockNotification }
+            { provide: NotificationService, useValue: mockNotification },
+            { provide: MockServerService, useValue: mockMockServer }
           ]
         }
       })
@@ -268,6 +276,55 @@ describe('RequestManagerComponent', () => {
       await component.executeRequest(0);
 
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Relative URLs and Mock Server Integration
+  // -----------------------------------------------------------------------
+
+  describe('relative URLs and mock server integration', () => {
+    it('should prepend mock server port when mock server is running', async () => {
+      mockMockServer.status.set({ running: true, port: 9090, dbPath: '' });
+      fixture.componentRef.setInput('files', [
+        makeFileTab({
+          requests: [makeRequest({ url: '/users' })]
+        })
+      ]);
+      fixture.detectChanges();
+
+      await component.executeRequest(0);
+
+      expect(mockHttp.sendRequest).toHaveBeenCalledTimes(1);
+      expect(mockHttp.sendRequest).toHaveBeenCalledWith(
+        expect.objectContaining({ url: 'http://localhost:9090/users' }),
+        expect.any(Object),
+        expect.any(String),
+        expect.any(String)
+      );
+    });
+
+    it('should handle mock-offline error response when mock server is offline', async () => {
+      mockMockServer.status.set({ running: false, port: 9090, dbPath: '' });
+      fixture.componentRef.setInput('files', [
+        makeFileTab({
+          requests: [makeRequest({ url: '/users' })]
+        })
+      ]);
+      fixture.detectChanges();
+
+      const spy = vi.fn();
+      component.filesChange.subscribe(spy);
+
+      await component.executeRequest(0);
+
+      expect(mockHttp.sendRequest).not.toHaveBeenCalled();
+      expect(spy).toHaveBeenCalledTimes(1);
+      const updatedFiles: FileTab[] = spy.mock.calls[0][0];
+      expect(updatedFiles[0].responseData[0]).toBeDefined();
+      expect(updatedFiles[0].responseData[0].status).toBe(0);
+      expect(updatedFiles[0].responseData[0].statusText).toBe('Mock Server Offline');
+      expect(updatedFiles[0].responseData[0].body).toContain('requires a running mock server');
     });
   });
 

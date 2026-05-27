@@ -202,6 +202,7 @@ export function collectUnknownVariableDiagnosticsForLine(params: {
   secretKeys: Set<string>;
   requestIndexForPlaceholderLine: number | null;
   chainVarsCache: Array<Set<string>>;
+  localMockParams?: Set<string>;
 }): Diagnostic[] {
   const placeholders = extractPlaceholders(params.text);
   if (!placeholders.length) return [];
@@ -212,6 +213,8 @@ export function collectUnknownVariableDiagnosticsForLine(params: {
     const inner = ph.inner;
     const from = params.lineFrom + ph.start;
     const to = params.lineFrom + ph.end;
+
+    if (params.localMockParams && params.localMockParams.has(inner)) continue;
 
     if (REQUEST_REF_PLACEHOLDER_REGEX.test(inner)) continue;
 

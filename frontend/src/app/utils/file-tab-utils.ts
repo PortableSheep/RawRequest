@@ -29,6 +29,7 @@ export function normalizeFileTab(file: FileTab): FileTab {
     ...file,
     id,
     selectedEnv,
-    displayName: displayName || undefined
+    displayName: displayName || undefined,
+    savedContent: file.savedContent ?? file.content
   };
 }

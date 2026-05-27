@@ -45,7 +45,14 @@
                 (click)="selectRequest(entry.requestIndex)"
                 type="button">
           <span class="outline-entry__method" [attr.data-method]="entry.method">{{ entry.method }}</span>
-          <span class="outline-entry__label" [title]="entry.label">{{ entry.label }}</span>
+          <div class="outline-entry-details" style="display: flex; flex-direction: column; overflow: hidden; flex: 1; text-align: left;">
+            @if (entry.label && entry.label !== entry.url && entry.label !== '(unnamed)') {
+              <span class="outline-entry__label" [title]="entry.label" style="font-weight: 500; font-size: 13px; color: var(--rr-text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ entry.label }}</span>
+              <span class="outline-entry__url" [title]="entry.url" style="font-size: 11px; color: var(--rr-text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-top: 1px;">{{ entry.url }}</span>
+            } @else {
+              <span class="outline-entry__label" [title]="entry.url" style="font-size: 12px; color: var(--rr-text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ entry.url }}</span>
+            }
+          </div>
         </button>
       }
     } @empty {

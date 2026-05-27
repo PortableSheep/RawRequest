@@ -116,6 +116,30 @@ describe('editor.lint.logic', () => {
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain('unknown');
   });
+
+  it('collectUnknownVariableDiagnosticsForLine respects localMockParams', () => {
+    const requests = [{ name: 'A', preScript: "" }];
+    const nameToIndex = buildNameToIndex(requests);
+    const dependsIndex = buildDependsIndex(requests, nameToIndex);
+    const setVarsByRequest = buildSetVarsByRequest(requests);
+    const chainVarsCache = buildChainVarsCache({ requests, dependsIndex, setVarsByRequest });
+
+    const diags = collectUnknownVariableDiagnosticsForLine({
+      text: 'GET /users/{{id}}/posts/{{post_id}} {{unknown}}',
+      lineFrom: 0,
+      envName: 'default',
+      vars: {},
+      envs: {},
+      currentEnvVars: {},
+      secretKeys: new Set(),
+      requestIndexForPlaceholderLine: 0,
+      chainVarsCache,
+      localMockParams: new Set(['id', 'post_id'])
+    });
+
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain('Unknown variable "unknown"');
+  });
 });
 
 describe('structural lint: annotation after method line', () => {

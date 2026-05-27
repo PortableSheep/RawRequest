@@ -14,13 +14,17 @@ export interface OutlineGroup {
 }
 
 export function buildOutlineEntries(requests: Request[]): OutlineEntry[] {
-  return requests.map((r, i) => ({
-    requestIndex: i,
-    method: (r.method || 'GET').toUpperCase(),
-    label: r.name || r.url || '(unnamed)',
-    url: r.url || '',
-    group: r.group || null
-  }));
+  return requests
+    .map((r, i) => ({
+      requestIndex: i,
+      method: (r.method || 'GET').toUpperCase(),
+      label: r.name || r.url || '(unnamed)',
+      url: r.url || '',
+      group: r.group || null,
+      isMock: !!r.isMock
+    }))
+    .filter(e => !e.isMock)
+    .map(({ isMock, ...rest }) => rest);
 }
 
 export function groupOutlineEntries(entries: OutlineEntry[]): OutlineGroup[] {

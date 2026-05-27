@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -184,22 +185,57 @@ func (a *App) getWindowStatePath() (string, error) {
 	return filepath.Join(configDir, "window-state.json"), nil
 }
 
+func (a *App) trackWindowState(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if a.ctx == nil {
+				continue
+			}
+			x, y := runtime.WindowGetPosition(a.ctx)
+			width, height := runtime.WindowGetSize(a.ctx)
+			maximized := runtime.WindowIsMaximised(a.ctx)
+
+			a.windowStateMu.Lock()
+			a.cachedWindowState = WindowState{
+				X:         x,
+				Y:         y,
+				Width:     width,
+				Height:    height,
+				Maximized: maximized,
+			}
+			a.windowStateMu.Unlock()
+		}
+	}
+}
+
 func (a *App) SaveWindowState() error {
 	statePath, err := a.getWindowStatePath()
 	if err != nil {
 		return err
 	}
 
-	x, y := runtime.WindowGetPosition(a.ctx)
-	width, height := runtime.WindowGetSize(a.ctx)
-	maximized := runtime.WindowIsMaximised(a.ctx)
+	a.windowStateMu.Lock()
+	state := a.cachedWindowState
+	a.windowStateMu.Unlock()
 
-	state := WindowState{
-		X:         x,
-		Y:         y,
-		Width:     width,
-		Height:    height,
-		Maximized: maximized,
+	// Fallback if loop has not run yet or a.ctx is valid
+	if state.Width == 0 && state.Height == 0 && a.ctx != nil {
+		x, y := runtime.WindowGetPosition(a.ctx)
+		width, height := runtime.WindowGetSize(a.ctx)
+		maximized := runtime.WindowIsMaximised(a.ctx)
+		state = WindowState{
+			X:         x,
+			Y:         y,
+			Width:     width,
+			Height:    height,
+			Maximized: maximized,
+		}
 	}
 
 	data, err := json.MarshalIndent(state, "", "  ")
@@ -265,7 +301,89 @@ func (a *App) SaveFileContents(filePath string, content string) (string, error) 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		return "", err
 	}
+
+	a.updateWatchedFileTime(filePath)
+
 	return filePath, nil
+}
+
+func (a *App) WatchFiles(filePaths []string) {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	newWatched := make(map[string]time.Time)
+	for _, fp := range filePaths {
+		if fp == "" {
+			continue
+		}
+		if info, err := os.Stat(fp); err == nil {
+			newWatched[fp] = info.ModTime()
+		} else {
+			newWatched[fp] = time.Time{}
+		}
+	}
+	a.watchedFiles = newWatched
+}
+
+func (a *App) updateWatchedFileTime(filePath string) {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	if a.watchedFiles == nil {
+		return
+	}
+	if _, exists := a.watchedFiles[filePath]; exists {
+		if info, err := os.Stat(filePath); err == nil {
+			a.watchedFiles[filePath] = info.ModTime()
+		}
+	}
+}
+
+func (a *App) startFileWatcher(ctx context.Context) {
+	ticker := time.NewTicker(1500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.checkWatchedFiles()
+		}
+	}
+}
+
+func (a *App) checkWatchedFiles() {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	if a.watchedFiles == nil {
+		return
+	}
+
+	for fp, lastTime := range a.watchedFiles {
+		info, err := os.Stat(fp)
+		if err != nil {
+			continue
+		}
+
+		modTime := info.ModTime()
+		if lastTime.IsZero() {
+			a.watchedFiles[fp] = modTime
+			continue
+		}
+
+		if modTime.After(lastTime) {
+			a.watchedFiles[fp] = modTime
+
+			if content, err := os.ReadFile(fp); err == nil {
+				a.emitEvent("file-externally-modified", map[string]string{
+					"filePath": fp,
+					"content":  string(content),
+				})
+			}
+		}
+	}
 }
 
 func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string, error) {

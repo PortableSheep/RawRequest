@@ -406,6 +406,22 @@ export function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic
     const trimmedStartIndex = text.length - text.trimStart().length;
     const requestIndexForPlaceholderLine = deps.getRequestIndexAtPos(view.state, line.from + trimmedStartIndex);
 
+    const localMockParams = new Set<string>();
+    if (
+      requestIndexForPlaceholderLine !== null &&
+      requestIndexForPlaceholderLine >= 0 &&
+      requestIndexForPlaceholderLine < requests.length
+    ) {
+      const req = requests[requestIndexForPlaceholderLine];
+      if (req && req.isMock && req.url) {
+        const paramRegex = /\{\{([^}]+)\}\}/g;
+        let match: RegExpExecArray | null;
+        while ((match = paramRegex.exec(req.url)) !== null) {
+          localMockParams.add(match[1].trim());
+        }
+      }
+    }
+
     diagnostics.push(
       ...collectUnknownVariableDiagnosticsForLine({
         text,
@@ -416,7 +432,8 @@ export function computeDiagnostics(view: EditorView, deps: LintDeps): Diagnostic
         currentEnvVars,
         secretKeys,
         requestIndexForPlaceholderLine,
-        chainVarsCache
+        chainVarsCache,
+        localMockParams
       })
     );
   }

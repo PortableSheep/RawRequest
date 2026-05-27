@@ -164,7 +164,8 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       }
     });
 
-    // Update autocomplete + lint when relevant inputs change
+    // Update autocomplete + lint when relevant inputs change (debounced to avoid blocking scroll / main thread)
+    let debounceTimer: any = null;
     effect(() => {
       const vars = this.variables();
       const envs = this.environments();
@@ -172,14 +173,22 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
       const reqs = this.requests();
       const env = this.currentEnv();
       const secrets = this.secrets();
-      if (this.editorView) {
-        this.editorView.dispatch({
-          effects: [
-            this.autocompleteCompartment.reconfigure(this.createAutocomplete()),
-            this.lintCompartment.reconfigure(this.createLintExtensions())
-          ]
-        });
+
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
       }
+
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        if (this.editorView) {
+          this.editorView.dispatch({
+            effects: [
+              this.autocompleteCompartment.reconfigure(this.createAutocomplete()),
+              this.lintCompartment.reconfigure(this.createLintExtensions())
+            ]
+          });
+        }
+      }, 250);
     });
 
     effect(() => {
@@ -353,8 +362,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
               requestAnimationFrame(() => {
                 if (!this.editorView) return;
                 const scrollAfter = this.editorView.scrollDOM.scrollTop;
-                const viewportH = this.editorView.scrollDOM.clientHeight;
-                if (Math.abs(scrollAfter - scrollBefore) > viewportH / 2) {
+                if (scrollAfter !== scrollBefore) {
                   this.editorView.scrollDOM.scrollTop = scrollBefore;
                 }
               });

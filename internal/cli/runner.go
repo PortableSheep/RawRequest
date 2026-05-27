@@ -15,6 +15,7 @@ import (
 	"time"
 
 	hcl "rawrequest/internal/httpclientlogic"
+	"rawrequest/internal/mockserver"
 	se "rawrequest/internal/scriptexec"
 	sr "rawrequest/internal/scriptruntime"
 )
@@ -112,10 +113,53 @@ func Run(opts *Options, version string) int {
 		return runRequests(opts, version)
 	case CommandLoad:
 		return RunLoadTest(opts, version)
+	case CommandMock:
+		return RunMockServer(opts)
 	default:
 		PrintHelp(version)
 		return 1
 	}
+}
+
+// RunMockServer starts the mock server in CLI mode
+func RunMockServer(opts *Options) int {
+	content, err := os.ReadFile(opts.File)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		return 1
+	}
+
+	parsed := ParseHttpFile(string(content))
+	if len(parsed.Requests) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no requests found in %s\n", opts.File)
+		return 1
+	}
+
+	var mockReqs []mockserver.MockRequest
+	for _, req := range parsed.Requests {
+		if req.IsMock {
+			mockReqs = append(mockReqs, mockserver.MockRequest{
+				Name:       req.Name,
+				Method:     req.Method,
+				URL:        req.URL,
+				Headers:    req.Headers,
+				Body:       req.Body,
+				PreScript:  req.PreScript,
+				PostScript: req.PostScript,
+			})
+		}
+	}
+
+	if len(mockReqs) == 0 {
+		fmt.Fprintf(os.Stderr, "Error: no mock endpoint definitions found in %s (use the @mock annotation to mark a request block as a mock endpoint)\n", opts.File)
+		return 1
+	}
+
+	if err := mockserver.StartMockServer(opts.File, opts.MockPort, opts.MockDB, mockReqs); err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting mock server: %v\n", err)
+		return 1
+	}
+	return 0
 }
 
 func runList(opts *Options) int {
@@ -184,6 +228,9 @@ func runRequests(opts *Options, version string) int {
 
 	parsed := ParseHttpFile(string(content))
 	runner := NewRunner(opts, version)
+	if opts.SecretResolver != nil {
+		runner.SetSecretResolver(opts.SecretResolver)
+	}
 
 	// Wire up script log output for CLI
 	runner.SetLogCallback(func(level, source, message string) {

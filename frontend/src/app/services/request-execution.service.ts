@@ -165,6 +165,11 @@ export class RequestExecutionService {
       cdr,
     );
 
+    if (request.loadTest) {
+      this.loadTestViz.loadTestMetrics = null;
+      this.panels.showLoadTestResults.set(true);
+    }
+
     const execution = this.delegate.executeRequestByIndex(
       requestIndex,
       this.activeRequestInfo.id,
@@ -241,12 +246,7 @@ export class RequestExecutionService {
     if (progress.requestId !== this.activeRequestInfo.id) {
       return;
     }
-    this.loadTestViz.activeRunProgress = progress;
-    if (progress.type === 'load') {
-      const sample =
-        typeof progress.activeUsers === 'number' ? progress.activeUsers : 0;
-      this.loadTestViz.pushLoadUsersSample(sample);
-    }
+    this.loadTestViz.updateProgress(progress);
   }
 
   // --- Active request helpers ---

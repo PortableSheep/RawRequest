@@ -18,11 +18,19 @@
             [class.rr-palette-item--selected]="i === selectedIndex()"
             (click)="selectItem(match)"
             (mouseenter)="selectedIndex.set(i)"
+            style="display: flex; align-items: center; padding: 8px 12px; gap: 10px; cursor: pointer;"
           >
-            <span [class]="getMethodClass(match.item.method)">{{ match.item.method }}</span>
-            <span class="rr-palette-label">{{ match.item.label || match.item.url }}</span>
+            <span [class]="getMethodClass(match.item.method)" style="flex-shrink: 0;">{{ match.item.method }}</span>
+            <div class="rr-palette-item-details" style="display: flex; flex-direction: column; overflow: hidden; flex: 1; text-align: left;">
+              @if (match.item.label) {
+                <span class="rr-palette-label" style="font-weight: 500; font-size: 13px; color: var(--rr-text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ match.item.label }}</span>
+                <span class="rr-palette-sublabel" style="font-size: 11px; color: var(--rr-text-secondary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap; margin-top: 1px;">{{ match.item.url }}</span>
+              } @else {
+                <span class="rr-palette-label" style="font-size: 12px; color: var(--rr-text-primary); text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ match.item.url }}</span>
+              }
+            </div>
             @if (match.item.group) {
-              <span class="rr-palette-group">{{ match.item.group }}</span>
+              <span class="rr-palette-group" style="font-size: 10px; padding: 2px 6px; border-radius: 4px; background: var(--rr-surface-2); color: var(--rr-text-secondary); flex-shrink: 0;">{{ match.item.group }}</span>
             }
           </div>
         } @empty {

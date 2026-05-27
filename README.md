@@ -1,6 +1,6 @@
 # RawRequest
 
-**Code-first HTTP client.** Write requests in `.http` files. Run them from the terminal, your AI assistant, or a full desktop GUI.
+**Code-first HTTP client platform.** Write requests in `.http` files. Run them from a polished desktop GUI, your terminal, or directly via your AI assistant.
 
 ![Main window](docs/MainWindow.png)
 
@@ -24,76 +24,65 @@ irm https://raw.githubusercontent.com/portablesheep/RawRequest/main/scripts/inst
 
 **Manual:** Download from [Releases](https://github.com/portablesheep/RawRequest/releases).
 
-## What is RawRequest?
+---
 
-RawRequest has two components that share the same `.http` file format and execution engine:
+## One Engine, Three Modes
 
-| | **rawrequest CLI** | **RawRequest Desktop** |
-|---|---|---|
-| **What** | Single binary — CLI commands + MCP mode | GUI application |
-| **For** | Terminal, CI/CD, AI assistants | Editing, visual testing, managing secrets |
-| **Install** | `brew install`, `curl`, or download binary | `.dmg` / `.exe` from Releases |
+RawRequest compiled as a single Go binary operates in three distinct, seamless modes:
 
-## .http File Format
+| Mode | Command / Environment | Purpose | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Desktop Mode** | **RawRequest Desktop (GUI)** | Premium visual workspace for building, debugging, and mock prototyping | CodeMirror 6, Encrypted Keyring, Visual Charts, Console Drawers, Silent Hot-Reloading |
+| **CLI Mode** | `rawrequest run` / `load` | CI/CD pipelines, shell scripting, and high-concurrency benchmarks | Concurrency controls, ramp-up rules, failure rate thresholds, JSON output options |
+| **MCP Mode** | `rawrequest mcp` | Direct stdio bridge for AI developer assistants (Claude, Copilot) | Automatic workspace discovery, run requests, fetch environments, session state |
+
+---
+
+## The `.http` File Syntax & Directives
+
+RawRequest supports an enhanced version of the JetBrains/VS Code style `.http` format, incorporating stateful request chaining, concurrency configs, and JS-scripted API mocks in the same file.
 
 ```http
 # === Environments ===
-@env.dev.baseUrl = http://localhost:3000
+@env.dev.baseUrl = http://localhost:8080
 @env.prod.baseUrl = https://api.example.com
 
-# === Variables ===
+# === Global Variables ===
 @contentType = application/json
 
-### GET request
+### GET Client Request
 GET {{baseUrl}}/users
-Accept: application/json
+Accept: {{contentType}}
 
-### POST with body
-POST {{baseUrl}}/users
-Content-Type: {{contentType}}
-
-{
-  "name": "Jane",
-  "email": "jane@example.com"
-}
-
-### Secrets
-POST {{baseUrl}}/auth/login
-Content-Type: application/json
-
-{
-  "password": "{{secret:myPassword}}"
-}
-
-### Scripts (pre and post)
+### Authenticate Outgoing Client Request
 @name login
 POST {{baseUrl}}/auth/login
-Content-Type: application/json
+Content-Type: {{contentType}}
 
 < {
-  // Pre-request script
-  console.log('Logging in...');
+  // Pre-request JS script
+  console.log('Initiating authenticating request...');
 }
 
 {
   "username": "admin",
-  "password": "{{secret:password}}"
+  "password": "{{secret:adminPassword}}"
 }
 
 > {
-  // Post-response script
-  assert(response.status === 200, `Expected 200, got ${response.status}`);
+  // Post-response JS assertions & variable sharing
+  assert(response.status === 200, `Expected status 200 but got ${response.status}`);
   setVar('token', response.json.token);
 }
 
-### Request chaining
+### Chained Client Request (Requires Token)
 @name getProfile
 @depends login
 GET {{baseUrl}}/profile
 Authorization: Bearer {{token}}
 
-### Load testing
-@name healthCheck
+### High-Concurrency Performance Benchmark
+@name stressTest
 @load
 duration: 30s
 users: 50
@@ -103,163 +92,121 @@ targetRPS: 200
 GET {{baseUrl}}/health
 ```
 
-**Key syntax:**
-- `###` separates requests
-- `@name` identifies a request for chaining/targeting
-- `@depends` declares dependencies on other named requests
-- `@env.<env>.<var>` defines per-environment variables
-- `@timeout` sets per-request timeout in milliseconds
-- `{{var}}` interpolates variables; `{{secret:key}}` resolves secrets
-- `< { }` pre-request script; `> { }` post-response script
-- Scripts have access to `request`, `response`, `setVar()`, `assert()`, `console.log()`
+---
 
-## CLI
+## Interactive Local Mock Server (with SQLite Backend)
 
-### `rawrequest run` — Execute requests
+RawRequest features a built-in stateful local Mock Server. You can mix mock definitions, startup initializers, and normal outgoing requests in the **exact same `.http` file**.
 
+### Declaring Mocks & Startup Initializers
+* **`@mockinit` Block:** Executed **exactly once** when the mock server starts up (before accepting HTTP calls). Use this to prepare your database tables and seed test data.
+* **`@mock` Route Definition:** Preceded by `@mock` to define passive local endpoint responders. In the Desktop GUI, `@mock` definitions have **no play gutter buttons**, keeping your workspace uncluttered and cleanly dividing mock routes from active client triggers.
+
+```http
+### 1. Mock Database Initializer (Runs once at server boot)
+@mockinit
+< {
+  // Initialize persistent SQLite database schema
+  db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, email TEXT)");
+  
+  // Seed database if empty
+  const count = db.query("SELECT COUNT(*) as cnt FROM users")[0].cnt;
+  if (count === 0) {
+    db.exec("INSERT INTO users (name, email) VALUES ('Alice', 'alice@rawrequest.dev')");
+  }
+  console.log("Mock database schemas prepared successfully.");
+}
+
+### 2. Stateful Mock: Register a new profile into SQLite
+@mock
+POST /db/users
+Content-Type: application/json
+
+< {
+  try {
+    const body = JSON.parse(request.body);
+    
+    // Perform write query
+    const res = db.exec("INSERT INTO users (name, email) VALUES (?, ?)", body.name, body.email);
+    
+    // Return dynamic stateful response
+    response.status = 201;
+    response.body = {
+      id: res.lastInsertId,
+      name: body.name,
+      email: body.email,
+      created: true
+    };
+  } catch(e) {
+    response.status = 400;
+    response.body = { error: "Failed to insert record: " + e.toString() };
+  }
+}
+
+### 3. Stateful Mock: Query profiles from SQLite
+@mock
+GET /db/users
+Content-Type: application/json
+
+< {
+  // Query records dynamically
+  const users = db.query("SELECT * FROM users ORDER BY id DESC");
+  response.body = users;
+}
+```
+
+### The Embedded SQLite JS Database API
+Inside any `< { ... }` mock or initializer handler script, RawRequest exposes a dedicated persistent SQLite database via the global `db` object:
+
+*   **`db.exec(sql, ...args)`**: Executes an action query (e.g. `CREATE`, `INSERT`, `UPDATE`, `DELETE`). Returns an object with:
+    *   `rowsAffected`: Number of modified rows.
+    *   `lastInsertId`: The auto-incremented primary ID of the inserted record.
+*   **`db.query(sql, ...args)`**: Executes a read query (e.g. `SELECT`). Returns an array of objects representing the resulting rows.
+*   **`db.get(sql, ...args)`**: Convenience method returning the first matched row object or `null`.
+
+---
+
+## CLI Mode
+
+### `rawrequest run` — Execute Requests
+Run client requests and verify APIs from your terminal:
 ```bash
-# Run a named request
+# Run a specific named request
 rawrequest run api.http -n login
 
-# Use an environment
-rawrequest run api.http -n getUsers -e prod
+# Target a specific environment profile
+rawrequest run api.http -n getProfile -e prod
 
-# Set variables
-rawrequest run api.http -n createUser -V "username=john" -V "email=john@test.com"
+# Hydrate variables dynamically
+rawrequest run api.http -n getProfile -V "baseUrl=https://api.custom.com"
 
-# Output formats: full (default), json, body, quiet
-rawrequest run api.http -n getData -o body | jq .
-
-# Skip pre/post scripts
-rawrequest run api.http -n getData --no-scripts
-
-# Verbose mode (show request details)
-rawrequest run api.http -n login --verbose
+# Stream only the JSON body response (perfect for jq piping)
+rawrequest run api.http -n getProfile -o body | jq .
 ```
 
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--name` | `-n` | *(required)* | Request name (repeatable) |
-| `--env` | `-e` | `default` | Environment |
-| `--var` | `-V` | | Variable `key=value` (repeatable) |
-| `--output` | `-o` | `full` | Output format: `full\|json\|body\|quiet` |
-| `--timeout` | | `30` | Timeout in seconds |
-| `--verbose` | | `false` | Show request details |
-| `--no-scripts` | | `false` | Disable pre/post scripts |
-
-### `rawrequest load` — Run load tests
-
-Run load tests against named requests from the command line.
-
+### `rawrequest load` — Stress Test APIs
+Turn any request into a concurrency benchmark:
 ```bash
-# Basic load test — 10 users for 30 seconds
+# Execute load test configuration defined in file
 rawrequest load api.http -n healthCheck
 
-# Custom concurrency and duration
-rawrequest load api.http -n healthCheck --users 50 --duration 2m
+# Override concurrent users and duration on the fly
+rawrequest load api.http -n healthCheck --users 100 --duration 1m
 
-# Rate limiting with ramp-up
-rawrequest load api.http -n healthCheck --rps 200 --ramp-up 10s --users 100
-
-# Abort if failure rate exceeds threshold
-rawrequest load api.http -n healthCheck --users 50 --fail-rate 0.05
-
-# Adaptive load control
-rawrequest load api.http -n healthCheck --adaptive --users 100
-
-# JSON output for CI pipelines
-rawrequest load api.http -n healthCheck -o json
+# Define concurrent ramp-up, target rate, and failure abort threshold
+rawrequest load api.http -n healthCheck --users 50 --rps 250 --ramp-up 10s --fail-rate 0.05
 ```
 
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--name` | `-n` | *(required)* | Request name to load test |
-| `--env` | `-e` | `default` | Environment |
-| `--var` | `-V` | | Variable `key=value` (repeatable) |
-| `--users` | | `10` | Max concurrent users |
-| `--duration` | | `30s` | Test duration (e.g. `30s`, `2m`) |
-| `--rps` | | `0` | Target requests/sec (0 = unlimited) |
-| `--ramp-up` | | | Ramp-up period (e.g. `10s`) |
-| `--fail-rate` | | `0` | Failure rate threshold to abort (0.0–1.0) |
-| `--adaptive` | | `false` | Enable adaptive load control |
-| `--output` | `-o` | `full` | Output format: `full\|json\|quiet` |
-| `--timeout` | | `30` | Per-request timeout in seconds |
+---
 
-Output includes response time percentiles (P50, P95, P99), throughput, error breakdown, and status code distribution.
+## Model Context Protocol (MCP) Server
 
-### `rawrequest list` — List requests
+Connect your AI assistants (Claude Code, Claude Desktop, GitHub Copilot) directly to your local APIs. RawRequest operates over a zero-port stdio transport.
 
-```bash
-rawrequest list api.http
-```
+### 1. Register the MCP Server
+Add the following stdio configurations to your AI client's configuration file:
 
-### `rawrequest envs` — List environments
-
-```bash
-rawrequest envs api.http
-```
-
-## MCP Server
-
-RawRequest works as an [MCP](https://modelcontextprotocol.io) server, letting AI assistants discover and execute your HTTP requests via chat. Uses stdio transport — no ports needed.
-
-### Setup
-
-```bash
-rawrequest mcp [--workspace <dir>] [--env <name>]
-```
-
-| Flag | Short | Default | Description |
-|------|-------|---------|-------------|
-| `--workspace` | `-w` | `.` | Root directory for `.http` file discovery |
-| `--env` | `-e` | | Default environment for requests |
-
-### Available Tools
-
-| Tool | Description |
-|------|-------------|
-| `list_files` | Discover all `.http` files in the workspace |
-| `list_requests` | List requests in a file (name, method, URL, group) |
-| `run_request` | Execute a named request and return the full response |
-| `list_environments` | Show environments and their variables |
-| `set_variable` | Set a session variable for subsequent requests |
-
-### Auto-Discovery
-
-When a tool's `file` parameter is omitted, RawRequest automatically searches the workspace:
-- **One `.http` file found** → used automatically
-- **Multiple files found** → error prompts to specify a file or use `list_files`
-- **No files found** → error message
-
-### Configuration Examples
-
-Most clients launch MCP servers from your project directory. Since `--workspace` defaults to `.` (current directory), you typically don't need it — auto-discovery just works.
-
-**Claude Code** — project (`.mcp.json` in project root):
-```json
-{
-  "mcpServers": {
-    "rawrequest": {
-      "command": "rawrequest",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-**Claude Code** — global (`~/.claude.json`):
-```json
-{
-  "mcpServers": {
-    "rawrequest": {
-      "command": "rawrequest",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-**Claude Desktop** (`claude_desktop_config.json`):
+**Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):**
 ```json
 {
   "mcpServers": {
@@ -271,9 +218,7 @@ Most clients launch MCP servers from your project directory. Since `--workspace`
 }
 ```
 
-> Claude Desktop does not support variable expansion or cwd — an absolute path is required.
-
-**GitHub Copilot — VS Code** (`.vscode/mcp.json`):
+**VS Code GitHub Copilot (`.vscode/mcp.json`):**
 ```json
 {
   "servers": {
@@ -286,91 +231,47 @@ Most clients launch MCP servers from your project directory. Since `--workspace`
 }
 ```
 
-**GitHub Copilot — project-wide** (`.github/copilot-mcp.json`):
-```json
-{
-  "servers": {
-    "rawrequest": {
-      "command": "rawrequest",
-      "args": ["mcp", "--workspace", "${workspaceFolder}"]
-    }
-  }
-}
-```
+### 2. Available Stdio AI Tools
+Once configured, the AI assistant can naturally invoke these tools:
+*   `list_files`: Scans and discovers all `.http` files in the workspace.
+*   `list_requests`: Lists request metadata inside a file (method, URL, parameters).
+*   `run_request`: Executes a specific client request and returns the full body, status, headers, and timings.
+*   `list_environments`: Discovers per-environment config profiles.
+*   `set_variable`: Sets a temporary session variable context for request chains.
 
-**GitHub Copilot CLI** — global (`~/.copilot/mcp-config.json`):
-```json
-{
-  "mcpServers": {
-    "rawrequest": {
-      "command": "rawrequest",
-      "args": ["mcp"]
-    }
-  }
-}
-```
+---
 
-### Secrets
+## Premium Developer Experience (DX)
 
-The MCP server resolves `{{secret:KEY}}` placeholders using the same encrypted vault as the desktop app. Set up secrets in the GUI first — they work automatically in MCP and CLI modes.
+RawRequest Desktop incorporates several advanced, premium editor features to keep your workflow fluent:
 
-## RawRequest Desktop
+*   **Mock Param Linter Bypass:** Dynamic path parameters (e.g. `/users/{{id}}` matching `{{id}}` inside the JSON mock body) are automatically analyzed as locally-scoped mock parameters. The linter suppresses "Unknown Variable" warning diagnostics for them, guaranteeing a completely clean, warning-free editor panel.
+*   **Fuzzy Navigation Panels (with Mock Exclusions):** The Command Palette (<kbd>⌘ P</kbd>) and Outline Panel (<kbd>⌘ Shift O</kbd>) let you filter and jump across massive files in real-time. They automatically **exclude** `@mock` API definitions to prioritize standard outgoing client requests, while safely preserving execution indexes.
+*   **Unsaved Changes Guard & Silent File watcher:** The GUI monitors open files' disk timestamps. If a file is modified externally (e.g. saved by an AI coding agent or IDE) and you have no unsaved changes in RawRequest, the editor **silently and instantly reloads** the new content. If you have dirty edits, a clear prompt guards your work.
+*   **Compositor White-Flash Elimination:** Built with premium CSS-level compositor layers, setting background colors directly down to the lowest CodeMirror editor DOM leaves zero unpainted layers, guaranteeing a 100% smooth, dark-theme focus experience without annoying WebKit white-flashing.
 
-The desktop application provides a full GUI for working with `.http` files:
-
-- **Code editor** — CodeMirror 6 with syntax highlighting, folding, linting, and variable diagnostics
-- **Request execution** — Visual response viewer with timing breakdown
-- **Secret vault** — Encrypted secret management with usage tracking
-- **Request history** — Browse and re-run past requests
-- **Collection import** — Import from Postman and Bruno
-- **Request navigation** — Outline panel (<kbd>⌘ Shift O</kbd>) and command palette (<kbd>⌘ P</kbd>)
-- **Load testing** — Visual load test runner with live progress and result charts
-
-![Load test in progress](docs/LoadTestInProgress.png)
-
-![Load test results](docs/LoadTestResult.png)
+---
 
 ## Development
 
-### Prerequisites
-- Go 1.24+
-- Node.js 20+
-- [Wails CLI](https://wails.io/docs/gettingstarted/installation)
-
 ### Dev Workflow
 ```bash
+# Setup Node dependencies
 cd frontend && npm install && cd ..
 
-# Development mode with hot reload
+# Launch development environment (hot-reloading Wails desktop + Go helper service)
 ./scripts/dev-build.sh
-
-# Build only (no dev server)
-./scripts/dev-build.sh --build-only
 ```
 
-### Testing
+### Run Unit Tests
+Ensure everything is fully passing before contributing:
 ```bash
-# Backend
+# Go backend test suite
 go test ./...
 
-# Frontend
+# Frontend Vitest test suite
 cd frontend && npm test
 ```
-
-### Building
-```bash
-./scripts/build.sh
-```
-
-## Architecture
-
-RawRequest is a single Go binary that operates in multiple modes:
-
-- **CLI mode** — `rawrequest run|load|list|envs` executes directly and exits
-- **MCP mode** — `rawrequest mcp` runs a long-lived stdio server for AI clients
-- **Desktop mode** — the GUI app runs an internal HTTP backend on localhost; the Angular frontend communicates with it
-
-All modes share the same request parsing, execution, scripting, and templating core.
 
 ## License
 

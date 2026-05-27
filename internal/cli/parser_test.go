@@ -22,3 +22,31 @@ func TestParseHttpFile_Names(t *testing.T) {
 		t.Errorf("request 1 name: expected 'postData', got %q", parsed.Requests[1].Name)
 	}
 }
+
+func TestParseHttpFile_Mock(t *testing.T) {
+	content := `@mock
+@name getMockUser
+GET /users/{{id}}
+Content-Type: application/json
+
+###
+
+@name normalRequest
+GET https://httpbun.com/get`
+
+	parsed := ParseHttpFile(content)
+	if len(parsed.Requests) != 2 {
+		t.Fatalf("expected 2 requests, got %d", len(parsed.Requests))
+	}
+
+	if !parsed.Requests[0].IsMock {
+		t.Errorf("expected request 0 to be a mock")
+	}
+	if parsed.Requests[0].Name != "getMockUser" {
+		t.Errorf("request 0 name: expected 'getMockUser', got %q", parsed.Requests[0].Name)
+	}
+
+	if parsed.Requests[1].IsMock {
+		t.Errorf("expected request 1 to be normal (not a mock)")
+	}
+}

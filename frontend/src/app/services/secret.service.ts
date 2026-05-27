@@ -277,4 +277,20 @@ export class SecretService {
     await this.setMasterPassword(password);
     await this.loadVaultInfo(true);
   }
+
+  async getEnterpriseConfig(): Promise<any> {
+    return this.backend.getEnterpriseConfig();
+  }
+
+  async saveEnterpriseConfig(config: any): Promise<void> {
+    await this.backend.saveEnterpriseConfig(config);
+  }
+
+  async testEnterpriseSecret(key: string): Promise<string> {
+    return this.backend.testEnterpriseSecret(key);
+  }
+
+  async openEnterpriseConfig(): Promise<void> {
+    await this.backend.openEnterpriseConfig();
+  }
 }

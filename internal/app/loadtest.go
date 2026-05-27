@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"math"
 	"math/rand"
+	"sort"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -146,6 +148,44 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 	progressTicker := time.NewTicker(200 * time.Millisecond)
 	defer progressTicker.Stop()
 	emitProgress := func(force bool, done bool) {
+		var p50, p90, p95, p99, avgVal, minVal, maxVal int64
+		rtMu.Lock()
+		count := len(responseTimes)
+		if count > 0 {
+			sorted := make([]int64, count)
+			copy(sorted, responseTimes)
+			rtMu.Unlock()
+
+			sort.Slice(sorted, func(i, j int) bool { return sorted[i] < sorted[j] })
+
+			minVal = sorted[0]
+			maxVal = sorted[count-1]
+
+			var sum int64
+			for _, v := range sorted {
+				sum += v
+			}
+			avgVal = sum / int64(count)
+
+			percentile := func(p float64) int64 {
+				idx := int(math.Ceil(p/100*float64(count))) - 1
+				if idx < 0 {
+					idx = 0
+				}
+				if idx >= count {
+					idx = count - 1
+				}
+				return sorted[idx]
+			}
+
+			p50 = percentile(50)
+			p90 = percentile(90)
+			p95 = percentile(95)
+			p99 = percentile(99)
+		} else {
+			rtMu.Unlock()
+		}
+
 		payload := lp.BuildProgressPayload(lp.ProgressInput{
 			RequestID:         requestID,
 			StartedAtMs:       startMs,
@@ -159,6 +199,13 @@ func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, 
 			Cancelled:         ctx.Err() == context.Canceled,
 			Aborted:           aborted.Load(),
 			AbortReason:       abortReason.Load().(string),
+			P50Ms:             p50,
+			P90Ms:             p90,
+			P95Ms:             p95,
+			P99Ms:             p99,
+			AvgMs:             avgVal,
+			MinMs:             minVal,
+			MaxMs:             maxVal,
 		})
 		a.emitEvent(loadTestProgressEventName, payload)
 		_ = force

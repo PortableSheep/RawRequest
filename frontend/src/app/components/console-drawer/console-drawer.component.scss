@@ -47,9 +47,8 @@
 
 .console-panel__header {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 0.5rem;
   padding: 0 0.75rem;
   height: 28px;
@@ -58,6 +57,17 @@
   background: var(--rr-surface-2);
   border-bottom: 1px solid var(--rr-border-color);
   color: var(--rr-text-tertiary);
+}
+
+.console-panel__header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.console-panel__header-right {
+  display: flex;
+  align-items: center;
 }
 
 .console-panel__hide-btn {
@@ -339,4 +349,259 @@
 .console-bubble__btn:hover {
   border-color: var(--rr-primary);
   color: var(--rr-primary);
+}
+
+// --- Tab styling ---
+.console-panel__tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.console-tab-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11px;
+  color: var(--rr-text-tertiary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  transition: color 120ms ease;
+
+  &:hover {
+    color: var(--rr-text-secondary);
+  }
+
+  &--active {
+    color: var(--rr-primary);
+    font-weight: 600;
+
+    &::after {
+      content: '';
+      position: absolute;
+      bottom: -1px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: var(--rr-primary);
+    }
+  }
+}
+
+.console-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(var(--rr-primary-rgb), 0.15);
+  padding: 1px 5px;
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--rr-primary);
+}
+
+.status-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717a; // Gray
+  display: inline-block;
+  transition: background 150ms ease, box-shadow 150ms ease;
+
+  &--online {
+    background: #10b981; // Green
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    animation: status-pulse 2s infinite;
+  }
+}
+
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+// --- Mock Server Panel Container ---
+.mock-server-container {
+  display: flex;
+  flex-direction: column;
+  background: var(--rr-surface-1);
+}
+
+.mock-server-config {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-1);
+  flex-wrap: wrap;
+}
+
+.mock-config-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  
+  &--port {
+    width: 120px;
+  }
+
+  &--db {
+    flex: 1;
+    min-width: 200px;
+  }
+}
+
+.mock-config-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--rr-text-secondary);
+  white-space: nowrap;
+}
+
+.mock-input-port {
+  width: 100%;
+  height: 24px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.mock-input-db {
+  width: 100%;
+  height: 24px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+
+.mock-actions {
+  display: flex;
+  align-items: center;
+}
+
+.mock-toggle-btn {
+  height: 26px;
+  font-size: 11px;
+  padding: 0 10px;
+  gap: 6px;
+  border-radius: var(--rr-radius-sm);
+  display: flex;
+  align-items: center;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  &--start {
+    background: var(--rr-primary);
+    color: var(--rr-text-on-primary);
+    border: none;
+    
+    &:hover:not(:disabled) {
+      filter: brightness(1.1);
+    }
+  }
+
+  &--stop {
+    background: #ef4444;
+    color: #ffffff;
+    border: none;
+
+    &:hover {
+      filter: brightness(1.1);
+    }
+  }
+}
+
+.mock-log-terminal {
+  background: #09090b !important; // Sleek dark slate terminal background
+  border-top: none;
+  font-family: var(--rr-font-mono, monospace);
+
+  .log-entry {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    padding: 6px 12px;
+
+    .log-meta {
+      font-size: 10px;
+    }
+  }
+}
+
+// --- Mock Tutorial Card ---
+.mock-tutorial-card {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  border-radius: var(--rr-radius-md, 8px);
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2, #18181b);
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: card-fade-in 0.3s ease-out;
+}
+
+.mock-tutorial-card__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--rr-primary, #6366f1);
+  text-align: center;
+}
+
+.mock-tutorial-card__text {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--rr-text-secondary, #a1a1aa);
+  text-align: center;
+  margin: 0;
+
+  code {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 4px;
+    border-radius: 4px;
+    font-family: var(--rr-font-mono, monospace);
+  }
+}
+
+.mock-tutorial-card__btn {
+  height: 28px;
+  font-size: 11px;
+  padding: 0 12px;
+  gap: 6px;
+  margin-top: 0.25rem;
+  border: 1px solid var(--rr-border-color);
+  background: transparent;
+  color: var(--rr-text-primary);
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--rr-primary);
+    background: rgba(var(--rr-primary-rgb), 0.05);
+    color: var(--rr-primary);
+    transform: translateY(-1px);
+  }
+}
+
+@keyframes card-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

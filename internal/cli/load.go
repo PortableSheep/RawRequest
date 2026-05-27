@@ -40,6 +40,9 @@ func RunLoadTest(opts *Options, version string) int {
 
 	// Build runner for variable resolution
 	runner := NewRunner(opts, version)
+	if opts.SecretResolver != nil {
+		runner.SetSecretResolver(opts.SecretResolver)
+	}
 	for k, v := range parsed.Variables {
 		if _, exists := opts.Variables[k]; !exists {
 			runner.SetVariable(k, v)

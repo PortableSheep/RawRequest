@@ -1,4 +1,4 @@
-import { Injectable, inject, signal, computed } from '@angular/core';
+import { Injectable, inject, signal, computed, effect } from '@angular/core';
 import type { FileTab, HistoryItem } from '../models/http.models';
 import { generateFileId, normalizeFileTab } from '../utils/file-tab-utils';
 import { WorkspaceFacadeService } from './workspace-facade.service';
@@ -19,6 +19,70 @@ export class WorkspaceStateService {
   private readonly workspace = inject(WorkspaceFacadeService);
   private readonly httpService = inject(HttpService);
   private readonly historyStore = inject(HistoryStoreService);
+
+  constructor() {
+    effect(() => {
+      const paths = this.files()
+        .map((f) => f.filePath)
+        .filter((p): p is string => !!p && p.length > 0);
+      
+      import('@wailsjs/go/app/App').then(({ WatchFiles }) => {
+        void WatchFiles(paths);
+      }).catch((err) => {
+        console.warn('Failed to call WatchFiles:', err);
+      });
+    });
+
+    import('@wailsjs/runtime/runtime').then(({ EventsOn }) => {
+      EventsOn('file-externally-modified', (data: { filePath: string; content: string }) => {
+        this.handleExternalFileModification(data.filePath, data.content);
+      });
+    }).catch((err) => {
+      console.warn('Failed to register file change listener:', err);
+    });
+  }
+
+  private handleExternalFileModification(filePath: string, newContent: string): void {
+    const files = this.files();
+    const index = files.findIndex((f) => f.filePath === filePath);
+    if (index === -1) return;
+
+    const file = files[index];
+    if (file.content === newContent) {
+      return; // Content is identical
+    }
+
+    const isDirty = file.savedContent !== undefined && file.content !== file.savedContent;
+
+    let shouldReload = false;
+    if (isDirty) {
+      shouldReload = confirm(
+        `The file "${file.name || 'Untitled'}" has been modified externally, but you have unsaved changes in RawRequest.\n\nDo you want to reload it and discard your unsaved changes?`
+      );
+    } else {
+      // Silent auto-reload!
+      shouldReload = true;
+    }
+
+    if (shouldReload) {
+      const updated = this.workspace.updateFileContent(
+        this.files(),
+        index,
+        newContent,
+      );
+
+      const updatedFiles = [...updated.files];
+      updatedFiles[index] = {
+        ...updatedFiles[index],
+        savedContent: newContent
+      };
+
+      this.files.set(updatedFiles);
+      if (index === this.currentFileIndex()) {
+        this.currentEnv.set(updated.currentEnv || '');
+      }
+    }
+  }
 
   readonly LAST_SESSION_KEY = 'rawrequest_last_session';
 
@@ -88,6 +152,8 @@ export class WorkspaceStateService {
   replaceFileAtIndex(index: number, newFile: FileTab): void {
     const updated = this.workspace.replaceFileAtIndex(this.files(), index, newFile);
     this.files.set(updated);
+    this.httpService.saveFiles(updated);
+    this.workspace.persistSessionState(this.LAST_SESSION_KEY, updated, this.currentFileIndex());
   }
 
   /** Update the active request index of the current tab. */
@@ -140,6 +206,7 @@ export class WorkspaceStateService {
       this.loadHistoryForFile(historyDecision.fileIdToLoad);
     }
     this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files(), this.currentFileIndex());
+    this.httpService.saveFiles(this.files());
   }
 
   /** Handle current file index changing (tab switch). */
@@ -162,22 +229,16 @@ export class WorkspaceStateService {
       this.loadHistoryForFile(historyDecision.fileIdToLoad);
     }
     this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files(), this.currentFileIndex());
+    this.httpService.saveFiles(this.files());
   }
 
   /** Handle environment change. */
   onCurrentEnvChange(env: string): void {
     const file = this.files()[this.currentFileIndex()];
     if (file) {
-      const updatedFiles = this.workspace.replaceFileAtIndex(
-        this.files(),
-        this.currentFileIndex(),
-        { ...file, selectedEnv: env },
-      );
-      this.files.set(updatedFiles);
+      this.replaceFileAtIndex(this.currentFileIndex(), { ...file, selectedEnv: env });
     }
     this.currentEnv.set(env);
-    this.httpService.saveFiles(this.files());
-    this.workspace.persistSessionState(this.LAST_SESSION_KEY, this.files(), this.currentFileIndex());
   }
 
   /** Handle editor content changes with immediate raw update. */
@@ -291,6 +352,25 @@ export class WorkspaceStateService {
     this.applyState(next);
 
     if (next.activeFileId === '__examples__') {
+      this.history.set([]);
+    }
+  }
+
+  /** Open/upsert the mock demo tab. */
+  async openMockDemoFile(): Promise<void> {
+    const { GetMockDemoFile } = await import('@wailsjs/go/app/App');
+    const result = await GetMockDemoFile();
+    const content = result?.content || '';
+    const name = result?.filePath || 'mock_demo.http';
+
+    const updated = this.workspace.upsertMockDemoTab(
+      this.LAST_SESSION_KEY, this.files(), content, name,
+    );
+
+    const next = deriveAppStateFromWorkspaceUpdate(updated);
+    this.applyState(next);
+
+    if (next.activeFileId === '__mock_demo__') {
       this.history.set([]);
     }
   }

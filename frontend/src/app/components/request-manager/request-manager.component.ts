@@ -26,6 +26,8 @@ import {
   shouldSkipDuplicateExecution
 } from './request-manager.logic';
 
+import { MockServerService } from '../../services/mock-server.service';
+
 @Component({
   selector: 'app-request-manager',
   standalone: true,
@@ -36,6 +38,7 @@ import {
 export class RequestManagerComponent {
   private httpService = inject(HttpService);
   private notificationService = inject(NotificationService);
+  private mockServer = inject(MockServerService);
 
   files = input.required<FileTab[]>();
   currentFileIndex = input.required<number>();
@@ -75,19 +78,31 @@ export class RequestManagerComponent {
     if (this.executingRequest) return;
     this.executingRequest = true;
 
-    const request = currentFile.requests[requestIndex];
+    const rawRequest = currentFile.requests[requestIndex];
+    const request = { ...rawRequest };
     const variables = this.getCombinedVariables();
     const envName = this.getActiveEnvName();
     this.activeRequestId = requestId ?? buildRequestId(currentFile.id, requestIndex, Date.now());
 
     try {
+      if (request.url && request.url.startsWith('/')) {
+        const mockStatus = this.mockServer.status();
+        if (mockStatus.running) {
+          request.url = `http://localhost:${mockStatus.port}${request.url}`;
+        } else {
+          const offlineErr = new Error(`Relative URL '${request.url}' requires a running mock server. Click the 'Mock Server' button in the top toolbar to configure and start it.`);
+          (offlineErr as any).statusText = 'Mock Server Offline';
+          throw offlineErr;
+        }
+      }
+
       if (request.loadTest) {
-        await this.executeLoadTest(requestIndex, envName, this.activeRequestId);
+        await this.executeLoadTest(requestIndex, request, envName, this.activeRequestId);
         return;
       }
 
       if (request.depends) {
-        await this.executeChainedRequest(requestIndex, envName, this.activeRequestId ?? undefined);
+        await this.executeChainedRequest(requestIndex, request, envName, this.activeRequestId ?? undefined);
         return;
       }
 
@@ -151,13 +166,25 @@ export class RequestManagerComponent {
     return getActiveEnvNameForFile(currentFile, this.currentEnv());
   }
 
-  private async executeChainedRequest(requestIndex: number, envName: string, requestId?: string): Promise<void> {
+  private async executeChainedRequest(requestIndex: number, request: Request, envName: string, requestId?: string): Promise<void> {
     const currentFile = this.files()[this.currentFileIndex()];
-    const request = currentFile.requests[requestIndex];
     const variables = this.getCombinedVariables();
 
     try {
-      const chain = this.buildRequestChain(requestIndex);
+      const chain = this.buildRequestChain(requestIndex).map(r => {
+        const cloned = { ...r };
+        if (cloned.url && cloned.url.startsWith('/')) {
+          const mockStatus = this.mockServer.status();
+          if (mockStatus.running) {
+            cloned.url = `http://localhost:${mockStatus.port}${cloned.url}`;
+          } else {
+            const offlineErr = new Error(`Relative URL '${cloned.url}' in chained request '${cloned.name || ''}' requires a running mock server. Click the 'Mock Server' button in the top toolbar to configure and start it.`);
+            (offlineErr as any).statusText = 'Mock Server Offline';
+            throw offlineErr;
+          }
+        }
+        return cloned;
+      });
       const chainHasNoHistory = chain.some(r => r.noHistory);
 
       const execution = await this.httpService.executeChain(chain, variables, requestId, envName);
@@ -229,9 +256,8 @@ export class RequestManagerComponent {
   }
 
   // Execute load test
-  private async executeLoadTest(requestIndex: number, envName: string, requestId: string): Promise<void> {
+  private async executeLoadTest(requestIndex: number, request: Request, envName: string, requestId: string): Promise<void> {
     const currentFile = this.files()[this.currentFileIndex()];
-    const request = currentFile.requests[requestIndex];
     const variables = this.getCombinedVariables();
 
     try {

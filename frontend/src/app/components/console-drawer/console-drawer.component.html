@@ -18,46 +18,12 @@
         aria-expanded="true"
       >
         <div class="console-panel__header">
-          <button
-            type="button"
-            class="rr-btn rr-btn--pill btn-ambient console-panel__hide-btn"
-            (click)="requestClose()"
-            aria-expanded="true"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="rr-btn__icon"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path stroke="none" d="M0 0h24v24/H0z" />
-              <path d="M6 15l6 -6l6 6" />
-            </svg>
-            <span>Hide console</span>
-            <span class="console-panel__count rr-color-primary">
-              {{ scriptConsole.logs().length }}
-            </span>
-          </button>
-        </div>
-
-        <div class="console-panel__content">
-          <div class="console-panel__meta">
-            <div>
-              @if (latestLog(); as latest) {
-                <p>Last entry {{ latest.timestamp | date:'shortTime' }}</p>
-              } @else {
-                <p>No entries yet</p>
-              }
-            </div>
+          <div class="console-panel__header-left">
             <button
               type="button"
-              class="rr-btn rr-btn--ghost console-panel__clear-btn"
-              (click)="handleClear()"
-              [disabled]="!scriptConsole.logs().length"
+              class="rr-btn rr-btn--pill btn-ambient console-panel__hide-btn"
+              (click)="requestClose()"
+              aria-expanded="true"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -69,51 +35,251 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <path stroke="none" d="M0 0h24v24/H0z" />
-                <path d="M8 6h12" />
-                <path d="M6 12h12" />
-                <path d="M4 18h12" />
+                <path stroke="none" d="M0 0h24v24H0z" />
+                <path d="M6 15l6 -6l6 6" />
               </svg>
-              <span>Clear</span>
+              <span>Hide console</span>
             </button>
+
+            <div class="console-panel__tabs">
+              <button
+                type="button"
+                class="console-tab-btn"
+                [class.console-tab-btn--active]="activeTab() === 'logs'"
+                (click)="activeTab.set('logs')"
+              >
+                <span>Console Logs</span>
+                @if (scriptConsole.logs().length > 0) {
+                  <span class="console-tab-badge">{{ scriptConsole.logs().length }}</span>
+                }
+              </button>
+              <button
+                type="button"
+                class="console-tab-btn"
+                [class.console-tab-btn--active]="activeTab() === 'mock'"
+                (click)="activeTab.set('mock')"
+              >
+                <span>Mock Server</span>
+                <span
+                  class="status-indicator-dot"
+                  [class.status-indicator-dot--online]="mockServerRunning()"
+                  [title]="mockServerRunning() ? 'Online' : 'Offline'"
+                ></span>
+              </button>
+            </div>
           </div>
 
-          <div
-            class="console-panel__viewport"
-            [style.height.px]="panelHeight()"
-            [class.select-none]="isResizing()"
-          >
-            @if (scriptConsole.logs().length) {
-              <div class="console-panel__scroll" aria-live="polite">
-                @for (log of scriptConsole.logs(); track trackLogEntry($index, log)) {
-                  <article
-                    class="log-entry"
-                    [class.log-entry--error]="log.level === 'error'"
-                    [class.log-entry--warn]="log.level === 'warn' || log.level === 'warning'"
-                    [class.log-entry--info]="log.level === 'info'"
-                    [class.log-entry--debug]="log.level === 'debug'"
-                    [class.log-entry--log]="log.level === 'log'"
-                    [attr.data-level]="log.level"
-                  >
-                    <div class="log-meta">
-                      <span class="log-level">{{ log.level }}</span>
-                      <span class="log-source">{{ log.source }}</span>
-                      <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
-                    </div>
-                    <pre class="log-message">{{ log.message }}</pre>
-                  </article>
-                }
-              </div>
-            } @else {
-              <div class="console-empty">
-                <svg xmlns="http://www.w3.org/2000/svg" class="console-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M4 17l6-6-6-6" />
-                  <path d="M12 19h8" />
+          <div class="console-panel__header-right">
+            @if (activeTab() === 'logs') {
+              <button
+                type="button"
+                class="rr-btn rr-btn--ghost console-panel__clear-btn"
+                (click)="handleClear()"
+                [disabled]="!scriptConsole.logs().length"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="rr-btn__icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path stroke="none" d="M0 0h24v24H0z" />
+                  <path d="M8 6h12" />
+                  <path d="M6 12h12" />
+                  <path d="M4 18h12" />
                 </svg>
-                <p class="console-empty__text">Console is quiet. Trigger a script run to see output.</p>
-              </div>
+                <span>Clear Logs</span>
+              </button>
+            } @else {
+              <button
+                type="button"
+                class="rr-btn rr-btn--ghost console-panel__clear-btn"
+                (click)="clearMockLogs()"
+                [disabled]="!mockLogs().length"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="rr-btn__icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path stroke="none" d="M0 0h24v24H0z" />
+                  <path d="M8 6h12" />
+                  <path d="M6 12h12" />
+                  <path d="M4 18h12" />
+                </svg>
+                <span>Clear Terminal</span>
+              </button>
             }
           </div>
+        </div>
+
+        <div class="console-panel__content">
+          @if (activeTab() === 'logs') {
+            <div class="console-panel__meta">
+              <div>
+                @if (latestLog(); as latest) {
+                  <p>Last entry {{ latest.timestamp | date:'shortTime' }}</p>
+                } @else {
+                  <p>No entries yet</p>
+                }
+              </div>
+            </div>
+
+            <div
+              class="console-panel__viewport"
+              [style.height.px]="panelHeight()"
+              [class.select-none]="isResizing()"
+            >
+              @if (scriptConsole.logs().length) {
+                <div class="console-panel__scroll" aria-live="polite">
+                  @for (log of scriptConsole.logs(); track trackLogEntry($index, log)) {
+                    <article
+                      class="log-entry"
+                      [class.log-entry--error]="log.level === 'error'"
+                      [class.log-entry--warn]="log.level === 'warn' || log.level === 'warning'"
+                      [class.log-entry--info]="log.level === 'info'"
+                      [class.log-entry--debug]="log.level === 'debug'"
+                      [class.log-entry--log]="log.level === 'log'"
+                      [attr.data-level]="log.level"
+                    >
+                      <div class="log-meta">
+                        <span class="log-level">{{ log.level }}</span>
+                        <span class="log-source">{{ log.source }}</span>
+                        <span class="log-time">{{ log.timestamp | date:'HH:mm:ss' }}</span>
+                      </div>
+                      <pre class="log-message">{{ log.message }}</pre>
+                    </article>
+                  }
+                </div>
+              } @else {
+                <div class="console-empty">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="console-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 17l6-6-6-6" />
+                    <path d="M12 19h8" />
+                  </svg>
+                  <p class="console-empty__text">Console is quiet. Trigger a script run to see output.</p>
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="mock-server-container">
+              <div class="mock-server-config">
+                <div class="mock-config-group mock-config-group--port">
+                  <label class="mock-config-label">Port</label>
+                  <input
+                    type="number"
+                    class="rr-input mock-input-port"
+                    [ngModel]="mockPort()"
+                    (ngModelChange)="mockPort.set($event)"
+                    [disabled]="mockServerRunning()"
+                    placeholder="8080"
+                  />
+                </div>
+
+                <div class="mock-config-group mock-config-group--db">
+                  <label class="mock-config-label">SQLite Database (Optional)</label>
+                  <input
+                    type="text"
+                    class="rr-input mock-input-db"
+                    [ngModel]="mockDB()"
+                    (ngModelChange)="mockDB.set($event)"
+                    [disabled]="mockServerRunning()"
+                    placeholder="e.g. users.db"
+                  />
+                </div>
+
+                <div class="mock-actions">
+                  @if (!mockServerRunning()) {
+                    <button
+                      type="button"
+                      class="rr-btn rr-btn--primary mock-toggle-btn mock-toggle-btn--start"
+                      (click)="startMockServer()"
+                      [disabled]="!hasActiveFile()"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                      </svg>
+                      <span>Start Server</span>
+                    </button>
+                  } @else {
+                    <button
+                      type="button"
+                      class="rr-btn rr-btn--danger mock-toggle-btn mock-toggle-btn--stop"
+                      (click)="stopMockServer()"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                      </svg>
+                      <span>Stop Server</span>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <div
+                class="console-panel__viewport mock-log-terminal"
+                [style.height.px]="panelHeight() - 56"
+                [class.select-none]="isResizing()"
+              >
+                @if (mockLogs().length) {
+                  <div class="console-panel__scroll" aria-live="polite">
+                    @for (log of mockLogs(); track trackMockLogEntry($index, log)) {
+                      <article
+                        class="log-entry"
+                        [class.log-entry--error]="log.level === 'error'"
+                        [class.log-entry--warn]="log.level === 'warn'"
+                        [class.log-entry--info]="log.level === 'info'"
+                        [class.log-entry--log]="log.level === 'log'"
+                      >
+                        <div class="log-meta">
+                          <span class="log-level">{{ log.level }}</span>
+                          <span class="log-source">{{ log.source }}</span>
+                          <span class="log-time">{{ log.timestamp }}</span>
+                        </div>
+                        <pre class="log-message">{{ log.message }}</pre>
+                      </article>
+                    }
+                  </div>
+                } @else {
+                  <div class="console-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="console-empty__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                      <rect x="2" y="2" width="20" height="20" rx="2" ry="2"></rect>
+                      <line x1="12" y1="2" x2="12" y2="22"></line>
+                      <line x1="2" y1="12" x2="22" y2="12"></line>
+                    </svg>
+                    @if (!mockServerRunning()) {
+                      <p class="console-empty__text">Server is offline. Click "Start Server" to run mock endpoints from the active tab.</p>
+                      
+                      <div class="mock-tutorial-card">
+                        <div class="mock-tutorial-card__title">How to create Mock APIs?</div>
+                        <p class="mock-tutorial-card__text">
+                          Add the <code>@mock</code> decorator above any request definition in your <code>.http</code> file. Mocks can parse route parameters, execute dynamic JavaScript blocks, and query our embedded stateful SQLite database.
+                        </p>
+                        <button type="button" class="rr-btn rr-btn--ghost mock-tutorial-card__btn" (click)="insertMockTemplate()">
+                          <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                          </svg>
+                          <span>Insert Mock API Template</span>
+                        </button>
+                      </div>
+                    } @else {
+                      <p class="console-empty__text">Server is online and listening on http://localhost:{{ mockPort() }}. Waiting for requests...</p>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          }
         </div>
       </section>
     </div>
@@ -139,7 +305,7 @@
       stroke-linecap="round"
       stroke-linejoin="round"
     >
-      <path stroke="none" d="M0 0h24v24/H0z" />
+      <path stroke="none" d="M0 0h24v24H0z" />
       <path d="M8 9h8" />
       <path d="M8 13h6" />
       <path d="M16 5l3 3-3 3" />

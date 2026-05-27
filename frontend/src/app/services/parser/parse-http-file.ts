@@ -31,6 +31,7 @@ export type PendingMetadata = {
   loadTest?: any;
   options?: { timeout?: number };
   noHistory?: boolean;
+  isMock?: boolean;
 };
 
 export type ParseHttpFileDeps = {
@@ -202,6 +203,31 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
       i++;
       continue;
     }
+
+    // @mockinit directive - indicates request is a mock server database/env initialization block
+    if (line === '@mockinit' || line.startsWith('@mockinit ')) {
+      currentRequest = {
+        method: 'MOCKINIT',
+        url: '@mockinit',
+        isMock: true,
+        headers: {},
+        ...(pendingMetadata as any)
+      };
+      pendingMetadata = {};
+      inRequest = true;
+      inBody = false;
+      requestBody = '';
+      i++;
+      continue;
+    }
+
+    // @mock directive - indicates request is a mock server endpoint definition
+    if (line === '@mock' || line.startsWith('@mock ')) {
+      pendingMetadata.isMock = true;
+      i++;
+      continue;
+    }
+
 
     if (line.startsWith('@')) {
       const varMatch = line.match(/^@(\w+)\s*=?\s*(.*)$/);

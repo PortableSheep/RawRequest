@@ -15,6 +15,7 @@ export class PanelVisibilityService {
   readonly showDeleteConfirmModal = signal(false);
   readonly showVersionManager = signal(false);
   readonly consoleOpen = signal(false);
+  readonly consoleActiveTab = signal<'logs' | 'mock'>('logs');
 
   /** True when no sidebar or modal overlay is active. */
   readonly noSidebarOpen = computed(

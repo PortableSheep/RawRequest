@@ -26,6 +26,7 @@ func main() {
 	// Check for CLI mode
 	if opts := cli.Parse(os.Args); opts != nil {
 		suppressGUI()
+		opts.SecretResolver = initSecretResolver()
 		if opts.Command == cli.CommandMCP {
 			if err := startMCPServer(opts); err != nil {
 				fmt.Fprintf(os.Stderr, "MCP server error: %v\n", err)
@@ -49,11 +50,12 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:     "RawRequest",
-		Width:     1024,
-		Height:    768,
-		MinWidth:  400,
-		MinHeight: 300,
+		Title:       "RawRequest",
+		Width:       1024,
+		Height:      768,
+		MinWidth:    400,
+		MinHeight:   300,
+		StartHidden: true, // Start hidden to prevent white flash before styling loads
 		Mac: &mac.Options{
 			DisableZoom: false,
 			TitleBar:    mac.TitleBarDefault(),
@@ -75,25 +77,25 @@ func main() {
 	}
 }
 
-func startMCPServer(opts *cli.Options) error {
-	// Initialize secret vault for {{secret:KEY}} resolution
+func initSecretResolver() cli.SecretResolver {
 	configDir, err := os.UserConfigDir()
 	if err != nil {
 		configDir = filepath.Join(os.Getenv("HOME"), ".config")
 	}
 	vaultDir := filepath.Join(configDir, "rawrequest", "secrets")
 
-	var secretResolver cli.SecretResolver
 	vault, err := app.NewSecretVault(vaultDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: secret vault unavailable: %v\n", err)
-	} else {
-		secretResolver = vault
+		return nil
 	}
+	return vault
+}
 
+func startMCPServer(opts *cli.Options) error {
 	return mcpserver.Serve(mcpserver.Options{
 		DefaultEnv:     opts.Environment,
-		SecretResolver: secretResolver,
+		SecretResolver: opts.SecretResolver,
 		Version:        app.Version,
 		Workspace:      opts.Workspace,
 	})

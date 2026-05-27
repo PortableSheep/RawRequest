@@ -122,4 +122,38 @@ describe('parser/parse-http-file', () => {
     expect(parsed.requests).toHaveLength(1);
     expect(parsed.requests[0].noHistory).toBeUndefined();
   });
+
+  it('parses @mock directive (standalone)', () => {
+    const parsed = parseHttpFile([
+      '@mock',
+      'GET /users/{{id}}',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].isMock).toBe(true);
+  });
+
+  it('isMock defaults to undefined when not specified', () => {
+    const parsed = parseHttpFile([
+      'GET https://example.com/normal',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].isMock).toBeUndefined();
+  });
+
+  it('parses @mockinit directive to a virtual MOCKINIT request block', () => {
+    const parsed = parseHttpFile([
+      '@mockinit',
+      '< {',
+      '  db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, name TEXT)");',
+      '}',
+    ].join('\n'));
+
+    expect(parsed.requests).toHaveLength(1);
+    expect(parsed.requests[0].method).toBe('MOCKINIT');
+    expect(parsed.requests[0].url).toBe('@mockinit');
+    expect(parsed.requests[0].isMock).toBe(true);
+    expect(parsed.requests[0].preScript).toContain('db.exec');
+  });
 });

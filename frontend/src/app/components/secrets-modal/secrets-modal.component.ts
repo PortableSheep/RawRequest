@@ -44,6 +44,22 @@ export class SecretsModalComponent {
   resetConfirmText = '';
   showResetConfirm = false;
 
+  // Enterprise secrets config state
+  activeTab: 'secrets' | 'provider' = 'secrets';
+  enterpriseConfig = {
+    provider: 'local',
+    customCommand: '',
+    aws: { region: '', profile: '' },
+    doppler: { project: '', config: '' },
+    vault: { address: '', token: '' }
+  };
+
+  // Test connection state
+  testKey = '';
+  testResultValue = '';
+  testResultError = '';
+  isTestingConnection = false;
+
   // Sort & filter state
   sortColumn: SortColumn = 'key';
   sortDirection: SortDirection = 'asc';
@@ -74,6 +90,14 @@ export class SecretsModalComponent {
         this.showForgotPasswordConfirm = false;
         this.showDeleteConfirm = false;
         this.secretToDelete = null;
+        
+        // Reset enterprise state on open
+        this.activeTab = 'secrets';
+        this.testKey = '';
+        this.testResultValue = '';
+        this.testResultError = '';
+        this.isTestingConnection = false;
+
         void this.initModalState();
       }
       this.wasOpen = open;
@@ -90,6 +114,68 @@ export class SecretsModalComponent {
       this.masterPasswordError = '';
       this.showMasterPasswordPrompt = true;
       this.focusMasterPasswordField();
+    }
+    try {
+      const cfg = await this.secretService.getEnterpriseConfig();
+      if (cfg) {
+        this.enterpriseConfig = {
+          provider: cfg.provider || 'local',
+          customCommand: cfg.customCommand || '',
+          aws: {
+            region: cfg.aws?.region || '',
+            profile: cfg.aws?.profile || ''
+          },
+          doppler: {
+            project: cfg.doppler?.project || '',
+            config: cfg.doppler?.config || ''
+          },
+          vault: {
+            address: cfg.vault?.address || '',
+            token: cfg.vault?.token || ''
+          }
+        };
+      }
+    } catch (err) {
+      console.error('Failed to load enterprise config', err);
+    }
+  }
+
+  async saveProviderConfig(): Promise<void> {
+    try {
+      await this.secretService.saveEnterpriseConfig(this.enterpriseConfig);
+      this.toast.success('Secrets provider configuration saved successfully.');
+    } catch (err) {
+      console.error('Failed to save provider config', err);
+      this.toast.error('Failed to save secrets provider configuration');
+    }
+  }
+
+  async openProviderConfig(): Promise<void> {
+    try {
+      await this.secretService.openEnterpriseConfig();
+      this.toast.success('Opened secrets config file location.');
+    } catch (err: any) {
+      console.error('Failed to open provider config', err);
+      this.toast.error('Failed to open secrets provider configuration file');
+    }
+  }
+
+  async runConnectionTest(): Promise<void> {
+    if (!this.testKey) {
+      this.toast.error('Please enter a secret key or URI to test.');
+      return;
+    }
+    this.isTestingConnection = true;
+    this.testResultValue = '';
+    this.testResultError = '';
+    try {
+      const res = await this.secretService.testEnterpriseSecret(this.testKey);
+      this.testResultValue = res;
+    } catch (err: any) {
+      console.error('Connection test failed', err);
+      this.testResultError = err.message || String(err);
+    } finally {
+      this.isTestingConnection = false;
     }
   }
 

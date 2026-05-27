@@ -75,3 +75,30 @@
   color: var(--rr-text-muted-color);
   white-space: nowrap;
 }
+
+.status-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717a; // Gray
+  display: inline-block;
+  transition: background 150ms ease, box-shadow 150ms ease;
+
+  &--online {
+    background: #10b981; // Green
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    animation: status-pulse 2s infinite;
+  }
+}
+
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}

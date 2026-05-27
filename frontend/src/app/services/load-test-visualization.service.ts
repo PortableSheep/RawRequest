@@ -51,6 +51,15 @@ export class LoadTestVisualizationService {
   private rpsRenderTarget: number | null = null;
 
   loadTestMetrics: any = null;
+  progressHistory: Array<{
+    time: number;
+    concurrency: number;
+    rps: number;
+    successRate: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  }> = [];
 
   /** Register an additional ChangeDetectorRef to be checked during the sparkline animation loop. */
   registerCdr(cdr: ChangeDetectorRef): void {
@@ -109,6 +118,32 @@ export class LoadTestVisualizationService {
     this.lastRpsSmoothed = loadRun.lastRpsSmoothed;
     this.rpsRenderValue = loadRun.rpsRenderValue;
     this.rpsRenderTarget = loadRun.rpsRenderTarget;
+    this.progressHistory = [];
+  }
+
+  updateProgress(progress: ActiveRunProgress): void {
+    this.activeRunProgress = progress;
+    if (progress.type === 'load') {
+      const concurrency = progress.activeUsers ?? 0;
+      this.pushLoadUsersSample(concurrency);
+
+      const elapsedMs = progress.startedAt ? (Date.now() - progress.startedAt) : 0;
+      const rps = this.currentLoadRpsView;
+
+      const total = progress.totalSent ?? 0;
+      const success = progress.successful ?? 0;
+      const successRate = total > 0 ? (success / total) * 100 : 100;
+
+      this.progressHistory.push({
+        time: elapsedMs / 1000,
+        concurrency,
+        rps,
+        successRate,
+        p50: progress.p50 ?? 0,
+        p95: progress.p95 ?? 0,
+        p99: progress.p99 ?? 0
+      });
+    }
   }
 
   startActiveRunTick(

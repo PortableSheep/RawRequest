@@ -1,0 +1,60 @@
+### Mock Database Initializer
+@mockinit
+< {
+  // Initialize persistent SQLite database schema once during mock server startup
+  db.exec("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT UNIQUE, email TEXT)");
+  console.log("Mock database initialized successfully!");
+}
+
+### Get all users (Zero-script fallback)
+@mock
+GET /users
+Content-Type: application/json
+
+[
+  {"id": 1, "name": "Alice"},
+  {"id": 2, "name": "Bob"}
+]
+
+### Get specific user by ID (Zero-script dynamic fallback interpolation)
+@mock
+GET /users/{{id}}
+Content-Type: application/json
+
+{
+  "id": "{{id}}",
+  "name": "Dynamic User {{id}}",
+  "status": "active"
+}
+
+### CRUD: Register a user in SQLite database (JS-based mock handler)
+@mock
+POST /db/users
+Content-Type: application/json
+
+< {
+  try {
+    const body = JSON.parse(request.body);
+    const res = db.exec("INSERT INTO users (name, email) VALUES (?, ?)", body.name, body.email);
+    response.status = 201;
+    response.body = {
+      id: res.lastInsertId,
+      name: body.name,
+      email: body.email,
+      created: true
+    };
+  } catch(e) {
+    response.status = 400;
+    response.body = { error: "Failed to insert user: " + e.toString() };
+  }
+}
+
+### CRUD: List users from SQLite database (JS-based mock handler)
+@mock
+GET /db/users
+Content-Type: application/json
+
+< {
+  const users = db.query("SELECT * FROM users ORDER BY id DESC");
+  response.body = users;
+}

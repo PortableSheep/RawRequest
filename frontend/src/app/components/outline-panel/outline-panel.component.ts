@@ -30,7 +30,7 @@ export class OutlinePanelComponent {
     return groupOutlineEntries(filtered);
   });
 
-  requestCount = computed(() => this.ws.currentFileView().requests.length);
+  requestCount = computed(() => (this.ws.currentFileView().requests || []).filter(r => !r.isMock).length);
 
   constructor() {
     effect(() => {

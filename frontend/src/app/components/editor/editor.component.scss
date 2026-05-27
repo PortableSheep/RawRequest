@@ -1,11 +1,13 @@
 :host {
   display: block;
   height: 100%;
+  background: var(--rr-surface-1);
 }
 
 .editor {
   position: relative;
   height: 100%;
+  background: var(--rr-surface-1);
 }
 
 .editor__surface {
@@ -14,8 +16,18 @@
   line-height: 1.55;
   background: var(--rr-surface-1);
 
+  ::ng-deep .cm-editor {
+    background: var(--rr-surface-1) !important;
+  }
+
+  ::ng-deep .cm-scroller {
+    overscroll-behavior: none;
+    background: var(--rr-surface-1) !important;
+  }
+
   ::ng-deep .cm-content {
     padding-bottom: 30vh !important;
+    background: var(--rr-surface-1) !important;
   }
 }
 

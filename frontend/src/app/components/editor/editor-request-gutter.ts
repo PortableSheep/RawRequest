@@ -1,6 +1,6 @@
 import { BlockInfo, EditorView, GutterMarker, ViewUpdate, gutter } from '@codemirror/view';
 import type { Extension } from '@codemirror/state';
-import { DEPENDS_LINE_REGEX, LOAD_LINE_REGEX, isMethodLine, isSeparatorLine } from '../../utils/http-file-analysis';
+import { DEPENDS_LINE_REGEX, LOAD_LINE_REGEX, MOCK_LINE_REGEX, isMethodLine, isSeparatorLine } from '../../utils/http-file-analysis';
 
 class CompositeGutterMarker extends GutterMarker {
   constructor(
@@ -24,14 +24,15 @@ class CompositeGutterMarker extends GutterMarker {
     // 1. Play Button
     const playBtn = document.createElement('button');
     playBtn.type = 'button';
-    playBtn.className = 'gutter-play-btn';
     playBtn.dataset['requestIndex'] = String(this.requestIndex);
+    
+    playBtn.className = 'gutter-play-btn';
+    playBtn.title = 'Run Request';
     playBtn.innerHTML = `
       <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" focusable="false">
         <path d="M8 5v14l11-7z" />
       </svg>
     `;
-    playBtn.title = 'Run Request';
     playBtn.onmousedown = e => e.preventDefault();
     playBtn.onclick = e => {
       e.preventDefault();
@@ -89,6 +90,7 @@ export function createRequestGutter(
       let isFirstMethod = true;
       let hasDepends = false;
       let hasLoad = false;
+      let isMock = false;
 
       // Scan upwards from the method line to find annotations belonging to this request.
       for (let i = lineNo - 1; i >= 1; i--) {
@@ -106,6 +108,9 @@ export function createRequestGutter(
         }
         if (LOAD_LINE_REGEX.test(prevTrimmed)) {
           hasLoad = true;
+        }
+        if (MOCK_LINE_REGEX.test(prevTrimmed)) {
+          isMock = true;
         }
       }
 
@@ -140,6 +145,10 @@ export function createRequestGutter(
       }
 
       if (requestIndex === -1) {
+        return null;
+      }
+
+      if (isMock) {
         return null;
       }
 
