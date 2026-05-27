@@ -6,7 +6,7 @@ require (
 	github.com/dop251/goja v0.0.0-20251201205617-2bb4c724c0f9
 	github.com/gen2brain/beeep v0.11.2
 	github.com/mark3labs/mcp-go v0.48.0
-	github.com/wailsapp/wails/v2 v2.10.2
+	github.com/wailsapp/wails/v2 v2.12.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.50.0
 	golang.org/x/sys v0.43.0
@@ -21,6 +21,8 @@ require (
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
 )
+
+require git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
@@ -58,7 +60,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasttemplate v1.2.2 // indirect
 	// Retained explicitly by go mod tidy with wails/v2 v2.12.0.
-	github.com/wailsapp/go-webview2 v1.0.21 // indirect
+	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
 	golang.org/x/net v0.52.0 // indirect
