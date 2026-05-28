@@ -1,9 +1,12 @@
-import { Injectable, signal, computed } from '@angular/core';
+import { Injectable, signal, computed, effect, inject } from '@angular/core';
+import { DiagnosticLoggerService } from './diagnostic-logger.service';
 
 export type SecondarySurface = 'history' | 'outline' | 'commandPalette' | 'console' | 'secrets';
 
 @Injectable({ providedIn: 'root' })
 export class PanelVisibilityService {
+  private readonly diagnostics = inject(DiagnosticLoggerService);
+
   readonly showHistory = signal(false);
   readonly showHistoryModal = signal(false);
   readonly showOutlinePanel = signal(false);
@@ -14,8 +17,41 @@ export class PanelVisibilityService {
   readonly showSnippetModal = signal(false);
   readonly showDeleteConfirmModal = signal(false);
   readonly showVersionManager = signal(false);
-  readonly consoleOpen = signal(false);
-  readonly consoleActiveTab = signal<'logs' | 'mock'>('logs');
+  
+  readonly consoleOpen = signal<boolean>(this.loadConsoleOpen());
+  readonly consoleActiveTab = signal<'logs' | 'mock'>(this.loadConsoleActiveTab());
+
+  constructor() {
+    effect(() => {
+      const open = this.consoleOpen();
+      localStorage.setItem('rawrequest:consoleOpen', JSON.stringify(open));
+      this.diagnostics.info(`Console visibility changed to: ${open ? 'OPEN' : 'CLOSED'}`);
+    });
+
+    effect(() => {
+      const tab = this.consoleActiveTab();
+      localStorage.setItem('rawrequest:consoleActiveTab', tab);
+      this.diagnostics.info(`Console active tab changed to: ${tab.toUpperCase()}`);
+    });
+  }
+
+  private loadConsoleOpen(): boolean {
+    try {
+      const val = localStorage.getItem('rawrequest:consoleOpen');
+      return val ? JSON.parse(val) === true : false;
+    } catch {
+      return false;
+    }
+  }
+
+  private loadConsoleActiveTab(): 'logs' | 'mock' {
+    try {
+      const val = localStorage.getItem('rawrequest:consoleActiveTab');
+      return (val === 'mock') ? 'mock' : 'logs';
+    } catch {
+      return 'logs';
+    }
+  }
 
   /** True when no sidebar or modal overlay is active. */
   readonly noSidebarOpen = computed(

@@ -8,6 +8,7 @@ import { FileSaveService } from '../../services/file-save.service';
 import { ToastService } from '../../services/toast.service';
 import { StartupService } from '../../services/startup.service';
 import { MockServerService } from '../../services/mock-server.service';
+import { DiagnosticLoggerService } from '../../services/diagnostic-logger.service';
 import { shortcutHint, getVisibleShortcuts, formatKeyCombo } from '../../logic/app/shortcut-catalog';
 
 @Component({
@@ -25,6 +26,7 @@ export class HeaderComponent {
   private readonly toast = inject(ToastService);
   readonly startup = inject(StartupService);
   private readonly mockServer = inject(MockServerService);
+  private readonly diagnostics = inject(DiagnosticLoggerService);
 
   readonly mockServerRunning = computed(() => this.mockServer.status().running);
 
@@ -210,6 +212,20 @@ export class HeaderComponent {
   handleDonateClick(): void {
     this.panels.showDonationModal.set(true);
     this.closeMoreMenu();
+  }
+
+  async handleExportDiagnosticsClick(): Promise<void> {
+    this.closeMoreMenu();
+    try {
+      const path = await this.diagnostics.exportLogs();
+      if (path) {
+        this.toast.success(`Diagnostic logs exported successfully to: ${path}`);
+      }
+    } catch (err: any) {
+      if (err !== "no path selected" && err?.message !== "no path selected" && err?.message !== "SaveFileDialog cancelled") {
+        this.toast.error(`Failed to export logs: ${err?.message || err}`);
+      }
+    }
   }
 
   handleImportPostmanClick(): void {

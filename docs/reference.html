@@ -89,8 +89,8 @@
                 </tr>
                 <tr>
                   <td><code>@depends</code></td>
-                  <td><code>@depends name1, name2</code></td>
-                  <td>Specifies request execution order. Dependees execute completely and populate active variables before this request fires.</td>
+                  <td><code>@depends nameOfRequest</code></td>
+                  <td>Specifies a single named dependency. That request executes first and can populate variables or response data used by this request.</td>
                 </tr>
                 <tr>
                   <td><code>@env</code></td>
@@ -99,8 +99,8 @@
                 </tr>
                 <tr>
                   <td><code>@load</code></td>
-                  <td><code>@load \n duration: 30s \n users: 50</code></td>
-                  <td>Configures a request as a high-concurrency performance benchmark. Set users, targetRPS, fail-rate, and rampUp.</td>
+                  <td><code>@load duration=30s users=50 rampUp=5s rps=200</code></td>
+                  <td>Configures a request as a high-concurrency performance benchmark. Common keys include <code>users</code>, <code>duration</code>, <code>rampUp</code>, <code>rps</code>, and <code>failureRateThreshold</code>.</td>
                 </tr>
                 <tr>
                   <td><code>@timeout</code></td>
@@ -229,6 +229,11 @@ Authorization: Bearer {{authRequest.response.body.token}}</code></pre>
                   <td><code>object</code></td>
                   <td>Headers key-map for outgoing or received values</td>
                 </tr>
+                <tr>
+                  <td><code>response.json</code></td>
+                  <td><code>object | array | undefined</code></td>
+                  <td>Parsed JSON body when the response body contains valid JSON.</td>
+                </tr>
               </tbody>
             </table>
 
@@ -293,6 +298,9 @@ if (!user) {
               <li><strong><code>run_request</code>:</strong> Runs a specific named request in the file, automatically resolving dependencies, environment variables, pre/post scripts, and secure vault credentials. Returns timing, status, headers, and body.</li>
               <li><strong><code>list_environments</code>:</strong> Inspects all environment keys defined in the file.</li>
               <li><strong><code>set_variable</code>:</strong> Injects temporary runtime variable mappings into the active execution context.</li>
+              <li><strong><code>create_request</code>:</strong> Adds a new named HTTP request to a target <code>.http</code> file.</li>
+              <li><strong><code>update_request</code>:</strong> Modifies an existing named request while preserving surrounding file content.</li>
+              <li><strong><code>save_variable</code>:</strong> Persists a global or environment-scoped variable into the target <code>.http</code> file.</li>
             </ul>
           </section>
 

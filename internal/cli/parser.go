@@ -2,7 +2,9 @@ package cli
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // ParsedHttpFile represents a parsed .http file
@@ -24,6 +26,7 @@ type Request struct {
 	Group      string
 	Depends    string
 	Timeout    int
+	LoadConfig map[string]any
 	IsMock     bool
 }
 
@@ -49,7 +52,9 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 	inHeaders := false
 	var pendingName, pendingGroup, pendingDepends string
 	pendingTimeout := 0
+	var pendingLoadConfig map[string]any
 	pendingIsMock := false
+	inLoadBlock := false
 
 	// Script block tracking
 	inPreScript := false
@@ -80,13 +85,26 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 		postScript.Reset()
 		inBody = false
 		inHeaders = false
-		// Note: Do NOT clear pendingName/pendingGroup/pendingDepends/pendingTimeout here.
+		// Note: Do NOT clear pendingName/pendingGroup/pendingDepends/pendingTimeout/pendingLoadConfig here.
 		// These are metadata for the NEXT request and should only be cleared after
 		// they are applied to a new request.
 	}
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
+
+		if inLoadBlock {
+			if trimmed == "" || strings.HasPrefix(trimmed, "#") || strings.HasPrefix(trimmed, "//") {
+				continue
+			}
+			if !methodRegex.MatchString(trimmed) && !strings.HasPrefix(trimmed, "@") && !isSeparatorLine(trimmed) {
+				if config, ok := parseLoadConfigText(trimmed); ok {
+					pendingLoadConfig = mergeLoadConfig(pendingLoadConfig, config)
+					continue
+				}
+			}
+			inLoadBlock = false
+		}
 
 		// Handle brace script bodies
 		if inPreScript || inPostScript {
@@ -204,8 +222,7 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 
 		// @timeout directive
 		if strings.HasPrefix(trimmed, "@timeout ") {
-			var t int
-			if _, err := parseTimeout(strings.TrimSpace(trimmed[9:])); err == nil {
+			if t, err := parseTimeout(strings.TrimSpace(trimmed[9:])); err == nil {
 				pendingTimeout = t
 			}
 			continue
@@ -216,8 +233,18 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 			continue
 		}
 
-		// @load - ignore load test config for CLI (for now)
+		// @load - support inline key/value config and block style config on following lines.
+		if trimmed == "@load" {
+			if pendingLoadConfig == nil {
+				pendingLoadConfig = map[string]any{}
+			}
+			inLoadBlock = true
+			continue
+		}
 		if strings.HasPrefix(trimmed, "@load ") {
+			if config, ok := parseLoadConfigText(strings.TrimSpace(trimmed[len("@load"):])); ok {
+				pendingLoadConfig = mergeLoadConfig(pendingLoadConfig, config)
+			}
 			continue
 		}
 
@@ -237,6 +264,7 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 			pendingGroup = ""
 			pendingDepends = ""
 			pendingTimeout = 0
+			pendingLoadConfig = nil
 			pendingIsMock = false
 			continue
 		}
@@ -246,7 +274,6 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 			pendingIsMock = true
 			continue
 		}
-
 
 		// Global variables: @varName = value
 		if strings.HasPrefix(trimmed, "@") {
@@ -302,19 +329,21 @@ func ParseHttpFile(content string) *ParsedHttpFile {
 				finalizeRequest()
 			}
 			currentRequest = &Request{
-				Name:    pendingName,
-				Method:  match[1],
-				URL:     match[2],
-				Headers: make(map[string]string),
-				Group:   pendingGroup,
-				Depends: pendingDepends,
-				Timeout: pendingTimeout,
-				IsMock:  pendingIsMock,
+				Name:       pendingName,
+				Method:     match[1],
+				URL:        match[2],
+				Headers:    make(map[string]string),
+				Group:      pendingGroup,
+				Depends:    pendingDepends,
+				Timeout:    pendingTimeout,
+				LoadConfig: cloneLoadConfig(pendingLoadConfig),
+				IsMock:     pendingIsMock,
 			}
 			pendingName = ""
 			pendingGroup = ""
 			pendingDepends = ""
 			pendingTimeout = 0
+			pendingLoadConfig = nil
 			pendingIsMock = false
 			inHeaders = true
 			inBody = false
@@ -348,10 +377,136 @@ func isSeparatorLine(line string) bool {
 }
 
 func parseTimeout(s string) (int, error) {
-	var t int
-	_, err := strings.NewReader(s).Read(make([]byte, 0))
-	// Simple parse - in production would use strconv
-	return t, err
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return 0, strconv.ErrSyntax
+	}
+	if millis, err := strconv.Atoi(s); err == nil {
+		return millis, nil
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return 0, err
+	}
+	return int(d / time.Millisecond), nil
+}
+
+func parseLoadConfigText(raw string) (map[string]any, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, false
+	}
+
+	pairRx := regexp.MustCompile(`([A-Za-z_][\w-]*)\s*(?:=|:)\s*("[^"]*"|'[^']*'|[^\s,]+)`)
+	matches := pairRx.FindAllStringSubmatch(raw, -1)
+	if len(matches) == 0 {
+		return nil, false
+	}
+
+	config := make(map[string]any, len(matches))
+	for _, match := range matches {
+		key := normalizeLoadKey(match[1])
+		if key == "" {
+			continue
+		}
+		value := strings.TrimSpace(match[2])
+		value = strings.Trim(value, `"'`)
+		config[key] = parseLoadValue(key, value)
+	}
+	if len(config) == 0 {
+		return nil, false
+	}
+	return config, true
+}
+
+func normalizeLoadKey(raw string) string {
+	key := strings.ToLower(strings.TrimSpace(raw))
+	key = strings.ReplaceAll(key, "-", "")
+	key = strings.ReplaceAll(key, "_", "")
+
+	switch key {
+	case "concurrency", "concurrent", "users", "user", "u":
+		return "concurrent"
+	case "amount", "requests", "requestcount", "iterations", "count":
+		return "iterations"
+	case "runtime", "duration", "time":
+		return "duration"
+	case "delay", "wait", "waittime", "thinktime":
+		return "delay"
+	case "minwait", "waitmin":
+		return "waitMin"
+	case "maxwait", "waitmax":
+		return "waitMax"
+	case "ramp", "rampup":
+		return "rampUp"
+	case "spawnrate", "r":
+		return "spawnRate"
+	case "start":
+		return "start"
+	case "startusers":
+		return "startUsers"
+	case "max":
+		return "max"
+	case "maxusers":
+		return "maxUsers"
+	case "rps", "requestspersecond", "targetrps":
+		return "requestsPerSecond"
+	case "failureratethreshold", "failurethreshold", "failthreshold", "failrate", "maxfailurerate", "maxfailure", "failpct", "failurepct":
+		return "failureRateThreshold"
+	case "adaptive", "autobackoff", "autoadjust", "autotune", "backoff", "stablebackoff":
+		return "adaptive"
+	case "adaptivefailurerate", "adaptivefailrate", "adaptivefailure", "adaptivefailurethreshold", "adaptivethreshold":
+		return "adaptiveFailureRate"
+	case "adaptivewindow", "window", "windowsec", "windows":
+		return "adaptiveWindow"
+	case "adaptivestable", "stablesec", "stablefor", "stable":
+		return "adaptiveStable"
+	case "adaptivecooldown", "cooldown":
+		return "adaptiveCooldown"
+	case "adaptivebackoffstep", "backoffstep", "backoffusers":
+		return "adaptiveBackoffStep"
+	default:
+		return strings.TrimSpace(raw)
+	}
+}
+
+func parseLoadValue(key, raw string) any {
+	switch key {
+	case "concurrent", "iterations", "spawnRate", "start", "startUsers", "max", "maxUsers", "requestsPerSecond", "adaptiveBackoffStep":
+		if n, err := strconv.Atoi(raw); err == nil {
+			return n
+		}
+	case "adaptive":
+		if b, err := strconv.ParseBool(strings.ToLower(raw)); err == nil {
+			return b
+		}
+	}
+	return raw
+}
+
+func mergeLoadConfig(base, extra map[string]any) map[string]any {
+	if len(extra) == 0 {
+		return cloneLoadConfig(base)
+	}
+	merged := cloneLoadConfig(base)
+	if merged == nil {
+		merged = map[string]any{}
+	}
+	for key, value := range extra {
+		merged[key] = value
+	}
+	return merged
+}
+
+func cloneLoadConfig(input map[string]any) map[string]any {
+	if len(input) == 0 {
+		return nil
+	}
+	out := make(map[string]any, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
 }
 
 // FindRequestsByName returns requests matching the given names

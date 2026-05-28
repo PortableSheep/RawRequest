@@ -17,6 +17,7 @@ export interface ShortcutEntry {
 export const SHORTCUT_CATALOG: readonly ShortcutEntry[] = [
   { id: 'app:save',                 combo: { key: 's', ctrl: true },                label: 'Save',              group: 'file' },
   { id: 'app:saveAs',               combo: { key: 's', ctrl: true, shift: true },   label: 'Save As…',          group: 'file',       priority: 1 },
+  { id: 'app:open',                 combo: { key: 'o', ctrl: true },                label: 'Open File',         group: 'file' },
   { id: 'app:toggleCommandPalette', combo: { key: 'p', ctrl: true },                label: 'Search Requests',   group: 'navigation' },
   { id: 'app:toggleOutline',        combo: { key: 'o', ctrl: true, shift: true },   label: 'Toggle Outline',    group: 'navigation' },
   { id: 'app:toggleHistory',        combo: { key: 'h', ctrl: true, shift: true },   label: 'Toggle History',    group: 'navigation' },

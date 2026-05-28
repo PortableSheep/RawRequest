@@ -83,11 +83,7 @@ Authorization: Bearer {{token}}
 
 ### High-Concurrency Performance Benchmark
 @name stressTest
-@load
-duration: 30s
-users: 50
-rampUp: 5s
-targetRPS: 200
+@load duration=30s users=50 rampUp=5s rps=200
 
 GET {{baseUrl}}/health
 ```
@@ -187,7 +183,7 @@ rawrequest run api.http -n getProfile -o body | jq .
 ### `rawrequest load` — Stress Test APIs
 Turn any request into a concurrency benchmark:
 ```bash
-# Execute load test configuration defined in file
+# Execute the @load configuration defined in the file
 rawrequest load api.http -n healthCheck
 
 # Override concurrent users and duration on the fly
@@ -238,6 +234,9 @@ Once configured, the AI assistant can naturally invoke these tools:
 *   `run_request`: Executes a specific client request and returns the full body, status, headers, and timings.
 *   `list_environments`: Discovers per-environment config profiles.
 *   `set_variable`: Sets a temporary session variable context for request chains.
+*   `create_request`: Creates a named request in a `.http` file.
+*   `update_request`: Modifies an existing named request while preserving surrounding content.
+*   `save_variable`: Persists a global or environment-scoped variable back to the `.http` file.
 
 ---
 

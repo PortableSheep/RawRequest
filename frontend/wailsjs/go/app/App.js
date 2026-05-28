@@ -26,6 +26,10 @@ export function EnsureServiceRunning(arg1) {
   return window['go']['app']['App']['EnsureServiceRunning'](arg1);
 }
 
+export function ExportDiagnosticLogs() {
+  return window['go']['app']['App']['ExportDiagnosticLogs']();
+}
+
 export function ExportSecrets() {
   return window['go']['app']['App']['ExportSecrets']();
 }
@@ -160,6 +164,10 @@ export function ParseResponseForVariables(arg1) {
 
 export function ReadFileContents(arg1) {
   return window['go']['app']['App']['ReadFileContents'](arg1);
+}
+
+export function RecordDiagnosticLog(arg1, arg2) {
+  return window['go']['app']['App']['RecordDiagnosticLog'](arg1, arg2);
 }
 
 export function RecordScriptLog(arg1, arg2, arg3) {

@@ -151,10 +151,6 @@ Variables set via `setVar()` do NOT need to be pre-declared with `@varName =` di
 ### Load Testing
 - Triggered via `@load` directive with config:
   ```
-  @load
-  duration: 60s
-  users: 100
-  rampUp: 10s
-  targetRPS: 500
+  @load duration=60s users=100 rampUp=10s rps=500
   ```
 - Results include percentile breakdowns, error rates, timing histograms

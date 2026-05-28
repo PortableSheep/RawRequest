@@ -63,8 +63,8 @@ func RunLoadTest(opts *Options, version string) int {
 	headersJSON, _ := json.Marshal(headersMap)
 	resolvedBody := runner.resolveVariables(req.Body)
 
-	// Build load config
-	loadConfig := buildLoadConfig(opts)
+	// Build load config from the request file first, then apply any CLI overrides.
+	loadConfig := buildLoadConfig(req, opts)
 	loadConfigJSON, _ := json.Marshal(loadConfig)
 
 	// Ensure service is running
@@ -119,7 +119,7 @@ func RunLoadTest(opts *Options, version string) int {
 
 	if opts.Output == OutputFull {
 		fmt.Fprintf(os.Stderr, "Load test started: %s %s\n", req.Method, resolvedURL)
-		fmt.Fprintf(os.Stderr, "Users: %d | Duration: %s | Ctrl+C to cancel\n\n", opts.LoadUsers, opts.LoadDuration)
+		fmt.Fprintf(os.Stderr, "Users: %s | Duration: %s | Ctrl+C to cancel\n\n", summarizeLoadUsers(loadConfig), summarizeLoadDuration(loadConfig))
 	}
 
 	// Wait for completion
@@ -141,33 +141,72 @@ func RunLoadTest(opts *Options, version string) int {
 	}
 }
 
-type loadConfig struct {
-	Concurrent  int     `json:"concurrent,omitempty"`
-	Duration    string  `json:"duration,omitempty"`
-	Rps         int     `json:"rps,omitempty"`
-	RampUp      string  `json:"rampUp,omitempty"`
-	FailureRate float64 `json:"failureRate,omitempty"`
-	Adaptive    bool    `json:"adaptive,omitempty"`
+func buildLoadConfig(req Request, opts *Options) map[string]any {
+	cfg := cloneLoadConfig(req.LoadConfig)
+	if cfg == nil {
+		cfg = map[string]any{}
+	}
+
+	if opts.LoadUsersSet {
+		cfg["concurrent"] = opts.LoadUsers
+	} else if !hasAnyLoadKey(cfg, "concurrent", "start", "startUsers", "max", "maxUsers") {
+		cfg["concurrent"] = 10
+	}
+
+	if opts.LoadDurationSet {
+		cfg["duration"] = opts.LoadDuration
+	} else if !hasAnyLoadKey(cfg, "duration", "iterations") {
+		cfg["duration"] = "30s"
+	}
+
+	if opts.LoadRPSSet {
+		cfg["requestsPerSecond"] = opts.LoadRPS
+	}
+	if opts.LoadRampUpSet {
+		cfg["rampUp"] = opts.LoadRampUp
+	}
+	if opts.LoadFailRateSet {
+		cfg["failureRateThreshold"] = opts.LoadFailRate
+	}
+	if opts.LoadAdaptiveSet {
+		cfg["adaptive"] = opts.LoadAdaptive
+	}
+
+	return cfg
 }
 
-func buildLoadConfig(opts *Options) loadConfig {
-	cfg := loadConfig{
-		Concurrent: opts.LoadUsers,
-		Duration:   opts.LoadDuration,
+func hasAnyLoadKey(cfg map[string]any, keys ...string) bool {
+	for _, key := range keys {
+		if _, exists := cfg[key]; exists {
+			return true
+		}
 	}
-	if opts.LoadRPS > 0 {
-		cfg.Rps = opts.LoadRPS
+	return false
+}
+
+func summarizeLoadUsers(cfg map[string]any) string {
+	switch value := cfg["concurrent"].(type) {
+	case int:
+		return fmt.Sprintf("%d", value)
+	case int64:
+		return fmt.Sprintf("%d", value)
+	case float64:
+		return fmt.Sprintf("%.0f", value)
+	case string:
+		return value
+	default:
+		return "10"
 	}
-	if opts.LoadRampUp != "" {
-		cfg.RampUp = opts.LoadRampUp
+}
+
+func summarizeLoadDuration(cfg map[string]any) string {
+	if duration, ok := cfg["duration"].(string); ok && strings.TrimSpace(duration) != "" {
+		return duration
 	}
-	if opts.LoadFailRate > 0 {
-		cfg.FailureRate = opts.LoadFailRate
+	if iterations, ok := cfg["iterations"]; ok {
+		return fmt.Sprintf("%v iterations", iterations)
 	}
-	if opts.LoadAdaptive {
-		cfg.Adaptive = true
-	}
-	return cfg
+	return "30s"
 }
 
 func ensureServiceRunning(serviceURL string) error {

@@ -378,9 +378,13 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 
 	// Create request
 	ctx := context.Background()
-	if r.timeout > 0 {
+	timeout := r.timeout
+	if req.Timeout > 0 {
+		timeout = time.Duration(req.Timeout) * time.Millisecond
+	}
+	if timeout > 0 {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, r.timeout)
+		ctx, cancel = context.WithTimeout(ctx, timeout)
 		defer cancel()
 	}
 

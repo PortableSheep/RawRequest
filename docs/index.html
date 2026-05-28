@@ -234,11 +234,7 @@
 <span class="cm-comment">### 3. High-Concurrency Stress Test Benchmark</span>
 <span class="cm-directive">@name</span> stressBenchmark
 <span class="cm-directive">@depends</span> login
-<span class="cm-directive">@load</span>
-duration: 30s
-users: 50
-rampUp: 5s
-targetRPS: 200
+<span class="cm-directive">@load</span> duration=30s users=50 rampUp=5s rps=200
 
 <span class="cm-method">GET</span> <span class="cm-url">{{baseUrl}}/profile</span>
 <span class="cm-header">Authorization:</span> Bearer {{token}}</code></pre>
@@ -555,7 +551,7 @@ targetRPS: 200
                             request definition.
                         </p>
                         <p>
-                            Specify custom target RPS, concurrent virtual users,
+                            Specify custom RPS caps, concurrent virtual users,
                             duration intervals, and ramp-up curves. Monitor
                             performance live in the GUI or trigger head-less
                             runs directly in terminal configurations.
@@ -563,8 +559,8 @@ targetRPS: 200
                         <div class="mcp-tools">
                             <div class="mcp-tool">
                                 <code
-                                    >rawrequest load api.http -n profile -u 100
-                                    -d 30s</code
+                                    >rawrequest load api.http -n profile --users
+                                    100 --duration 30s</code
                                 >
                                 <span
                                     >Trigger instant CLI load tests with
@@ -620,6 +616,41 @@ targetRPS: 200
                                 <span
                                     >Execute requests and stream responses and
                                     timings back to the AI.</span
+                                >
+                            </div>
+                            <div class="mcp-tool">
+                                <code>list_environments</code>
+                                <span
+                                    >Inspect available environments and their
+                                    variables for a file.</span
+                                >
+                            </div>
+                            <div class="mcp-tool">
+                                <code>set_variable</code>
+                                <span
+                                    >Set a session-scoped variable before
+                                    request execution.</span
+                                >
+                            </div>
+                            <div class="mcp-tool">
+                                <code>create_request</code>
+                                <span
+                                    >Create a named HTTP request directly in a
+                                    `.http` file.</span
+                                >
+                            </div>
+                            <div class="mcp-tool">
+                                <code>update_request</code>
+                                <span
+                                    >Modify an existing named request while
+                                    preserving file structure.</span
+                                >
+                            </div>
+                            <div class="mcp-tool">
+                                <code>save_variable</code>
+                                <span
+                                    >Persist a global or environment variable
+                                    back into the file.</span
                                 >
                             </div>
                         </div>

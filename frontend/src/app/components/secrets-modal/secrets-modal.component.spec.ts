@@ -26,6 +26,10 @@ function createMockSecretService(secrets: any = {}) {
     getSecretValue: vi.fn().mockResolvedValue('revealed_value'),
     setMasterPasswordAndRefresh: vi.fn().mockResolvedValue(undefined),
     verifyMasterPassword: vi.fn().mockResolvedValue(true),
+    getEnterpriseConfig: vi.fn().mockResolvedValue(null),
+    saveEnterpriseConfig: vi.fn().mockResolvedValue(undefined),
+    testEnterpriseSecret: vi.fn().mockResolvedValue(''),
+    openEnterpriseConfig: vi.fn().mockResolvedValue(undefined),
   };
 }
 

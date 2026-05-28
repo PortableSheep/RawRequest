@@ -55,6 +55,7 @@ import { RequestExecutionService } from "./services/request-execution.service";
 import { WorkspaceStateService } from "./services/workspace-state.service";
 import { FileSaveService } from "./services/file-save.service";
 import { StartupService } from "./services/startup.service";
+import { DiagnosticLoggerService } from "./services/diagnostic-logger.service";
 
 @Component({
   selector: "app-root",
@@ -99,6 +100,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly fileSave = inject(FileSaveService);
   readonly startup = inject(StartupService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly diagnostics = inject(DiagnosticLoggerService);
 
   readonly shortcutHint = shortcutHint;
 
@@ -136,9 +138,28 @@ export class AppComponent implements OnInit, OnDestroy {
     this.splitPane.refreshSplitLayoutState();
     this.registerKeyboardShortcuts();
     void this.startup.bootstrap(this.destroy$, (idx) => this.onRequestExecute(idx));
+
+    // Telemetry: initial boot log
+    this.diagnostics.info("RawRequest App Booting / Initializing");
+
+    // Global drag and drop block to prevent WKWebView reload navigation
+    document.addEventListener("dragover", (e) => e.preventDefault(), false);
+    document.addEventListener("drop", (e) => e.preventDefault(), false);
+
+    // Global unhandled error capturing
+    window.onerror = (message, source, lineno, colno, error) => {
+      const errorDetails = `Message: ${message} | Source: ${source}:${lineno}:${colno}`;
+      this.diagnostics.log('FATAL', `Unhandled JS Runtime Error: ${errorDetails} | ${error ? error.stack || error : ''}`);
+      return false; // Let browser keep its standard console logs as well
+    };
+
+    window.onunhandledrejection = (event) => {
+      this.diagnostics.log('FATAL', `Unhandled Promise Rejection: ${event.reason?.stack || event.reason}`);
+    };
   }
 
   ngOnDestroy() {
+    this.diagnostics.info("RawRequest App Destroyed / Shutting Down");
     this.keyboardShortcuts.unregisterMany(this.SHORTCUT_IDS);
     this.destroy$.next();
     this.destroy$.complete();
@@ -321,6 +342,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly shortcutActions: Record<string, () => void> = {
     'app:save': () => void this.saveCurrentFile(),
     'app:saveAs': () => void this.saveCurrentFileAs(),
+    'app:open': () => void this.ws.openFilesFromDisk(),
     'app:toggleHistory': () => this.panels.toggleHistory(),
     'app:toggleOutline': () => this.panels.toggleOutlinePanel(),
     'app:toggleCommandPalette': () => this.panels.toggleCommandPalette(),
@@ -329,12 +351,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private registerKeyboardShortcuts(): void {
     this.keyboardShortcuts.registerMany(
-      SHORTCUT_CATALOG.map(entry => ({
-        id: entry.id,
-        combo: entry.combo,
-        priority: entry.priority,
-        action: this.shortcutActions[entry.id] ?? (() => {}),
-      })),
+      SHORTCUT_CATALOG
+        .filter(entry => !!this.shortcutActions[entry.id])
+        .map(entry => ({
+          id: entry.id,
+          combo: entry.combo,
+          priority: entry.priority,
+          action: this.shortcutActions[entry.id]!,
+        })),
     );
   }
 

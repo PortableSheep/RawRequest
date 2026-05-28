@@ -1473,6 +1473,35 @@ main {
   color: var(--muted);
 }
 
+/* Document Lists */
+.docs-section ol,
+.docs-section ul {
+  padding-left: 28px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.docs-section ol {
+  list-style-type: decimal;
+}
+
+.docs-section ul {
+  list-style-type: disc;
+}
+
+.docs-section li {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.docs-section li strong {
+  color: var(--accent-light);
+  font-weight: 600;
+}
+
 /* Responsive Docs Layout */
 @media (max-width: 1024px) {
   .docs-container {

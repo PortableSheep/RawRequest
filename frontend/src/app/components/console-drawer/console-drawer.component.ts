@@ -128,7 +128,7 @@ export class ConsoleDrawerComponent implements OnInit, OnDestroy {
     if (!this.panels.consoleOpen()) {
       return;
     }
-    this.animateClose(() => this.panels.toggleConsole());
+    this.panels.toggleConsole(false);
   }
 
   handleClear() {

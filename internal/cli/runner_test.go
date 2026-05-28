@@ -78,6 +78,28 @@ func TestExecuteRequest_TimeoutError(t *testing.T) {
 	}
 }
 
+func TestExecuteRequest_UsesPerRequestTimeoutWhenPresent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	runner := NewRunner(&Options{
+		Variables: make(map[string]string),
+		Timeout:   10,
+	}, "test-version")
+	result := runner.ExecuteRequest(Request{
+		Method:  http.MethodGet,
+		URL:     srv.URL,
+		Timeout: 100,
+	})
+
+	if !strings.HasPrefix(result.Error, "Request failed: ") {
+		t.Fatalf("error = %q", result.Error)
+	}
+}
+
 func TestExecuteRequest_PreScriptSetsVariable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Token") != "from-script" {

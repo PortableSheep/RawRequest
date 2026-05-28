@@ -53,6 +53,12 @@ type Options struct {
 	LoadRampUp   string  // e.g. "10s"
 	LoadFailRate float64
 	LoadAdaptive bool
+	LoadUsersSet    bool
+	LoadDurationSet bool
+	LoadRPSSet      bool
+	LoadRampUpSet   bool
+	LoadFailRateSet bool
+	LoadAdaptiveSet bool
 	Workspace    string  // MCP workspace root
 	// Mock options
 	MockPort     int
@@ -157,6 +163,22 @@ func Parse(args []string) *Options {
 				opts.Variables[v[:idx]] = v[idx+1:]
 			}
 		}
+		fs.Visit(func(f *flag.Flag) {
+			switch f.Name {
+			case "users":
+				opts.LoadUsersSet = true
+			case "duration":
+				opts.LoadDurationSet = true
+			case "rps":
+				opts.LoadRPSSet = true
+			case "ramp-up":
+				opts.LoadRampUpSet = true
+			case "fail-rate":
+				opts.LoadFailRateSet = true
+			case "adaptive":
+				opts.LoadAdaptiveSet = true
+			}
+		})
 
 		return opts
 	}

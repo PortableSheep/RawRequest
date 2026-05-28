@@ -16,6 +16,8 @@ export function DeleteSecret(arg1:string,arg2:string):Promise<Record<string, Arr
 
 export function EnsureServiceRunning(arg1:string):Promise<void>;
 
+export function ExportDiagnosticLogs():Promise<string>;
+
 export function ExportSecrets():Promise<Record<string, Record<string, string>>>;
 
 export function GetAppVersion():Promise<string>;
@@ -83,6 +85,8 @@ export function OpenReleaseURL(arg1:string):Promise<void>;
 export function ParseResponseForVariables(arg1:string):Promise<void>;
 
 export function ReadFileContents(arg1:string):Promise<string>;
+
+export function RecordDiagnosticLog(arg1:string,arg2:string):Promise<void>;
 
 export function RecordScriptLog(arg1:string,arg2:string,arg3:string):Promise<void>;
 
