@@ -12,10 +12,12 @@ import (
 	"time"
 )
 
+var commandRunner = runCommand
+
 // EnterpriseConfig holds settings for enterprise secrets vault providers.
 type EnterpriseConfig struct {
 	Comment              string        `json:"_comment,omitempty"`
-	Provider             string        `json:"provider"`      // "local", "1password", "doppler", "aws", "vault", "custom"
+	Provider             string        `json:"provider"` // "local", "1password", "doppler", "aws", "vault", "custom"
 	CustomCommandComment string        `json:"_customCommandComment,omitempty"`
 	CustomCommand        string        `json:"customCommand"` // Custom CLI command template e.g. "op read {{key}}"
 	AWS                  AWSConfig     `json:"aws"`
@@ -135,13 +137,13 @@ func ResolveSecret(key string, config *EnterpriseConfig) (string, error) {
 // resolve1Password executes: op read <uri> --no-color
 func resolve1Password(uri string, _ *AWSConfig) (string, error) {
 	// op read op://vault/item/field --no-color
-	return runCommand(30*time.Second, nil, "op", "read", uri, "--no-color")
+	return commandRunner(30*time.Second, nil, "op", "read", uri, "--no-color")
 }
 
 // resolveDoppler executes: doppler secrets get <key> --plain
 func resolveDoppler(key string, cfg *DopplerConfig) (string, error) {
 	cleanKey := strings.TrimPrefix(key, "doppler://")
-	
+
 	// Doppler URI parsing: doppler://[project]/[config]/KEY
 	project := cfg.Project
 	config := cfg.Config
@@ -165,13 +167,13 @@ func resolveDoppler(key string, cfg *DopplerConfig) (string, error) {
 		args = append(args, "--config", config)
 	}
 
-	return runCommand(30*time.Second, nil, "doppler", args...)
+	return commandRunner(30*time.Second, nil, "doppler", args...)
 }
 
 // resolveAWS executes: aws secretsmanager get-secret-value --secret-id <secret_id>
 func resolveAWS(key string, cfg *AWSConfig) (string, error) {
 	cleanKey := strings.TrimPrefix(key, "aws://")
-	
+
 	// aws://secret_id/json_key
 	secretID := cleanKey
 	jsonKey := ""
@@ -189,7 +191,7 @@ func resolveAWS(key string, cfg *AWSConfig) (string, error) {
 		args = append(args, "--profile", cfg.Profile)
 	}
 
-	output, err := runCommand(30*time.Second, nil, "aws", args...)
+	output, err := commandRunner(30*time.Second, nil, "aws", args...)
 	if err != nil {
 		return "", err
 	}
@@ -239,7 +241,7 @@ func resolveVault(key string, cfg *VaultConfig) (string, error) {
 		env = append(env, "VAULT_TOKEN="+cfg.Token)
 	}
 
-	return runCommand(30*time.Second, env, "vault", args...)
+	return commandRunner(30*time.Second, env, "vault", args...)
 }
 
 // resolveCustom runs a user-defined shell CLI template replacing {{key}}
@@ -254,7 +256,7 @@ func resolveCustom(key string, template string) (string, error) {
 		return "", errors.New("invalid custom command template")
 	}
 
-	return runCommand(30*time.Second, nil, args[0], args[1:]...)
+	return commandRunner(30*time.Second, nil, args[0], args[1:]...)
 }
 
 // runCommand runs a command with timeout and returns standard output stripped of whitespace.

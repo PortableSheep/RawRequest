@@ -8,7 +8,7 @@ export type VaultInfo = any;
 
 @Injectable({ providedIn: 'root' })
 export class SecretService {
-  private readonly pattern = /\{\{\s*secret:([a-zA-Z0-9_\-\.]+)\s*\}\}/g;
+  private readonly pattern = /\{\{\s*secret:([^}\r\n]+?)\s*\}\}/g;
   private cache = new Map<string, string>();
   private pending = new Map<string, Promise<string>>();
   private lastSnapshot: SecretIndex = {};
@@ -124,7 +124,7 @@ export class SecretService {
 
     const replacements = new Map<string, string>();
     for (const match of matches) {
-      const token = match[1];
+      const token = match[1].trim();
       if (replacements.has(token)) {
         continue;
       }
@@ -133,7 +133,8 @@ export class SecretService {
     }
 
     return input.replace(this.pattern, (_, token: string) => {
-      return replacements.has(token) ? replacements.get(token)! : _;
+      const trimmedToken = token.trim();
+      return replacements.has(trimmedToken) ? replacements.get(trimmedToken)! : _;
     });
   }
 

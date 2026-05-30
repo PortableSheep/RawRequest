@@ -140,6 +140,23 @@ describe('editor.lint.logic', () => {
     expect(diags).toHaveLength(1);
     expect(diags[0].message).toContain('Unknown variable "unknown"');
   });
+
+  it('collectUnknownVariableDiagnosticsForLine skips external secret URIs', () => {
+    const diags = collectUnknownVariableDiagnosticsForLine({
+      text: 'GET https://x {{secret:op://team/api/token}} {{unknown}}',
+      lineFrom: 0,
+      envName: 'default',
+      vars: {},
+      envs: {},
+      currentEnvVars: {},
+      secretKeys: new Set(),
+      requestIndexForPlaceholderLine: 0,
+      chainVarsCache: []
+    });
+
+    expect(diags).toHaveLength(1);
+    expect(diags[0].message).toContain('Unknown variable "unknown"');
+  });
 });
 
 describe('structural lint: annotation after method line', () => {

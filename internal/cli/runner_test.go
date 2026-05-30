@@ -211,6 +211,29 @@ func TestExecuteRequest_NoScriptsFlag(t *testing.T) {
 	}
 }
 
+func TestResolveForTest_ExternalSecretURI(t *testing.T) {
+	runner := NewRunner(&Options{
+		Variables: make(map[string]string),
+	}, "test")
+	runner.SetSecretResolver(secretResolverFunc(func(env, key string) (string, error) {
+		if env != "default" || key != "custom://api-token" {
+			t.Fatalf("unexpected secret lookup env=%q key=%q", env, key)
+		}
+		return "external-api-token", nil
+	}))
+
+	got := runner.ResolveForTest("Authorization: Bearer {{secret:custom://api-token}}")
+	if got != "Authorization: Bearer external-api-token" {
+		t.Fatalf("ResolveForTest() = %q", got)
+	}
+}
+
+type secretResolverFunc func(env, key string) (string, error)
+
+func (f secretResolverFunc) GetSecret(env, key string) (string, error) {
+	return f(env, key)
+}
+
 func TestExecuteRequest_LogCallbackInvoked(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/fs"
 	"maps"
@@ -72,6 +73,11 @@ type App struct {
 	cachedWindowState WindowState
 	watchedFiles      map[string]time.Time
 	watchedFilesMu    sync.Mutex
+	shutdownOnce      sync.Once
+	shutdownErr       error
+	stopMockServerFn  func() error
+	stopManagedSvcFn  func() error
+	saveWindowStateFn func() error
 }
 
 const (
@@ -101,6 +107,9 @@ func NewApp(examplesFS ...fs.FS) *App {
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]
 	}
+	a.stopMockServerFn = a.StopMockServer
+	a.stopManagedSvcFn = a.stopManagedService
+	a.saveWindowStateFn = a.SaveWindowState
 	return a
 }
 
@@ -122,11 +131,31 @@ func (a *App) OnDomReady(ctx context.Context) {
 	runtime.WindowShow(ctx)
 }
 
-func (a *App) OnBeforeClose(ctx context.Context) bool {
-	_ = a.StopMockServer()
-	_ = a.stopManagedService()
-	_ = a.SaveWindowState()
+func (a *App) OnBeforeClose(_ context.Context) bool {
+	_ = a.shutdown()
 	return false
+}
+
+func (a *App) Shutdown(_ context.Context) {
+	_ = a.shutdown()
+}
+
+func (a *App) shutdown() error {
+	a.shutdownOnce.Do(func() {
+		a.shutdownErr = errors.Join(
+			runCleanupStep(a.stopMockServerFn),
+			runCleanupStep(a.stopManagedSvcFn),
+			runCleanupStep(a.saveWindowStateFn),
+		)
+	})
+	return a.shutdownErr
+}
+
+func runCleanupStep(fn func() error) error {
+	if fn == nil {
+		return nil
+	}
+	return fn()
 }
 
 func (a *App) executeRequests(requests []map[string]any) string {

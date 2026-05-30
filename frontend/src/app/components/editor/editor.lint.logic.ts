@@ -4,6 +4,7 @@ import {
   extractPlaceholders,
   extractSetVarKeys,
   ENV_PLACEHOLDER_REGEX,
+  isExternalSecretReference,
   REQUEST_REF_PLACEHOLDER_REGEX,
   SECRET_PLACEHOLDER_REGEX
 } from '../../utils/http-file-analysis';
@@ -220,7 +221,8 @@ export function collectUnknownVariableDiagnosticsForLine(params: {
 
     const secretMatch = inner.match(SECRET_PLACEHOLDER_REGEX);
     if (secretMatch) {
-      const key = secretMatch[1];
+      const key = secretMatch[1].trim();
+      if (isExternalSecretReference(key)) continue;
       if (params.secretKeys.has(key)) continue;
       diagnostics.push({
         from,

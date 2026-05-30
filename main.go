@@ -67,6 +67,7 @@ func main() {
 		OnStartup:        a.Startup,
 		OnDomReady:       a.OnDomReady,
 		OnBeforeClose:    a.OnBeforeClose,
+		OnShutdown:       a.Shutdown,
 		Bind: []interface{}{
 			a,
 		},

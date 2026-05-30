@@ -21,9 +21,9 @@ func TestSecretVaultReset_RemovesMasterHash(t *testing.T) {
 
 	// Seed files the Reset() call is expected to remove.
 	files := map[string][]byte{
-		sv.dataPath:              []byte("ciphertext"),
-		sv.keyPath:               []byte("key"),
-		sv.masterPasswordPath():  []byte("bcrypt-hash"),
+		sv.dataPath:             []byte("ciphertext"),
+		sv.keyPath:              []byte("key"),
+		sv.masterPasswordPath(): []byte("bcrypt-hash"),
 	}
 	for path, data := range files {
 		if err := os.WriteFile(path, data, 0o600); err != nil {
@@ -43,5 +43,34 @@ func TestSecretVaultReset_RemovesMasterHash(t *testing.T) {
 
 	if sv.HasMasterPassword() {
 		t.Fatalf("HasMasterPassword should be false after reset")
+	}
+}
+
+func TestSecretVaultGetSecret_ExternalURI(t *testing.T) {
+	dir := t.TempDir()
+	sv, err := NewSecretVault(dir)
+	if err != nil {
+		t.Fatalf("NewSecretVault: %v", err)
+	}
+	sv.keyringService = ""
+	sv.keyringUser = ""
+
+	config := []byte(`{
+  "provider": "local",
+  "customCommand": "echo external-{{key}}",
+  "aws": {},
+  "doppler": {},
+  "vault": {}
+}`)
+	if err := os.WriteFile(filepath.Join(dir, "secrets-config.json"), config, 0o600); err != nil {
+		t.Fatalf("write secrets-config.json: %v", err)
+	}
+
+	got, err := sv.GetSecret("default", "custom://api-token")
+	if err != nil {
+		t.Fatalf("GetSecret: %v", err)
+	}
+	if got != "external-api-token" {
+		t.Fatalf("GetSecret() = %q", got)
 	}
 }

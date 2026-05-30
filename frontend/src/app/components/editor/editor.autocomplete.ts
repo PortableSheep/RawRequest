@@ -95,7 +95,7 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
   const closeSuffix = hasClosingBraces ? '' : '}}';
 
   // Check for secret completion: {{secret:
-  const secretMatch = textBeforeCursor.match(/\{\{\s*secret:([a-zA-Z0-9_\-\.]*)$/);
+  const secretMatch = textBeforeCursor.match(/\{\{\s*secret:([^}\r\n]*)$/);
   if (secretMatch) {
     const prefix = secretMatch[1];
     const from = context.pos - prefix.length;
@@ -113,7 +113,7 @@ function httpCompletions(context: CompletionContext, deps: AutocompleteDeps): Co
       }));
 
     if (!options.length) return null;
-    return { from, options, validFor: /^[a-zA-Z0-9_\-\.]*$/ };
+    return { from, options, validFor: /^[^}\r\n]*$/ };
   }
 
   // Check for variable completion: {{

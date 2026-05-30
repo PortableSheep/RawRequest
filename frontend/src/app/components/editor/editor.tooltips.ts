@@ -2,6 +2,7 @@ import type { Extension } from '@codemirror/state';
 import { hoverTooltip } from '@codemirror/view';
 
 import { findChainVarOriginText } from './editor.chain-vars';
+import { isExternalSecretReference } from '../../utils/http-file-analysis';
 
 export type TooltipDeps = {
   getVariables: () => { [key: string]: string };
@@ -115,12 +116,13 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
       }
 
       // Check if it's a secret reference (don't reveal value)
-      const secretMatch = varName.match(/^secret:([a-zA-Z0-9_\-\.]+)$/);
+      const secretMatch = varName.match(/^secret:(.+)$/);
       if (secretMatch) {
-        const secretKey = secretMatch[1];
+        const secretKey = secretMatch[1].trim();
+        const isExternalRef = isExternalSecretReference(secretKey);
         const env = (currentEnvName || 'default').trim() || 'default';
         const keys = new Set<string>([...(secrets[env] || []), ...(secrets['default'] || [])]);
-        const exists = keys.has(secretKey);
+        const exists = isExternalRef || keys.has(secretKey);
         return {
           pos: start,
           end: end,
@@ -131,7 +133,7 @@ export function createVariableHoverTooltipExtension(deps: TooltipDeps): Extensio
             dom.innerHTML = `
               <div class="tooltip-header"><span class="tooltip-icon tooltip-icon--secret"></span>Secret</div>
               <div class="tooltip-name">${escapeHtml(secretKey)}</div>
-              <div class="tooltip-hint">${exists ? 'Resolved at runtime from vault' : 'Missing secret in current environment'}</div>
+              <div class="tooltip-hint">${isExternalRef ? 'Resolved at runtime via external provider' : exists ? 'Resolved at runtime from vault' : 'Missing secret in current environment'}</div>
             `;
             return { dom };
           }

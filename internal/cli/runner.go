@@ -522,7 +522,7 @@ func (r *Runner) resolveVariables(input string) string {
 	return result
 }
 
-var secretPattern = regexp.MustCompile(`\{\{\s*secret:([a-zA-Z0-9_\-\.]+)\s*\}\}`)
+var secretPattern = regexp.MustCompile(`\{\{\s*secret:([^}\r\n]+?)\s*\}\}`)
 
 func (r *Runner) resolveSecrets(input string) string {
 	if r.secretResolver == nil {
@@ -533,7 +533,7 @@ func (r *Runner) resolveSecrets(input string) string {
 		if len(sub) < 2 {
 			return match
 		}
-		key := sub[1]
+		key := strings.TrimSpace(sub[1])
 		env := r.environment
 		if env == "" {
 			env = "default"

@@ -38,13 +38,15 @@ func (a *App) EnsureServiceRunning(baseURL string) error {
 		return fmt.Errorf("failed to start service process: %w", err)
 	}
 
+	servicePID := cmd.Process.Pid
 	a.managedServiceMu.Lock()
-	a.managedServicePID = cmd.Process.Pid
+	a.managedServicePID = servicePID
 	a.managedServiceMu.Unlock()
 
-	go func() {
+	go func(pid int) {
 		_ = cmd.Wait()
-	}()
+		a.clearManagedServicePID(pid)
+	}(servicePID)
 
 	if waitForServiceHealth(normalizedBaseURL, 8*time.Second) {
 		return nil
@@ -70,6 +72,14 @@ func (a *App) stopManagedService() error {
 	}
 	_ = proc.Kill()
 	return nil
+}
+
+func (a *App) clearManagedServicePID(pid int) {
+	a.managedServiceMu.Lock()
+	defer a.managedServiceMu.Unlock()
+	if a.managedServicePID == pid {
+		a.managedServicePID = 0
+	}
 }
 
 func normalizeServiceEndpoint(raw string) (baseURL string, addr string, err error) {

@@ -7,7 +7,8 @@ export const SEPARATOR_LINE_REGEX = /^\s*###\s+\S/;
 export const SEPARATOR_PREFIX_REGEX = /^\s*###\s+/;
 
 export const PLACEHOLDER_REGEX = /\{\{([^}]+)\}\}/g;
-export const SECRET_PLACEHOLDER_REGEX = /^secret:([a-zA-Z0-9_\-\.]+)$/;
+export const SECRET_PLACEHOLDER_REGEX = /^secret:(.+)$/;
+export const EXTERNAL_SECRET_SCHEME_REGEX = /^(op|doppler|aws|vault|custom):\/\//;
 export const ENV_PLACEHOLDER_REGEX = /^env\.([^.]+)\.(.+)$/;
 export const REQUEST_REF_PLACEHOLDER_REGEX = /^(request\d+)\.(response\.(body|status|headers|json|timing|size).*)/;
 
@@ -48,6 +49,10 @@ export function extractPlaceholders(text: string): PlaceholderMatch[] {
     });
   }
   return matches;
+}
+
+export function isExternalSecretReference(key: string): boolean {
+  return EXTERNAL_SECRET_SCHEME_REGEX.test(key.trim());
 }
 
 export function extractMethodFromLine(text: string): string | null {
