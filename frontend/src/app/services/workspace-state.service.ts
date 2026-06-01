@@ -8,6 +8,7 @@ import {
   deriveAppStateFromWorkspaceUpdate,
 } from '../logic/app/workspace-update.logic';
 import { decideHistorySyncForWorkspaceState } from '../logic/app/history-sync.logic';
+import { isFileContentFunctionallyEqual } from './workspace-state.normalize';
 
 /**
  * Centralized reactive state store for workspace data.
@@ -50,6 +51,15 @@ export class WorkspaceStateService {
     const file = files[index];
     if (file.content === newContent) {
       return; // Content is identical
+    }
+
+    // Defensive: ignore whitespace-only churn (e.g. CRLF/LF flip from another
+    // tool, trailing-newline normalization). The file watcher polls on mtime
+    // alone, so any tool that re-saves a byte-identical buffer with different
+    // line endings would otherwise trigger a silent reload, replace the
+    // editor doc, and reset the user's scroll position.
+    if (isFileContentFunctionallyEqual(file.content, newContent)) {
+      return;
     }
 
     const isDirty = file.savedContent !== undefined && file.content !== file.savedContent;

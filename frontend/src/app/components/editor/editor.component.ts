@@ -21,6 +21,7 @@ import {
   computeContextMenuLocalPosition,
   shouldCollapseAccidentalSelection
 } from './editor.component.logic';
+import { computeMinimalReplace } from './editor.diff-replace';
 import {
   computeRequestIndexAtPosFallback,
   findRequestIndexByPos,
@@ -122,30 +123,42 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
             selection: { anchor: targetCursor }
           });
 
-          // Restore scroll position after a short tick
-          requestAnimationFrame(() => {
-            if (this.editorView && this.fileId() === newFileId) {
-              this.editorView.scrollDOM.scrollTop = savedState ? savedState.scroll : 0;
-            }
-          });
+          // Restore scroll position after CodeMirror's measure cycle.
+          this.restoreScrollAcrossFrames(
+            newFileId,
+            savedState ? savedState.scroll : 0,
+          );
 
           this.lastFileId = newFileId;
         } else {
-          // Same tab: only update content if it is different (e.g. external edits or debounced parses)
+          // Same tab: only update content if it is different (e.g. external
+          // edits or debounced parses). Use a minimal-diff replacement so
+          // unchanged regions are not re-laid out and scroll position is
+          // preserved reliably.
           if (!this.isUpdatingFromInput) {
             const currentContent = this.editorView.state.doc.toString();
-            if (currentContent !== newContent) {
+            const change = computeMinimalReplace(currentContent, newContent);
+            if (change) {
               const scrollPos = this.editorView.scrollDOM.scrollTop;
-              const cursor = Math.min(this.editorView.state.selection.main.head, newContent.length);
-              
+              const prevCursor = this.editorView.state.selection.main.head;
+              const newDocLen = newContent.length;
+
               this.isUpdatingFromInput = true;
               this.editorView.dispatch({
-                changes: { from: 0, to: this.editorView.state.doc.length, insert: newContent },
-                selection: { anchor: cursor }
+                changes: change,
+                // Only re-anchor the cursor if it would now be out of range.
+                // Otherwise leave the selection alone so CodeMirror does not
+                // attempt to scroll the cursor into view.
+                ...(prevCursor > newDocLen
+                  ? { selection: { anchor: newDocLen } }
+                  : {}),
               });
               this.isUpdatingFromInput = false;
-              
+
+              // Restore synchronously plus across the next two animation
+              // frames to win against CodeMirror's async measure cycle.
               this.editorView.scrollDOM.scrollTop = scrollPos;
+              this.restoreScrollAcrossFrames(newFileId, scrollPos);
             }
           }
         }
@@ -213,6 +226,27 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
 
   closeEditorContextMenu(): void {
     this.editorContextMenu.show = false;
+  }
+
+  /**
+   * Restore `scrollDOM.scrollTop` across multiple animation frames to win
+   * against CodeMirror's asynchronous measure cycle, which can otherwise
+   * clamp/clobber a synchronous scrollTop write made right after a doc
+   * change. Guarded by `fileId` so a tab switch mid-frame does not write the
+   * wrong value into the new tab's scroller.
+   */
+  private restoreScrollAcrossFrames(fileId: string, scrollTop: number): void {
+    const apply = () => {
+      if (!this.editorView) return;
+      if (this.fileId() !== fileId) return;
+      if (this.editorView.scrollDOM.scrollTop !== scrollTop) {
+        this.editorView.scrollDOM.scrollTop = scrollTop;
+      }
+    };
+    requestAnimationFrame(() => {
+      apply();
+      requestAnimationFrame(apply);
+    });
   }
 
   private getSelectionRange(): { from: number; to: number } {

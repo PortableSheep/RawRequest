@@ -10,7 +10,6 @@ import (
 	"maps"
 	"strings"
 	"sync"
-	"time"
 
 	"rawrequest/internal/importers"
 	rc "rawrequest/internal/requestchain"
@@ -71,7 +70,7 @@ type App struct {
 	binaryBodiesMu    sync.Mutex
 	windowStateMu     sync.Mutex
 	cachedWindowState WindowState
-	watchedFiles      map[string]time.Time
+	watchedFiles      map[string]watchedFileState
 	watchedFilesMu    sync.Mutex
 	shutdownOnce      sync.Once
 	shutdownErr       error
@@ -102,7 +101,7 @@ func NewApp(examplesFS ...fs.FS) *App {
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
 		binaryBodies:   make(map[string][]byte),
-		watchedFiles:   make(map[string]time.Time),
+		watchedFiles:   make(map[string]watchedFileState),
 	}
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]
