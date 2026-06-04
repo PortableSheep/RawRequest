@@ -21,7 +21,11 @@ import (
 // The auto-updater swaps the entire install directory with the contents of
 // the portable ZIP which only ships RawRequest.exe (uppercase). We recreate
 // the lowercase alias and service launcher in both locations.
-func refreshCLICopyBestEffort(installPath string) {
+//
+// stagingDir is unused on Windows (the CLI is always sourced from the
+// installed RawRequest.exe), but is accepted to match the cross-platform
+// signature.
+func refreshCLICopyBestEffort(installPath, _ string) {
 	newExe := filepath.Join(installPath, "RawRequest.exe")
 	if _, err := os.Stat(newExe); err != nil {
 		return

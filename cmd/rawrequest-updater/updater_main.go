@@ -160,7 +160,7 @@ func main() {
 	}
 
 	clearPreparedUpdateStateBestEffort()
-	refreshCLICopyBestEffort(installPath)
+	refreshCLICopyBestEffort(installPath, stagingDir)
 
 	fmt.Printf("Update applied successfully.\n")
 	if opts.relaunch {

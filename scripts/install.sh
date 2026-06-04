@@ -101,19 +101,40 @@ cp -R "$APP_PATH" "$INSTALL_DIR/"
 # Remove quarantine attribute
 xattr -dr com.apple.quarantine "$INSTALL_DIR/RawRequest.app" 2>/dev/null || true
 
-# Create CLI symlink so 'rawrequest' is available on PATH
+# Install the standalone CLI binary as a real file (not a symlink into
+# the app bundle). Symlinking into the bundle causes macOS LaunchServices
+# to register the CLI/MCP child as the bundle's running instance, which
+# in turn prevents the GUI from launching while the MCP is alive
+# (e.g. when Claude is running). See internal/migrations/m0001_cli_real_file_darwin.go.
 run_install_cmd mkdir -p "$BIN_DIR"
-CLI_LINK="$BIN_DIR/rawrequest"
-CLI_TARGET="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
-echo "Creating CLI symlink at $CLI_LINK..."
-if [ -L "$CLI_LINK" ] || [ -e "$CLI_LINK" ]; then
-    run_install_cmd rm -f "$CLI_LINK"
-fi
-run_install_cmd ln -s "$CLI_TARGET" "$CLI_LINK"
+CLI_DEST="$BIN_DIR/rawrequest"
 
-# Verify the symlink target exists
-if [ ! -x "$CLI_TARGET" ]; then
-    echo -e "${RED}Error: CLI binary not found at $CLI_TARGET${NC}"
+# Prefer the standalone CLI binary shipped at the top level of the
+# tarball. Fall back to the binary inside the app bundle for older
+# tarballs or dev installs that didn't include the standalone copy.
+STANDALONE_CLI="$(find "$TMP_DIR" -maxdepth 3 -type f -name "rawrequest" ! -path "*RawRequest.app*" | head -1)"
+if [ -z "$STANDALONE_CLI" ] || [ ! -f "$STANDALONE_CLI" ]; then
+    STANDALONE_CLI="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
+    echo -e "${YELLOW}Standalone CLI not found in tarball; copying from app bundle.${NC}"
+fi
+if [ ! -f "$STANDALONE_CLI" ]; then
+    echo -e "${RED}Error: CLI binary not found (tried tarball and app bundle).${NC}"
+    exit 1
+fi
+
+echo "Installing CLI binary to $CLI_DEST..."
+if [ -L "$CLI_DEST" ] || [ -e "$CLI_DEST" ]; then
+    run_install_cmd rm -f "$CLI_DEST"
+fi
+run_install_cmd install -m 0755 "$STANDALONE_CLI" "$CLI_DEST"
+# Strip any quarantine attribute that may have been inherited from the
+# downloaded tarball so the binary can be exec'd without Gatekeeper friction.
+run_install_cmd xattr -d com.apple.quarantine "$CLI_DEST" 2>/dev/null || true
+
+# Verify the bundle's main executable still exists for GUI launches.
+BUNDLE_BIN="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
+if [ ! -x "$BUNDLE_BIN" ]; then
+    echo -e "${RED}Error: app bundle binary not found at $BUNDLE_BIN${NC}"
     echo "The app bundle may be incomplete. Try reinstalling."
     exit 1
 fi
@@ -124,9 +145,9 @@ SERVICE_SCRIPT="$TMP_DIR/rawrequest-service"
 cat > "$SERVICE_SCRIPT" << 'EOF'
 #!/bin/bash
 set -euo pipefail
-exec "__RAWREQUEST_CLI_LINK__" service "$@"
+exec "__RAWREQUEST_CLI_DEST__" service "$@"
 EOF
-sed -i.bak "s|__RAWREQUEST_CLI_LINK__|$CLI_LINK|g" "$SERVICE_SCRIPT"
+sed -i.bak "s|__RAWREQUEST_CLI_DEST__|$CLI_DEST|g" "$SERVICE_SCRIPT"
 rm -f "$SERVICE_SCRIPT.bak"
 chmod +x "$SERVICE_SCRIPT"
 echo "Creating service launcher at $SERVICE_CMD..."
@@ -149,7 +170,7 @@ USER_SHELL="${SHELL:-/bin/zsh}"
 if ! "$USER_SHELL" -lc "command -v rawrequest" >/dev/null 2>&1; then
     echo ""
     echo -e "${YELLOW}Warning:${NC} rawrequest is not on PATH in your shell ($(basename "$USER_SHELL"))."
-    echo "The symlink was created at: $CLI_LINK"
+    echo "The CLI binary was installed at: $CLI_DEST"
     echo ""
     SHELL_NAME="$(basename "$USER_SHELL")"
     case "$SHELL_NAME" in

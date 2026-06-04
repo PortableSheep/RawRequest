@@ -114,6 +114,9 @@ func NewApp(examplesFS ...fs.FS) *App {
 
 func (a *App) Startup(ctx context.Context) {
 	a.ctx = ctx
+	// Best-effort install-state migrations. Runs in a goroutine so a slow
+	// or hung migration cannot delay Wails initialization.
+	go a.runStartupMigrations(ctx)
 }
 
 func (a *App) OnDomReady(ctx context.Context) {
