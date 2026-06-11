@@ -118,6 +118,7 @@ func refreshCLIBinary(path, srcBinary string) {
 
 	err = installRealFile(path, srcBinary)
 	if err == nil {
+		ensureCLIIdentifier(path)
 		return
 	}
 	if !isPermissionDenied(err) {
@@ -128,6 +129,22 @@ func refreshCLIBinary(path, srcBinary string) {
 	fmt.Printf("Elevated permissions needed to refresh %s; requesting admin access...\n", path)
 	if perr := installRealFilePrivileged(path, srcBinary); perr != nil {
 		fmt.Printf("Warning: privileged CLI refresh failed for %s: %v\n", path, perr)
+	}
+}
+
+// ensureCLIIdentifier ad-hoc resigns the standalone CLI at path with the
+// distinct identifier dev.rawrequest.cli. This keeps macOS LaunchServices
+// from conflating headless `rawrequest mcp` / `rawrequest service`
+// processes with the GUI bundle (CFBundleIdentifier=dev.rawrequest.app),
+// which would otherwise prevent GUI launches while the MCP child is
+// alive. Mirrors internal/migrations/m0002_cli_distinct_identifier_darwin.go.
+//
+// Failures are best-effort: the migration framework will retry on the
+// next GUI launch.
+func ensureCLIIdentifier(path string) {
+	cmd := exec.Command("codesign", "--force", "--sign", "-", "--identifier", "dev.rawrequest.cli", path)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		fmt.Printf("Warning: ad-hoc resign of %s failed: %v: %s\n", path, err, strings.TrimSpace(string(out)))
 	}
 }
 
@@ -205,9 +222,10 @@ func installRealFilePrivileged(path, srcBinary string) error {
 	}
 
 	script := fmt.Sprintf(
-		`do shell script "rm -f %s && cp -f %s %s && chmod 0755 %s" with administrator privileges`,
+		`do shell script "rm -f %s && cp -f %s %s && chmod 0755 %s && /usr/bin/codesign --force --sign - --identifier dev.rawrequest.cli %s" with administrator privileges`,
 		osaQuote(path),
 		osaQuote(stage),
+		osaQuote(path),
 		osaQuote(path),
 		osaQuote(path),
 	)

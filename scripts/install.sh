@@ -131,6 +131,17 @@ run_install_cmd install -m 0755 "$STANDALONE_CLI" "$CLI_DEST"
 # downloaded tarball so the binary can be exec'd without Gatekeeper friction.
 run_install_cmd xattr -d com.apple.quarantine "$CLI_DEST" 2>/dev/null || true
 
+# Re-sign the standalone CLI with a distinct ad-hoc identifier so macOS
+# LaunchServices does not conflate a long-lived `rawrequest mcp` child with
+# the GUI bundle (CFBundleIdentifier=dev.rawrequest.app). When the
+# identifiers collide, GUI launches of RawRequest.app are routed to the
+# headless child and time out. See
+# internal/migrations/m0002_cli_distinct_identifier_darwin.go.
+if command -v codesign >/dev/null 2>&1; then
+    run_install_cmd codesign --force --sign - --identifier dev.rawrequest.cli "$CLI_DEST" >/dev/null 2>&1 || \
+        echo -e "${YELLOW}Warning:${NC} ad-hoc resigning $CLI_DEST failed; the migration will retry on first GUI launch."
+fi
+
 # Verify the bundle's main executable still exists for GUI launches.
 BUNDLE_BIN="$INSTALL_DIR/RawRequest.app/Contents/MacOS/RawRequest"
 if [ ! -x "$BUNDLE_BIN" ]; then
