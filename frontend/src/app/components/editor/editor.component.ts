@@ -31,6 +31,7 @@ import { writeClipboardText, readClipboardText } from './editor-clipboard.utils'
 import {
   buildEditorThemeExtension,
   createDependsLinker,
+  createLastExecutedRequestHighlighter,
   createRequestBlockIndexer,
   createRequestFolding,
   createRequestHighlighter,
@@ -68,6 +69,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   secrets = input<SecretIndex>({});
   requestNames = input<string[]>([]);
   executingRequestIndex = input<number | null>(null);
+  lastExecutedRequestIndex = input<number | null>(null);
   isBusy = input<boolean>(false);
   contentChange = output<string>();
   requestExecute = output<number>();
@@ -79,6 +81,7 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
   private lintCompartment = new Compartment();
   private readOnlyCompartment = new Compartment();
   private themeCompartment = new Compartment();
+  private executedRequestHighlightCompartment = new Compartment();
   private readonly themeService = inject(ThemeService);
   private readonly searchService = inject(EditorSearchService);
   private readonly ws = inject(WorkspaceStateService);
@@ -212,6 +215,17 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         });
       }
     });
+
+    effect(() => {
+      const requestIndex = this.lastExecutedRequestIndex();
+      if (this.editorView) {
+        this.editorView.dispatch({
+          effects: this.executedRequestHighlightCompartment.reconfigure(
+            createLastExecutedRequestHighlighter(requestIndex)
+          )
+        });
+      }
+    });
   }
 
   ngAfterViewInit() {
@@ -332,6 +346,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         createRequestFolding(),
         search({ top: true }),
         createRequestHighlighter(),
+        this.executedRequestHighlightCompartment.of(
+          createLastExecutedRequestHighlighter(this.lastExecutedRequestIndex())
+        ),
         createDependsLinker((name) => jumpToRequestByName(this.editorView, name)),
         this.autocompleteCompartment.of(this.createAutocomplete()),
         this.themeCompartment.of(buildEditorThemeExtension(this.themeService.resolvedTheme())),

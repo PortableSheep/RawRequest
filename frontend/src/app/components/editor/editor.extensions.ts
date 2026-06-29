@@ -15,6 +15,9 @@ import { findRequestNameLineNumber } from './editor.component.logic';
 
 export function buildEditorThemeExtension(theme: 'dark' | 'light') {
   const isDark = theme === 'dark';
+  const selectionBackground = isDark ? 'rgba(129, 140, 248, 0.34)' : 'rgba(79, 70, 229, 0.30)';
+  const activeLineBackground = isDark ? 'rgba(99, 102, 241, 0.16)' : 'rgba(79, 70, 229, 0.12)';
+  const activeLineGutterBackground = isDark ? 'rgba(99, 102, 241, 0.20)' : 'rgba(79, 70, 229, 0.16)';
   return [
     EditorView.theme({
       "&": {
@@ -25,7 +28,7 @@ export function buildEditorThemeExtension(theme: 'dark' | 'light') {
         caretColor: "var(--rr-primary)"
       },
       ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--rr-primary)" },
-      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: "var(--rr-primary-alpha-20)" },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: selectionBackground },
 
       ".cm-gutters": {
         backgroundColor: "var(--rr-surface-1)",
@@ -33,13 +36,13 @@ export function buildEditorThemeExtension(theme: 'dark' | 'light') {
         border: "none"
       },
       ".cm-activeLineGutter": {
-        backgroundColor: "var(--rr-surface-2)"
+        backgroundColor: activeLineGutterBackground
       },
       ".cm-lineNumbers .cm-gutterElement": {
         padding: "0 8px 0 4px",
         minWidth: "32px"
       },
-      ".cm-activeLine": { backgroundColor: "var(--rr-surface-2)" },
+      ".cm-activeLine": { backgroundColor: activeLineBackground },
       ".cm-foldPlaceholder": {
         backgroundColor: "transparent",
         border: "none",
@@ -379,6 +382,47 @@ export function createRequestFolding() {
     }
     if (start >= state.doc.length) return null;
     return { from: start, to: state.doc.length };
+  });
+}
+
+export function createLastExecutedRequestHighlighter(lastExecutedRequestIndex: number | null) {
+  if (lastExecutedRequestIndex === null || lastExecutedRequestIndex < 0) {
+    return [];
+  }
+
+  return ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+
+    constructor(view: EditorView) {
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.viewportChanged) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView): DecorationSet {
+      const blocks = computeRequestBlockIndex(view.state.doc);
+      const block = blocks.find((candidate) => candidate.index === lastExecutedRequestIndex);
+      if (!block) {
+        return Decoration.none;
+      }
+
+      const startLine = view.state.doc.lineAt(block.from).number;
+      const endLine = view.state.doc.lineAt(block.to).number;
+      const lineClass = Decoration.line({ class: 'cm-last-executed-request' });
+      const builder = new RangeSetBuilder<Decoration>();
+      for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
+        const line = view.state.doc.line(lineNo);
+        builder.add(line.from, line.from, lineClass);
+      }
+
+      return builder.finish();
+    }
+  }, {
+    decorations: (view) => view.decorations
   });
 }
 

@@ -117,6 +117,7 @@ export class AppComponent implements OnInit, OnDestroy {
   get currentFileRequestNames() { return this.ws.currentFileRequestNames; }
   get isRequestRunningSignal() { return this.reqExec.isRequestRunningSignal; }
   get pendingRequestIndexSignal() { return this.reqExec.pendingRequestIndexSignal; }
+  get lastExecutedRequestIndexSignal() { return this.reqExec.lastExecutedRequestIndexSignal; }
 
   // Imperative accessors for template/logic
   get isRequestRunning() { return this.reqExec.isRequestRunning; }

@@ -350,9 +350,14 @@
 }
 
 ::ng-deep .cm-activeLineGutter {
-  background-color: var(--rr-surface-2) !important;
+  background-color: rgba(99, 102, 241, 0.2) !important;
   color: var(--rr-text) !important;
 }
+
+:host-context(html[data-theme="light"]) ::ng-deep .cm-activeLineGutter {
+  background-color: rgba(79, 70, 229, 0.16) !important;
+}
+
 ::ng-deep .cm-panel.cm-search {
   display: none !important;
 }

@@ -53,14 +53,26 @@ describe('editor-request-indexer.logic', () => {
       expect(computeRequestBlockIndex(doc)).toEqual([]);
     });
 
-    it('handles directives before method line', () => {
+    it('includes directive lines before method line in the same block', () => {
       const text = '@name Login\nPOST https://api.test/login\nContent-Type: application/json';
       const doc = docFrom(text);
       const blocks = computeRequestBlockIndex(doc);
-      // The block should start at the method line, not at the @name directive
-      const methodLineFrom = text.indexOf('POST');
+      const directiveLineFrom = text.indexOf('@name');
       expect(blocks).toHaveLength(1);
-      expect(blocks[0].from).toBe(methodLineFrom);
+      expect(blocks[0].from).toBe(directiveLineFrom);
+    });
+
+    it('includes contiguous directive metadata above method but not unrelated lines', () => {
+      const text = [
+        '# comment',
+        '@name Login',
+        '@depends Auth',
+        'POST https://api.test/login',
+      ].join('\n');
+      const doc = docFrom(text);
+      const blocks = computeRequestBlockIndex(doc);
+      expect(blocks).toHaveLength(1);
+      expect(blocks[0].from).toBe(text.indexOf('@name Login'));
     });
   });
 
@@ -126,6 +138,13 @@ describe('editor-request-indexer.logic', () => {
     it('returns null for position before any method line', () => {
       const doc = docFrom('@name Foo\n@depends Bar');
       expect(computeRequestIndexAtPosFallback(doc, 3, 1)).toBeNull();
+    });
+
+    it('maps directive lines to their request index when they are attached to a method block', () => {
+      const text = '@name Login\nPOST https://api.test/login';
+      const doc = docFrom(text);
+      const posInDirective = text.indexOf('@name') + 2;
+      expect(computeRequestIndexAtPosFallback(doc, posInDirective, 1)).toBe(0);
     });
   });
 });

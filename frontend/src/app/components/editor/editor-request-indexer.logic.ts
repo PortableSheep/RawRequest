@@ -46,7 +46,15 @@ export function computeRequestBlockIndex(doc: DocLike): RequestBlock[] {
 
     if (isMethodLine(text) && !inRequest) {
       inRequest = true;
-      currentFrom = line.from;
+      let blockStart = line.from;
+      for (let back = lineNo - 1; back >= 1; back--) {
+        const prev = doc.line(back);
+        if (isSeparatorLine(prev.text)) break;
+        const trimmed = prev.text.trim();
+        if (!trimmed.startsWith('@')) break;
+        blockStart = prev.from;
+      }
+      currentFrom = blockStart;
     }
   }
 
@@ -81,7 +89,7 @@ export function findRequestIndexByPos(blocks: RequestBlock[], pos: number): numb
 }
 
 /**
- * Fallback: compute request index at `pos` by scanning lines (O(lines)).
+ * Fallback: compute request index at `pos` from block ranges.
  * Used when the cached block index is empty or stale.
  */
 export function computeRequestIndexAtPosFallback(
@@ -89,27 +97,9 @@ export function computeRequestIndexAtPosFallback(
   pos: number,
   requestCount: number
 ): number | null {
-  let idx = -1;
-  let inRequest = false;
-  for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
-    const line = doc.line(lineNo);
-    const text = line.text;
-
-    if (isSeparatorLine(text)) {
-      inRequest = false;
-    } else if (isMethodLine(text)) {
-      if (!inRequest) {
-        idx++;
-        inRequest = true;
-      }
-    }
-
-    if (pos <= line.to) {
-      break;
-    }
-  }
-
-  if (idx < 0) return null;
-  if (idx >= requestCount) return null;
+  const blocks = computeRequestBlockIndex(doc);
+  const idx = findRequestIndexByPos(blocks, pos);
+  if (idx === null) return null;
+  if (idx < 0 || idx >= requestCount) return null;
   return idx;
 }
