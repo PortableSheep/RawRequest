@@ -77,3 +77,9 @@ e2e/*.map
 
 # Build artifacts
 /dist/
+
+# Local AI/assistant artifacts (keep local-only)
+.antigravitycli/
+.claude/
+.cursor/
+.copilot/
