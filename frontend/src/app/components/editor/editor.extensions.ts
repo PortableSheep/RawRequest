@@ -410,9 +410,10 @@ export function createLastExecutedRequestHighlighter(lastExecutedRequestIndex: n
         return Decoration.none;
       }
 
+      const method = (block.method || 'get').toLowerCase();
       const startLine = view.state.doc.lineAt(block.from).number;
       const endLine = view.state.doc.lineAt(block.to).number;
-      const lineClass = Decoration.line({ class: 'cm-last-executed-request' });
+      const lineClass = Decoration.line({ class: `cm-last-executed-request cm-last-executed-request--${method}` });
       const builder = new RangeSetBuilder<Decoration>();
       for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
         const line = view.state.doc.line(lineNo);

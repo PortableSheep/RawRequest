@@ -36,7 +36,7 @@ describe('editor-request-indexer.logic', () => {
     it('finds a single request', () => {
       const doc = docFrom('GET https://example.com\nAccept: application/json');
       const blocks = computeRequestBlockIndex(doc);
-      expect(blocks).toEqual([{ from: 0, to: doc.length, index: 0 }]);
+      expect(blocks).toEqual([{ from: 0, to: doc.length, index: 0, method: 'GET' }]);
     });
 
     it('finds two requests separated by ###', () => {
@@ -78,9 +78,9 @@ describe('editor-request-indexer.logic', () => {
 
   describe('findRequestIndexByPos', () => {
     const blocks: RequestBlock[] = [
-      { from: 0, to: 30, index: 0 },
-      { from: 50, to: 90, index: 1 },
-      { from: 110, to: 150, index: 2 }
+      { from: 0, to: 30, index: 0, method: 'GET' },
+      { from: 50, to: 90, index: 1, method: 'POST' },
+      { from: 110, to: 150, index: 2, method: 'DELETE' }
     ];
 
     it('returns null for empty blocks', () => {

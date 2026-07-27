@@ -1,9 +1,10 @@
-import { isMethodLine, isSeparatorLine } from '../../utils/http-file-analysis';
+import { extractMethodFromLine, isMethodLine, isSeparatorLine } from '../../utils/http-file-analysis';
 
 export interface RequestBlock {
   from: number;
   to: number;
   index: number;
+  method: string | null;
 }
 
 /**
@@ -25,6 +26,7 @@ export function computeRequestBlockIndex(doc: DocLike): RequestBlock[] {
 
   let inRequest = false;
   let currentFrom: number | null = null;
+  let currentMethod: string | null = null;
   let index = 0;
 
   for (let lineNo = 1; lineNo <= doc.lines; lineNo++) {
@@ -35,17 +37,19 @@ export function computeRequestBlockIndex(doc: DocLike): RequestBlock[] {
       if (inRequest && currentFrom !== null) {
         const end = line.from - 1;
         if (end > currentFrom) {
-          blocks.push({ from: currentFrom, to: end, index });
+          blocks.push({ from: currentFrom, to: end, index, method: currentMethod });
           index++;
         }
       }
       inRequest = false;
       currentFrom = null;
+      currentMethod = null;
       continue;
     }
 
     if (isMethodLine(text) && !inRequest) {
       inRequest = true;
+      currentMethod = extractMethodFromLine(text);
       let blockStart = line.from;
       for (let back = lineNo - 1; back >= 1; back--) {
         const prev = doc.line(back);
@@ -59,7 +63,7 @@ export function computeRequestBlockIndex(doc: DocLike): RequestBlock[] {
   }
 
   if (inRequest && currentFrom !== null) {
-    blocks.push({ from: currentFrom, to: doc.length, index });
+    blocks.push({ from: currentFrom, to: doc.length, index, method: currentMethod });
   }
 
   return blocks;

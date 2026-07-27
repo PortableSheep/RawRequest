@@ -1259,8 +1259,8 @@ html[data-theme="light"] .floating-overlay {
 
 /* Selection Styling */
 ::selection {
-  background: rgba(99, 102, 241, 0.3); /* blue-500 with opacity */
-  color: #fff;
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
 }
 
 /* CodeMirror Overrides (theme-aware)
@@ -1291,6 +1291,11 @@ html[data-theme="light"] .cm-selectionBackground {
   background-color: rgba(79, 70, 229, 0.30) !important;
 }
 
+/* Dark theme (default) selection: white overlay for contrast on any background */
+.cm-selectionBackground {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
 .cm-line.cm-last-executed-request,
 .cm-line.cm-last-executed-request.cm-script-line,
 .cm-line.cm-last-executed-request.cm-payload-line {
@@ -1298,11 +1303,98 @@ html[data-theme="light"] .cm-selectionBackground {
   box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.95);
 }
 
+/* Method-colored variants for the executed block */
+.cm-line.cm-last-executed-request--get,
+.cm-line.cm-last-executed-request--get.cm-script-line,
+.cm-line.cm-last-executed-request--get.cm-payload-line {
+  background-color: rgba(34, 197, 94, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.95);
+}
+.cm-line.cm-last-executed-request--post,
+.cm-line.cm-last-executed-request--post.cm-script-line,
+.cm-line.cm-last-executed-request--post.cm-payload-line {
+  background-color: rgba(99, 102, 241, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(99, 102, 241, 0.95);
+}
+.cm-line.cm-last-executed-request--put,
+.cm-line.cm-last-executed-request--put.cm-script-line,
+.cm-line.cm-last-executed-request--put.cm-payload-line {
+  background-color: rgba(245, 158, 11, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.95);
+}
+.cm-line.cm-last-executed-request--patch,
+.cm-line.cm-last-executed-request--patch.cm-script-line,
+.cm-line.cm-last-executed-request--patch.cm-payload-line {
+  background-color: rgba(168, 85, 247, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(168, 85, 247, 0.95);
+}
+.cm-line.cm-last-executed-request--delete,
+.cm-line.cm-last-executed-request--delete.cm-script-line,
+.cm-line.cm-last-executed-request--delete.cm-payload-line {
+  background-color: rgba(239, 68, 68, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.95);
+}
+.cm-line.cm-last-executed-request--head,
+.cm-line.cm-last-executed-request--head.cm-script-line,
+.cm-line.cm-last-executed-request--head.cm-payload-line {
+  background-color: rgba(6, 182, 212, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(6, 182, 212, 0.95);
+}
+.cm-line.cm-last-executed-request--options,
+.cm-line.cm-last-executed-request--options.cm-script-line,
+.cm-line.cm-last-executed-request--options.cm-payload-line {
+  background-color: rgba(139, 92, 246, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(139, 92, 246, 0.95);
+}
+
 html[data-theme="light"] .cm-line.cm-last-executed-request,
 html[data-theme="light"] .cm-line.cm-last-executed-request.cm-script-line,
 html[data-theme="light"] .cm-line.cm-last-executed-request.cm-payload-line {
   background-color: rgba(34, 197, 94, 0.20) !important;
   box-shadow: inset 3px 0 0 rgba(21, 128, 61, 0.95);
+}
+
+html[data-theme="light"] .cm-line.cm-last-executed-request--get,
+html[data-theme="light"] .cm-line.cm-last-executed-request--get.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--get.cm-payload-line {
+  background-color: rgba(34, 197, 94, 0.20) !important;
+  box-shadow: inset 3px 0 0 rgba(21, 128, 61, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--post,
+html[data-theme="light"] .cm-line.cm-last-executed-request--post.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--post.cm-payload-line {
+  background-color: rgba(79, 70, 229, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(79, 70, 229, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--put,
+html[data-theme="light"] .cm-line.cm-last-executed-request--put.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--put.cm-payload-line {
+  background-color: rgba(217, 119, 6, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(217, 119, 6, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch,
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch.cm-payload-line {
+  background-color: rgba(124, 58, 237, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete,
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete.cm-payload-line {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(220, 38, 38, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--head,
+html[data-theme="light"] .cm-line.cm-last-executed-request--head.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--head.cm-payload-line {
+  background-color: rgba(8, 145, 178, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(8, 145, 178, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--options,
+html[data-theme="light"] .cm-line.cm-last-executed-request--options.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--options.cm-payload-line {
+  background-color: rgba(109, 40, 217, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(109, 40, 217, 0.95);
 }
 
 html[data-theme="light"] .cm-line.cm-payload-line {

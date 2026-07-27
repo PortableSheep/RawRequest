@@ -260,19 +260,13 @@ export class RequestExecutionService {
 
   getActiveRequestPreview(currentFile: FileTab): string {
     const request = this.getActiveRequestDetails(currentFile);
-    const processedUrl = this.activeRequestInfo
-      ? (currentFile.responseData?.[this.activeRequestInfo.requestIndex]
-          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
-      : undefined;
+    const processedUrl = this.activeRequestInfo?.processedUrl;
     return buildActiveRequestPreview(request, processedUrl);
   }
 
   getActiveRequestMeta(currentFile: FileTab): string {
     const request = this.getActiveRequestDetails(currentFile);
-    const processedUrl = this.activeRequestInfo
-      ? (currentFile.responseData?.[this.activeRequestInfo.requestIndex]
-          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
-      : undefined;
+    const processedUrl = this.activeRequestInfo?.processedUrl;
     return buildActiveRequestMeta({
       activeRequestInfo: this.activeRequestInfo,
       isRequestRunning: this.isRequestRunning,
