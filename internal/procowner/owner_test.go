@@ -132,10 +132,19 @@ func TestStopKillsRealProcess(t *testing.T) {
 // TestOwnerConcurrentAccess exercises Set/Get/ClearIfMatch/Stop concurrently
 // to catch data races (run with -race) and confirm the Owner never panics
 // under contention.
+//
+// basePID offsets every synthetic PID used here far above any real-world
+// PID: Linux's kernel.pid_max tops out well below 1<<30 even on 64-bit
+// systems with the maximum tunable value. Stop() issues a real
+// syscall-level Kill(), so without this offset small values like g*1000+i
+// (0-49199) can collide with and SIGKILL an actual running process -
+// including the test binary's own process or a CI runner process, which is
+// exactly what happened when this originally shipped without the offset.
 func TestOwnerConcurrentAccess(t *testing.T) {
 	o := New()
 	const goroutines = 50
 	const iterations = 200
+	const basePID = 1 << 30
 
 	var wg sync.WaitGroup
 	for g := 0; g < goroutines; g++ {
@@ -145,11 +154,11 @@ func TestOwnerConcurrentAccess(t *testing.T) {
 			for i := 0; i < iterations; i++ {
 				switch i % 4 {
 				case 0:
-					o.Set(g*1000 + i)
+					o.Set(basePID + g*1000 + i)
 				case 1:
 					_ = o.Get()
 				case 2:
-					_ = o.ClearIfMatch(g * 1000)
+					_ = o.ClearIfMatch(basePID + g*1000)
 				default:
 					_ = o.Stop()
 				}
