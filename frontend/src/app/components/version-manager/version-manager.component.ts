@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PanelVisibilityService } from '../../services/panel-visibility.service';
 import { UpdateService, ReleaseInfo } from '../../services/update.service';
@@ -18,6 +18,16 @@ export class VersionManagerComponent implements OnInit {
 
   ngOnInit(): void {
     void this.updateService.listReleases();
+  }
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.panels.showVersionManager()) return;
+    if (this.confirmVersion) {
+      this.cancelInstall();
+      return;
+    }
+    this.close();
   }
 
   close(): void {

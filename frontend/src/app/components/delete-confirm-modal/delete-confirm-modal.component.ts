@@ -1,4 +1,4 @@
-import { Component, input, output } from '@angular/core';
+import { Component, HostListener, input, output } from '@angular/core';
 
 
 @Component({
@@ -14,4 +14,10 @@ export class DeleteConfirmModalComponent {
 
   onConfirm = output<void>();
   onCancel = output<void>();
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.isOpen()) return;
+    this.onCancel.emit();
+  }
 }

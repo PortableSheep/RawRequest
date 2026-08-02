@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Output, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScriptSnippetService, ScriptSnippet } from '../../services/script-snippet.service';
@@ -21,6 +21,12 @@ export class ScriptSnippetModalComponent {
   previewTab = signal<'pre' | 'post'>('pre');
 
   constructor(public snippetService: ScriptSnippetService) {}
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.isOpen()) return;
+    this.close();
+  }
 
   open() {
     this.isOpen.set(true);

@@ -176,4 +176,45 @@ describe('CommandPaletteComponent', () => {
       expect(component.getMethodClass('GET')).toBe('rr-palette-method rr-palette-method--get');
     });
   });
+
+  describe('listbox semantics', () => {
+    beforeEach(() => {
+      mockCurrentFileView.set({
+        ...emptyFileView,
+        requests: [
+          { method: 'GET', url: '/a' } as any,
+          { method: 'POST', url: '/b' } as any,
+        ],
+      });
+      mockShowCommandPalette.set(true);
+      fixture.detectChanges();
+    });
+
+    it('should expose combobox/listbox roles wired together', () => {
+      const input: HTMLElement = fixture.nativeElement.querySelector('.rr-palette-input');
+      const listbox: HTMLElement = fixture.nativeElement.querySelector('.rr-palette-results');
+
+      expect(input.getAttribute('role')).toBe('combobox');
+      expect(listbox.getAttribute('role')).toBe('listbox');
+      expect(input.getAttribute('aria-controls')).toBe(listbox.id);
+    });
+
+    it('should mark each result as an option with aria-selected wired to selectedIndex', () => {
+      const items: NodeListOf<HTMLElement> = fixture.nativeElement.querySelectorAll('.rr-palette-item');
+
+      expect(items[0].getAttribute('role')).toBe('option');
+      expect(items[0].getAttribute('aria-selected')).toBe('true');
+      expect(items[1].getAttribute('aria-selected')).toBe('false');
+    });
+
+    it('should update aria-activedescendant as selection moves', () => {
+      const input: HTMLElement = fixture.nativeElement.querySelector('.rr-palette-input');
+      expect(input.getAttribute('aria-activedescendant')).toBe(component.optionId(0));
+
+      component.onKeydown(new KeyboardEvent('keydown', { key: 'ArrowDown' }));
+      fixture.detectChanges();
+
+      expect(input.getAttribute('aria-activedescendant')).toBe(component.optionId(1));
+    });
+  });
 });
