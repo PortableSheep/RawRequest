@@ -1,18 +1,17 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { RequestManagerComponent } from './request-manager.component';
-import { HttpService } from '../../services/http.service';
-import { NotificationService } from '../../services/notification.service';
-import { MockServerService } from '../../services/mock-server.service';
+import { RequestManagerService } from './request-manager.service';
+import { HttpService } from './http.service';
+import { NotificationService } from './notification.service';
+import { MockServerService } from './mock-server.service';
+import { WorkspaceStateService } from './workspace-state.service';
 import {
   Request,
   FileTab,
   ResponseData,
-  RequestPreview,
   LoadTestResults,
   LoadTestMetrics,
-  ActiveRunProgress
-} from '../../models/http.models';
+} from '../models/http.models';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,50 +120,52 @@ function createMockNotificationService(): vi.Mocked<Pick<
   };
 }
 
+function createMockWorkspaceStateService(files: FileTab[], currentFileIndex = 0, currentEnv = '') {
+  return {
+    files: signal(files),
+    currentFileIndex: signal(currentFileIndex),
+    currentEnv: signal(currentEnv),
+    onFilesChange: vi.fn(),
+    onHistoryUpdated: vi.fn(),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('RequestManagerComponent', () => {
-  let fixture: ComponentFixture<RequestManagerComponent>;
-  let component: RequestManagerComponent;
+describe('RequestManagerService', () => {
+  let service: RequestManagerService;
   let mockHttp: ReturnType<typeof createMockHttpService>;
   let mockNotification: ReturnType<typeof createMockNotificationService>;
   let mockMockServer: any;
+  let mockWs: ReturnType<typeof createMockWorkspaceStateService>;
 
-  beforeEach(async () => {
+  function configure(files: FileTab[], currentFileIndex = 0, currentEnv = ''): void {
+    TestBed.resetTestingModule();
     mockHttp = createMockHttpService();
     mockNotification = createMockNotificationService();
     mockMockServer = {
       status: signal({ running: false, port: 8080, dbPath: '' }),
       logs: signal([])
     };
+    mockWs = createMockWorkspaceStateService(files, currentFileIndex, currentEnv);
 
-    await TestBed.configureTestingModule({
-      imports: [RequestManagerComponent]
-    })
-      .overrideComponent(RequestManagerComponent, {
-        set: {
-          providers: [
-            { provide: HttpService, useValue: mockHttp },
-            { provide: NotificationService, useValue: mockNotification },
-            { provide: MockServerService, useValue: mockMockServer }
-          ]
-        }
-      })
-      .compileComponents();
+    TestBed.configureTestingModule({
+      providers: [
+        RequestManagerService,
+        { provide: HttpService, useValue: mockHttp },
+        { provide: NotificationService, useValue: mockNotification },
+        { provide: MockServerService, useValue: mockMockServer },
+        { provide: WorkspaceStateService, useValue: mockWs },
+      ],
+    });
 
-    fixture = TestBed.createComponent(RequestManagerComponent);
-    component = fixture.componentInstance;
+    service = TestBed.inject(RequestManagerService);
+  }
 
-    fixture.componentRef.setInput('files', [makeFileTab()]);
-    fixture.componentRef.setInput('currentFileIndex', 0);
-    fixture.componentRef.setInput('currentEnv', '');
-    fixture.detectChanges();
-  });
-
-  afterEach(() => {
-    fixture.destroy();
+  beforeEach(() => {
+    configure([makeFileTab()]);
   });
 
   // -----------------------------------------------------------------------
@@ -172,7 +173,7 @@ describe('RequestManagerComponent', () => {
   // -----------------------------------------------------------------------
 
   it('should create', () => {
-    expect(component).toBeTruthy();
+    expect(service).toBeTruthy();
   });
 
   // -----------------------------------------------------------------------
@@ -181,7 +182,7 @@ describe('RequestManagerComponent', () => {
 
   describe('executeRequest', () => {
     it('should call httpService.sendRequest for a simple request', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).toHaveBeenCalledTimes(1);
       expect(mockHttp.sendRequest).toHaveBeenCalledWith(
@@ -192,23 +193,20 @@ describe('RequestManagerComponent', () => {
       );
     });
 
-    it('should emit filesChange with updated response data', async () => {
-      const spy = vi.fn();
-      component.filesChange.subscribe(spy);
+    it('should push updated files to workspace state with response data', async () => {
+      await service.executeRequest(0);
 
-      await component.executeRequest(0);
-
-      expect(spy).toHaveBeenCalledTimes(1);
-      const updatedFiles: FileTab[] = spy.mock.calls[0][0];
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
+      const updatedFiles: FileTab[] = mockWs.onFilesChange.mock.calls[0][0];
       expect(updatedFiles[0].responseData[0]).toBeDefined();
       expect(updatedFiles[0].responseData[0].status).toBe(200);
     });
 
     it('should emit requestExecuted with requestIndex and response', async () => {
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(spy).toHaveBeenCalledTimes(1);
       expect(spy).toHaveBeenCalledWith(
@@ -220,7 +218,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should notify on request completion', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockNotification.notifyRequestComplete).toHaveBeenCalledWith(
         undefined, // name from the default request
@@ -230,7 +228,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should push history entry after execution', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.addToHistory).toHaveBeenCalledTimes(1);
       expect(mockHttp.addToHistory).toHaveBeenCalledWith(
@@ -241,22 +239,19 @@ describe('RequestManagerComponent', () => {
       );
     });
 
-    it('should emit historyUpdated after pushing history', async () => {
-      const spy = vi.fn();
-      component.historyUpdated.subscribe(spy);
+    it('should push updated history to workspace state after execution', async () => {
+      await service.executeRequest(0);
 
-      await component.executeRequest(0);
-
-      expect(spy).toHaveBeenCalledWith(
+      expect(mockWs.onHistoryUpdated).toHaveBeenCalledWith(
         expect.objectContaining({ fileId: 'file-1', history: [] })
       );
     });
 
     it('should not execute if already executing', async () => {
       // Start first execution (don't await)
-      const first = component.executeRequest(0);
+      const first = service.executeRequest(0);
       // Attempt second while first is in progress
-      const second = component.executeRequest(0);
+      const second = service.executeRequest(0);
 
       await Promise.all([first, second]);
 
@@ -264,16 +259,15 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should return early for invalid request index', async () => {
-      await component.executeRequest(99);
+      await service.executeRequest(99);
 
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
     });
 
     it('should return early when files array has no current file', async () => {
-      fixture.componentRef.setInput('files', []);
-      fixture.detectChanges();
+      configure([]);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
     });
@@ -285,15 +279,14 @@ describe('RequestManagerComponent', () => {
 
   describe('relative URLs and mock server integration', () => {
     it('should prepend mock server port when mock server is running', async () => {
-      mockMockServer.status.set({ running: true, port: 9090, dbPath: '' });
-      fixture.componentRef.setInput('files', [
+      configure([
         makeFileTab({
           requests: [makeRequest({ url: '/users' })]
         })
       ]);
-      fixture.detectChanges();
+      mockMockServer.status.set({ running: true, port: 9090, dbPath: '' });
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).toHaveBeenCalledTimes(1);
       expect(mockHttp.sendRequest).toHaveBeenCalledWith(
@@ -305,22 +298,18 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should handle mock-offline error response when mock server is offline', async () => {
-      mockMockServer.status.set({ running: false, port: 9090, dbPath: '' });
-      fixture.componentRef.setInput('files', [
+      configure([
         makeFileTab({
           requests: [makeRequest({ url: '/users' })]
         })
       ]);
-      fixture.detectChanges();
+      mockMockServer.status.set({ running: false, port: 9090, dbPath: '' });
 
-      const spy = vi.fn();
-      component.filesChange.subscribe(spy);
-
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
-      expect(spy).toHaveBeenCalledTimes(1);
-      const updatedFiles: FileTab[] = spy.mock.calls[0][0];
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
+      const updatedFiles: FileTab[] = mockWs.onFilesChange.mock.calls[0][0];
       expect(updatedFiles[0].responseData[0]).toBeDefined();
       expect(updatedFiles[0].responseData[0].status).toBe(0);
       expect(updatedFiles[0].responseData[0].statusText).toBe('Mock Server Offline');
@@ -334,18 +323,18 @@ describe('RequestManagerComponent', () => {
 
   describe('executeRequestByIndex', () => {
     it('should delegate to executeRequest', async () => {
-      const spy = vi.spyOn(component, 'executeRequest');
+      const spy = vi.spyOn(service, 'executeRequest');
 
-      await component.executeRequestByIndex(0);
+      await service.executeRequestByIndex(0);
 
       expect(spy).toHaveBeenCalledWith(0, undefined);
     });
 
     it('should skip duplicate execution for the same index while executing', async () => {
-      const spy = vi.spyOn(component, 'executeRequest');
+      const spy = vi.spyOn(service, 'executeRequest');
 
-      const first = component.executeRequestByIndex(0);
-      const second = component.executeRequestByIndex(0);
+      const first = service.executeRequestByIndex(0);
+      const second = service.executeRequestByIndex(0);
 
       await Promise.all([first, second]);
 
@@ -363,9 +352,9 @@ describe('RequestManagerComponent', () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('Network Error'));
 
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(spy).toHaveBeenCalledTimes(1);
       const emitted = spy.mock.calls[0][0];
@@ -373,23 +362,20 @@ describe('RequestManagerComponent', () => {
       expect(emitted.response.statusText).toBe('Network Error');
     });
 
-    it('should emit filesChange with error response on failure', async () => {
+    it('should push files with error response on failure', async () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('Connection refused'));
 
-      const filesSpy = vi.fn();
-      component.filesChange.subscribe(filesSpy);
+      await service.executeRequest(0);
 
-      await component.executeRequest(0);
-
-      expect(filesSpy).toHaveBeenCalledTimes(1);
-      const updatedFiles: FileTab[] = filesSpy.mock.calls[0][0];
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
+      const updatedFiles: FileTab[] = mockWs.onFilesChange.mock.calls[0][0];
       expect(updatedFiles[0].responseData[0].status).toBe(0);
     });
 
     it('should push error history on failure', async () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('Timeout'));
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.addToHistory).toHaveBeenCalledTimes(1);
       expect(mockHttp.addToHistory).toHaveBeenCalledWith(
@@ -403,11 +389,11 @@ describe('RequestManagerComponent', () => {
     it('should reset executing state after error', async () => {
       mockHttp.sendRequest.mockRejectedValue(new Error('fail'));
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       // Should be able to execute again (not stuck in executing state)
       mockHttp.sendRequest.mockResolvedValue(makeResponseData());
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).toHaveBeenCalledTimes(2);
     });
@@ -421,15 +407,13 @@ describe('RequestManagerComponent', () => {
     it('should handle cancellation error gracefully', async () => {
       mockHttp.sendRequest.mockRejectedValue({ cancelled: true });
 
-      const filesSpy = vi.fn();
       const execSpy = vi.fn();
-      component.filesChange.subscribe(filesSpy);
-      component.requestExecuted.subscribe(execSpy);
+      service.requestExecuted.subscribe(execSpy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       // Should emit cancelled response
-      expect(filesSpy).toHaveBeenCalledTimes(1);
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
       expect(execSpy).toHaveBeenCalledTimes(1);
       const emitted = execSpy.mock.calls[0][0];
       expect(emitted.response.statusText).toContain('Cancelled');
@@ -438,17 +422,17 @@ describe('RequestManagerComponent', () => {
     it('should not push history for cancelled requests', async () => {
       mockHttp.sendRequest.mockRejectedValue({ cancelled: true });
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.addToHistory).not.toHaveBeenCalled();
     });
 
     it('cancelActiveRequest should call httpService.cancelRequest', async () => {
       // Start a request to set activeRequestId
-      const promise = component.executeRequest(0);
+      const promise = service.executeRequest(0);
 
       // Cancel while running
-      await component.cancelActiveRequest();
+      await service.cancelActiveRequest();
 
       await promise;
 
@@ -456,7 +440,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('cancelActiveRequest should do nothing when no active request', async () => {
-      await component.cancelActiveRequest();
+      await service.cancelActiveRequest();
 
       expect(mockHttp.cancelRequest).not.toHaveBeenCalled();
     });
@@ -467,41 +451,34 @@ describe('RequestManagerComponent', () => {
   // -----------------------------------------------------------------------
 
   describe('chained request execution', () => {
-    let chainFiles: FileTab[];
-
     beforeEach(() => {
-      chainFiles = [
+      configure([
         makeFileTab({
           requests: [
             makeRequest({ name: 'login', method: 'POST', url: 'https://api.example.com/login' }),
             makeRequest({ name: 'getData', depends: 'login' })
           ]
         })
-      ];
-      fixture.componentRef.setInput('files', chainFiles);
-      fixture.detectChanges();
+      ]);
     });
 
     it('should call executeChain for requests with depends', async () => {
-      await component.executeRequest(1);
+      await service.executeRequest(1);
 
       expect(mockHttp.executeChain).toHaveBeenCalledTimes(1);
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
     });
 
-    it('should emit filesChange with chain response', async () => {
-      const spy = vi.fn();
-      component.filesChange.subscribe(spy);
+    it('should push files with chain response', async () => {
+      await service.executeRequest(1);
 
-      await component.executeRequest(1);
-
-      expect(spy).toHaveBeenCalledTimes(1);
-      const updatedFiles: FileTab[] = spy.mock.calls[0][0];
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
+      const updatedFiles: FileTab[] = mockWs.onFilesChange.mock.calls[0][0];
       expect(updatedFiles[0].responseData[1]).toBeDefined();
     });
 
     it('should notify chain completion', async () => {
-      await component.executeRequest(1);
+      await service.executeRequest(1);
 
       expect(mockNotification.notifyChainComplete).toHaveBeenCalledWith(
         1,     // chain length (responses count)
@@ -516,7 +493,7 @@ describe('RequestManagerComponent', () => {
         requestPreviews: [{ method: 'GET', url: 'https://example.com', headers: {} }]
       });
 
-      await component.executeRequest(1);
+      await service.executeRequest(1);
 
       expect(mockNotification.notifyChainComplete).toHaveBeenCalledWith(
         1,
@@ -529,9 +506,9 @@ describe('RequestManagerComponent', () => {
       mockHttp.executeChain.mockRejectedValue(new Error('Chain failed'));
 
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(1);
+      await service.executeRequest(1);
 
       expect(spy).toHaveBeenCalledTimes(1);
       const emitted = spy.mock.calls[0][0];
@@ -541,13 +518,10 @@ describe('RequestManagerComponent', () => {
     it('should handle cancellation during chain execution', async () => {
       mockHttp.executeChain.mockRejectedValue({ cancelled: true });
 
-      const filesSpy = vi.fn();
-      component.filesChange.subscribe(filesSpy);
+      await service.executeRequest(1);
 
-      await component.executeRequest(1);
-
-      expect(filesSpy).toHaveBeenCalledTimes(1);
-      const response = filesSpy.mock.calls[0][0][0].responseData[1];
+      expect(mockWs.onFilesChange).toHaveBeenCalledTimes(1);
+      const response = mockWs.onFilesChange.mock.calls[0][0][0].responseData[1];
       expect(response.statusText).toContain('Cancelled');
     });
   });
@@ -557,10 +531,8 @@ describe('RequestManagerComponent', () => {
   // -----------------------------------------------------------------------
 
   describe('load test execution', () => {
-    let loadTestFiles: FileTab[];
-
     beforeEach(() => {
-      loadTestFiles = [
+      configure([
         makeFileTab({
           requests: [
             makeRequest({
@@ -569,20 +541,18 @@ describe('RequestManagerComponent', () => {
             })
           ]
         })
-      ];
-      fixture.componentRef.setInput('files', loadTestFiles);
-      fixture.detectChanges();
+      ]);
     });
 
     it('should call executeLoadTest for requests with loadTest config', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.executeLoadTest).toHaveBeenCalledTimes(1);
       expect(mockHttp.sendRequest).not.toHaveBeenCalled();
     });
 
     it('should calculate metrics from load test results', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.calculateLoadTestMetrics).toHaveBeenCalledWith(
         expect.objectContaining({ totalRequests: 100 })
@@ -591,9 +561,9 @@ describe('RequestManagerComponent', () => {
 
     it('should emit requestExecuted with loadTestMetrics', async () => {
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(spy).toHaveBeenCalledTimes(1);
       const emitted = spy.mock.calls[0][0];
@@ -602,7 +572,7 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should notify load test completion', async () => {
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockNotification.notifyLoadTestComplete).toHaveBeenCalledWith(
         'loadTest',
@@ -614,7 +584,7 @@ describe('RequestManagerComponent', () => {
 
     it('should emit requestProgress during load test', async () => {
       const progressSpy = vi.fn();
-      component.requestProgress.subscribe(progressSpy);
+      service.requestProgress.subscribe(progressSpy);
 
       // Make executeLoadTest call the progress callback
       mockHttp.executeLoadTest.mockImplementation(
@@ -632,7 +602,7 @@ describe('RequestManagerComponent', () => {
         }
       );
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(progressSpy).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'load', totalSent: 50 })
@@ -643,9 +613,9 @@ describe('RequestManagerComponent', () => {
       mockHttp.executeLoadTest.mockRejectedValue(new Error('Load test timeout'));
 
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(spy).toHaveBeenCalledTimes(1);
       const emitted = spy.mock.calls[0][0];
@@ -660,9 +630,9 @@ describe('RequestManagerComponent', () => {
   describe('response data handling', () => {
     it('should include chainItems in emitted response', async () => {
       const spy = vi.fn();
-      component.requestExecuted.subscribe(spy);
+      service.requestExecuted.subscribe(spy);
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       const emitted = spy.mock.calls[0][0];
       expect(emitted.response.chainItems).toBeDefined();
@@ -670,14 +640,13 @@ describe('RequestManagerComponent', () => {
     });
 
     it('should use named request in notification', async () => {
-      fixture.componentRef.setInput('files', [
+      configure([
         makeFileTab({
           requests: [makeRequest({ name: 'myEndpoint' })]
         })
       ]);
-      fixture.detectChanges();
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockNotification.notifyRequestComplete).toHaveBeenCalledWith(
         'myEndpoint',
@@ -693,16 +662,18 @@ describe('RequestManagerComponent', () => {
 
   describe('environment handling', () => {
     it('should pass combined variables to sendRequest', async () => {
-      fixture.componentRef.setInput('files', [
-        makeFileTab({
-          variables: { baseUrl: 'https://api.example.com' },
-          environments: { dev: { host: 'localhost' } }
-        })
-      ]);
-      fixture.componentRef.setInput('currentEnv', 'dev');
-      fixture.detectChanges();
+      configure(
+        [
+          makeFileTab({
+            variables: { baseUrl: 'https://api.example.com' },
+            environments: { dev: { host: 'localhost' } }
+          })
+        ],
+        0,
+        'dev'
+      );
 
-      await component.executeRequest(0);
+      await service.executeRequest(0);
 
       expect(mockHttp.sendRequest).toHaveBeenCalledWith(
         expect.any(Object),

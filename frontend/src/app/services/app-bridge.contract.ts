@@ -34,6 +34,22 @@ export interface AppBridgeContract {
   ensureServiceRunning(baseUrl: string): Promise<void>;
   getExamplesForFirstRun(): Promise<AppModels.ExamplesForFirstRunResponse>;
   markFirstRunComplete(): Promise<void>;
+
+  // Notifications
+  sendNotification(title: string, message: string): Promise<void>;
+
+  // App updates
+  checkForUpdates(): Promise<AppModels.UpdateInfo>;
+  clearPreparedUpdate(): Promise<void>;
+  getAppVersion(): Promise<string>;
+  listReleases(): Promise<AppModels.ReleaseInfo[]>;
+  openReleaseURL(url: string): Promise<void>;
+  startUpdateAndRestart(version: string): Promise<void>;
+
+  // Mock server
+  startMockServer(content: string, filePath: string, port: number, dbPath: string): Promise<void>;
+  stopMockServer(): Promise<void>;
+  getMockServerStatus(): Promise<AppModels.MockServerStatus>;
 }
 
 export const APP_BRIDGE = new InjectionToken<AppBridgeContract>('APP_BRIDGE', {
