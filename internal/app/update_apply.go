@@ -142,7 +142,7 @@ func (a *App) StartUpdateAndRestart(latestVersion string) error {
 			cmd.Stderr = os.Stderr
 		}
 
-		if err := cmd.Start(); err != nil {
+		if err := startUpdaterProcess(cmd); err != nil {
 			return fmt.Errorf("failed to launch updater: %w", err)
 		}
 
