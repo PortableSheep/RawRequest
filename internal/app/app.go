@@ -10,11 +10,12 @@ import (
 	"strings"
 	"sync"
 
+	cr "rawrequest/internal/cancelregistry"
 	"rawrequest/internal/importers"
 	rc "rawrequest/internal/requestchain"
 	rp "rawrequest/internal/responseparse"
-	rb "rawrequest/internal/ringbuffer"
 	se "rawrequest/internal/scriptexec"
+	sls "rawrequest/internal/scriptlogstore"
 	sr "rawrequest/internal/scriptruntime"
 	tpl "rawrequest/internal/templating"
 	vs "rawrequest/internal/variablestore"
@@ -50,10 +51,8 @@ type WindowState struct {
 type App struct {
 	ctx               context.Context
 	vars              *vs.Store
-	requestCancels    map[string]context.CancelFunc
-	cancelMutex       sync.Mutex
-	scriptLogs        *rb.Buffer[ScriptLogEntry]
-	scriptLogMutex    sync.Mutex
+	cancels           *cr.Registry
+	scriptLogs        *sls.Store
 	eventBroker       *appEventBroker
 	secretVault       *SecretVault
 	secretVaultOnce   sync.Once
@@ -80,21 +79,21 @@ const (
 	maxScriptLogs            = 500
 )
 
-type ScriptLogEntry struct {
-	Timestamp string `json:"timestamp"`
-	Level     string `json:"level"`
-	Source    string `json:"source"`
-	Message   string `json:"message"`
-}
+// ScriptLogEntry is the Wails-bound representation of a single script log
+// line. It is a type alias for internal/scriptlogstore.Entry, which owns
+// the actual storage/buffering logic, so JSON marshaling and existing
+// callers (frontend bindings, service_server.go) are unaffected by the
+// extraction.
+type ScriptLogEntry = sls.Entry
 
 func NewApp(examplesFS ...fs.FS) *App {
 	a := &App{
-		vars:           vs.New(),
-		requestCancels: make(map[string]context.CancelFunc),
-		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
-		eventBroker:    newAppEventBroker(),
-		binaryBodies:   make(map[string][]byte),
-		watchedFiles:   make(map[string]watchedFileState),
+		vars:         vs.New(),
+		cancels:      cr.New(),
+		scriptLogs:   sls.New(maxScriptLogs),
+		eventBroker:  newAppEventBroker(),
+		binaryBodies: make(map[string][]byte),
+		watchedFiles: make(map[string]watchedFileState),
 	}
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]
@@ -158,10 +157,8 @@ func (a *App) executeRequests(requests []map[string]any) string {
 }
 
 func (a *App) executeRequestsWithID(requestID string, requests []map[string]interface{}) string {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	a.registerCancel(requestID, cancel)
-	defer a.clearCancel(requestID)
+	ctx, release := a.cancels.Track(context.Background(), requestID)
+	defer release()
 	return a.executeRequestsWithContext(ctx, requests)
 }
 
