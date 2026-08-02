@@ -3,6 +3,8 @@ import { WorkspaceStateService } from './workspace-state.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
+import { APP_BRIDGE, type AppBridgeContract } from './app-bridge.contract';
+import { EventTransportService } from './event-transport.service';
 import type { FileTab, HistoryItem } from '../models/http.models';
 
 function makeFileTab(overrides: Partial<FileTab> = {}): FileTab {
@@ -25,6 +27,8 @@ describe('WorkspaceStateService', () => {
   let workspaceFacade: vi.Mocked<Partial<WorkspaceFacadeService>>;
   let httpService: vi.Mocked<Partial<HttpService>>;
   let historyStore: vi.Mocked<Partial<HistoryStoreService>>;
+  let appBridge: vi.Mocked<Partial<AppBridgeContract>>;
+  let events: vi.Mocked<Partial<EventTransportService>>;
 
   beforeEach(() => {
     workspaceFacade = {
@@ -50,6 +54,7 @@ describe('WorkspaceStateService', () => {
       reorderTabsDerived: vi.fn(),
       updateFileContent: vi.fn(),
       upsertExamplesTab: vi.fn(),
+      upsertMockDemoTab: vi.fn(),
     };
 
     httpService = {
@@ -63,12 +68,25 @@ describe('WorkspaceStateService', () => {
       ensureLoaded: vi.fn().mockResolvedValue([]),
     };
 
+    appBridge = {
+      watchFiles: vi.fn().mockResolvedValue(undefined),
+      revealInFinder: vi.fn().mockResolvedValue(undefined),
+      getExamplesFile: vi.fn(),
+      getMockDemoFile: vi.fn(),
+    };
+
+    events = {
+      on: vi.fn().mockReturnValue(() => {}),
+    };
+
     TestBed.configureTestingModule({
       providers: [
         WorkspaceStateService,
         { provide: WorkspaceFacadeService, useValue: workspaceFacade },
         { provide: HttpService, useValue: httpService },
         { provide: HistoryStoreService, useValue: historyStore },
+        { provide: APP_BRIDGE, useValue: appBridge },
+        { provide: EventTransportService, useValue: events },
       ],
     });
 
@@ -316,6 +334,104 @@ describe('WorkspaceStateService', () => {
       };
       service.selectedHistoryItem.set(item);
       expect(service.selectedHistoryItem()).toBe(item);
+    });
+  });
+
+  describe('app bridge integration', () => {
+    it('subscribes to file-externally-modified via the event transport bridge', () => {
+      expect(events.on).toHaveBeenCalledWith('file-externally-modified', expect.any(Function));
+    });
+
+    it('reloads a file when notified of an external modification with no unsaved changes', () => {
+      const file = makeFileTab({ filePath: '/tmp/test.http', content: 'GET http://example.com' });
+      service.applyState({ files: [file], currentFileIndex: 0, currentEnv: 'dev' });
+      (workspaceFacade.updateFileContent as vi.Mock).mockReturnValue({
+        files: [{ ...file, content: 'GET http://changed.com' }],
+        currentFileIndex: 0,
+        currentEnv: 'dev',
+      });
+
+      const callback = (events.on as vi.Mock).mock.calls.find(
+        (call) => call[0] === 'file-externally-modified',
+      )?.[1];
+      expect(callback).toBeInstanceOf(Function);
+
+      callback({ filePath: '/tmp/test.http', content: 'GET http://changed.com' });
+
+      expect(service.files()[0].content).toBe('GET http://changed.com');
+    });
+
+    it('watchFiles is invoked with current file paths via the app bridge', async () => {
+      const file = makeFileTab({ filePath: '/tmp/test.http' });
+      service.applyState({ files: [file], currentFileIndex: 0, currentEnv: 'dev' });
+
+      TestBed.flushEffects();
+      await Promise.resolve();
+
+      expect(appBridge.watchFiles).toHaveBeenCalledWith(['/tmp/test.http']);
+    });
+
+    it('openExamplesFile delegates to appBridge.getExamplesFile and upserts the tab', async () => {
+      (appBridge.getExamplesFile as vi.Mock).mockResolvedValue({
+        content: 'GET https://example.com',
+        filePath: 'examples.http',
+      });
+      (workspaceFacade.upsertExamplesTab as vi.Mock).mockReturnValue({
+        files: [makeFileTab({ id: '__examples__' })],
+        currentFileIndex: 0,
+        activeFileId: '__examples__',
+        currentEnv: '',
+      });
+
+      await service.openExamplesFile();
+
+      expect(appBridge.getExamplesFile).toHaveBeenCalled();
+      expect(workspaceFacade.upsertExamplesTab).toHaveBeenCalledWith(
+        service.LAST_SESSION_KEY,
+        [],
+        'GET https://example.com',
+        'examples.http',
+      );
+    });
+
+    it('openMockDemoFile delegates to appBridge.getMockDemoFile and upserts the tab', async () => {
+      (appBridge.getMockDemoFile as vi.Mock).mockResolvedValue({
+        content: 'GET https://mock.example.com',
+        filePath: 'mock_demo.http',
+      });
+      (workspaceFacade.upsertMockDemoTab as vi.Mock).mockReturnValue({
+        files: [makeFileTab({ id: '__mock_demo__' })],
+        currentFileIndex: 0,
+        activeFileId: '__mock_demo__',
+        currentEnv: '',
+      });
+
+      await service.openMockDemoFile();
+
+      expect(appBridge.getMockDemoFile).toHaveBeenCalled();
+      expect(workspaceFacade.upsertMockDemoTab).toHaveBeenCalledWith(
+        service.LAST_SESSION_KEY,
+        [],
+        'GET https://mock.example.com',
+        'mock_demo.http',
+      );
+    });
+
+    it('revealInFinder delegates to the app bridge for a saved file', async () => {
+      const file = makeFileTab({ filePath: '/tmp/saved.http' });
+      service.applyState({ files: [file], currentFileIndex: 0, currentEnv: 'dev' });
+
+      await service.revealInFinder(0);
+
+      expect(appBridge.revealInFinder).toHaveBeenCalledWith('/tmp/saved.http');
+    });
+
+    it('revealInFinder throws when the file has not been saved', async () => {
+      const file = makeFileTab({ filePath: undefined as any });
+      service.applyState({ files: [file], currentFileIndex: 0, currentEnv: 'dev' });
+
+      await expect(service.revealInFinder(0)).rejects.toThrow('File has not been saved to disk yet.');
+      expect(appBridge.revealInFinder).not.toHaveBeenCalled();
     });
   });
 });

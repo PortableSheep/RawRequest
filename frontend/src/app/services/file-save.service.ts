@@ -3,6 +3,7 @@ import { WorkspaceStateService } from './workspace-state.service';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
+import { APP_BRIDGE } from './app-bridge.contract';
 import {
   buildFileAfterSave,
   buildFirstSaveDefaultName,
@@ -17,28 +18,23 @@ export class FileSaveService {
   private readonly httpService = inject(HttpService);
   private readonly historyStore = inject(HistoryStoreService);
   private readonly workspace = inject(WorkspaceFacadeService);
+  private readonly appBridge = inject(APP_BRIDGE);
 
   async saveCurrentFile(): Promise<void> {
     const file = this.state.getCurrentFile();
     if (!file) return;
 
     try {
-      const {
-        SaveFileContents,
-        ShowSaveDialog,
-        MigrateResponsesFromRunLocationToHttpFile,
-      } = await import('@wailsjs/go/app/App');
-
       if (file.filePath && file.filePath.length) {
-        await SaveFileContents(file.filePath, file.content);
+        await this.appBridge.saveFileContents(file.filePath, file.content);
         const idx = this.state.currentFileIndex();
         this.state.replaceFileAtIndex(idx, { ...file, savedContent: file.content });
       } else {
         const previousId = file.id;
         const defaultName = buildFirstSaveDefaultName(file);
-        const path = await ShowSaveDialog(defaultName);
+        const path = await this.appBridge.showSaveDialog(defaultName);
         if (path && path.length) {
-          await SaveFileContents(path, file.content);
+          await this.appBridge.saveFileContents(path, file.content);
 
           let priorHistory: any[] = [];
           try {
@@ -48,7 +44,7 @@ export class FileSaveService {
           }
 
           try {
-            await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
+            await this.appBridge.migrateResponsesFromRunLocationToHttpFile(previousId, path);
           } catch (moveErr) {
             console.warn('Failed to migrate response files on first save:', moveErr);
           }
@@ -88,21 +84,15 @@ export class FileSaveService {
     if (!file) return;
 
     try {
-      const {
-        SaveFileContents,
-        ShowSaveDialog,
-        MigrateResponsesFromRunLocationToHttpFile,
-      } = await import('@wailsjs/go/app/App');
-
       const previousId = file.id;
       const previousPath = file.filePath;
       const defaultName = buildSaveAsDefaultName(file);
-      const path = await ShowSaveDialog(defaultName);
+      const path = await this.appBridge.showSaveDialog(defaultName);
       if (!path || !path.length) {
         return;
       }
 
-      await SaveFileContents(path, file.content);
+      await this.appBridge.saveFileContents(path, file.content);
       const updated = buildFileAfterSave(file, path);
 
       const idx = this.state.currentFileIndex();
@@ -114,7 +104,7 @@ export class FileSaveService {
 
         if (!previousPath || !previousPath.length) {
           try {
-            await MigrateResponsesFromRunLocationToHttpFile(previousId, path);
+            await this.appBridge.migrateResponsesFromRunLocationToHttpFile(previousId, path);
           } catch (moveErr) {
             console.warn('Failed to migrate response files on Save As:', moveErr);
           }
