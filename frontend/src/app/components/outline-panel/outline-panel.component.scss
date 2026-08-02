@@ -38,7 +38,7 @@
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: var(--rr-text-primary);
+  color: var(--rr-text);
 }
 
 .outline-drawer__subtitle {
@@ -52,7 +52,7 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--rr-text-primary);
+    color: var(--rr-text);
   }
 }
 
@@ -65,7 +65,7 @@
   width: 100%;
   padding: 6px 10px;
   font-size: 12px;
-  color: var(--rr-text-primary);
+  color: var(--rr-text);
   background: var(--rr-surface-1);
   border: 1px solid var(--rr-border-color);
   border-radius: var(--rr-radius-sm);
@@ -105,7 +105,7 @@
   background: none;
   cursor: pointer;
   text-align: left;
-  color: var(--rr-text-primary);
+  color: var(--rr-text);
   font-size: 12px;
   transition: background 80ms ease;
 

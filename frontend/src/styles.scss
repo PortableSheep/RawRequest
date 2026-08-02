@@ -18,7 +18,7 @@
   --rr-primary: #6366f1;
   --rr-method-put: #818cf8;
   --rr-text-secondary: #8b8b92;
-  --rr-text-tertiary: #56565c;
+  --rr-text-tertiary: #84848b;
   --rr-warning: #eab308;
   --rr-accent: #818cf8;
   --rr-success: #22c55e;
@@ -118,7 +118,7 @@ html[data-theme="light"] {
   --rr-success: #16a34a;
 
   --rr-text-secondary: #4a4a52;
-  --rr-text-tertiary: #6b6b73;
+  --rr-text-tertiary: #5f5f66;
 
   --rr-page-bg: #f8f8fa;
   --rr-page-fg: #1a1a1e;
@@ -557,6 +557,19 @@ html[data-theme="light"] body::before {
   min-width: 0;
   overflow-x: auto;
   align-self: flex-end;
+
+  // Scroll-shadow overflow cue: the shadow gradients only become visible once
+  // there is actual content to scroll to on that side (background-attachment:
+  // local scrolls with the content, scroll stays fixed to the viewport so the
+  // two layers intersect only near a scrollable edge). Pure CSS, no JS.
+  background:
+    linear-gradient(to right, var(--rr-page-bg) 0%, transparent 24px) 0 0,
+    linear-gradient(to left, var(--rr-page-bg) 0%, transparent 24px) 100% 0,
+    linear-gradient(to right, rgba(0, 0, 0, 0.25), transparent 12px) 0 0,
+    linear-gradient(to left, rgba(0, 0, 0, 0.25), transparent 12px) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 24px 100%, 24px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .rr-tabs__list {

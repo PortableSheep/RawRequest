@@ -19,7 +19,7 @@
                 >
                     <a
                         class="rr-tab__link"
-                        aria-current="page"
+                        [attr.aria-current]="ws.currentFileIndex() === i ? 'page' : null"
                         href="#"
                         (click)="$event.preventDefault(); ws.onCurrentFileIndexChange(i)"
                     >

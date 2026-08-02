@@ -223,6 +223,28 @@ describe('ResponsePanelComponent', () => {
 
       expect(component.expandedEntryId()).toBeNull();
     });
+
+    it('should expose the header as a keyboard-operable disclosure control', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+
+      expect(header.getAttribute('role')).toBe('button');
+      expect(header.getAttribute('tabindex')).toBe('0');
+      expect(header.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('should toggle the entry on Enter and Space keydown', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBeNull();
+
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+    });
   });
 
   // -----------------------------------------------------------------------
