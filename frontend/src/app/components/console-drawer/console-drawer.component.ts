@@ -6,8 +6,6 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { ScriptConsoleService } from '../../services/script-console.service';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { MockServerService } from '../../services/mock-server.service';
-import { EventsOn } from '@wailsjs/runtime/runtime';
-import { StartMockServer, StopMockServer, GetMockServerStatus } from '@wailsjs/go/app/App';
 import { gsap } from 'gsap';
 
 type FooterTone = 'idle' | 'pending' | 'success' | 'warning' | 'error';

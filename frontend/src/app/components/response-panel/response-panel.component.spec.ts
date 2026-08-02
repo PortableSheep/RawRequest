@@ -5,6 +5,7 @@ import { ChainEntryPreview, ResponseData, Request, AssertionResult, FileTab } fr
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
+import { APP_BRIDGE, AppBridgeContract } from '../../services/app-bridge.contract';
 
 // Lightweight stub so we don't pull in the real virtual-response-body tree.
 @Component({
@@ -107,6 +108,13 @@ function createMockReqExec(overrides: any = {}) {
   };
 }
 
+function createMockAppBridge(overrides: Partial<AppBridgeContract> = {}): AppBridgeContract {
+  return {
+    saveBase64ToFile: vi.fn().mockResolvedValue('/tmp/saved-file'),
+    ...overrides,
+  } as AppBridgeContract;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -116,10 +124,12 @@ describe('ResponsePanelComponent', () => {
   let component: ResponsePanelComponent;
   let mockWs: ReturnType<typeof createMockWs>;
   let mockReqExec: ReturnType<typeof createMockReqExec>;
+  let mockAppBridge: AppBridgeContract;
 
-  function setup(fileData: any = {}, reqExecOverrides: any = {}) {
+  function setup(fileData: any = {}, reqExecOverrides: any = {}, appBridgeOverrides: Partial<AppBridgeContract> = {}) {
     mockWs = createMockWs(fileData);
     mockReqExec = createMockReqExec(reqExecOverrides);
+    mockAppBridge = createMockAppBridge(appBridgeOverrides);
 
     TestBed.configureTestingModule({
       imports: [ResponsePanelComponent],
@@ -130,6 +140,7 @@ describe('ResponsePanelComponent', () => {
       })
       .overrideProvider(WorkspaceStateService, { useValue: mockWs })
       .overrideProvider(RequestExecutionService, { useValue: mockReqExec })
+      .overrideProvider(APP_BRIDGE, { useValue: mockAppBridge })
       .compileComponents();
 
     fixture = TestBed.createComponent(ResponsePanelComponent);
@@ -405,6 +416,98 @@ describe('ResponsePanelComponent', () => {
 
       expect(copyBtn.getAttribute('data-state')).toBe('copied');
       expect(copyBtn.textContent).toContain('Copied');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Save binary response (routes through APP_BRIDGE)
+  // -----------------------------------------------------------------------
+
+  describe('save binary response', () => {
+    function makeBinaryEntry(overrides: Partial<ChainEntryPreview> = {}): ChainEntryPreview {
+      return makeEntry({
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'image/png' },
+          body: 'base64-image-data',
+          responseTime: 10,
+          isBinary: true,
+          contentType: 'image/png',
+        } as any,
+        ...overrides,
+      });
+    }
+
+    it('should be idle by default', () => {
+      setup();
+      expect(component.getSaveState('entry-1')).toBe('idle');
+    });
+
+    it('should do nothing when the response is not binary', async () => {
+      setup();
+      const entry = makeEntry();
+      await component.saveBinaryResponse(entry);
+      expect(mockAppBridge.saveBase64ToFile).not.toHaveBeenCalled();
+      expect(component.getSaveState(entry.id)).toBe('idle');
+    });
+
+    it('should do nothing when the binary response has no body', async () => {
+      setup();
+      const entry = makeBinaryEntry({ response: { status: 200, statusText: 'OK', headers: {}, body: '', responseTime: 10, isBinary: true } as any });
+      await component.saveBinaryResponse(entry);
+      expect(mockAppBridge.saveBase64ToFile).not.toHaveBeenCalled();
+    });
+
+    it('should call appBridge.saveBase64ToFile with body, content-type and request url', async () => {
+      setup();
+      const entry = makeBinaryEntry({ request: { method: 'GET', url: 'https://example.com/img.png', headers: {} } });
+
+      await component.saveBinaryResponse(entry);
+
+      expect(mockAppBridge.saveBase64ToFile).toHaveBeenCalledWith(
+        'base64-image-data',
+        'image/png',
+        'https://example.com/img.png'
+      );
+      expect(component.getSaveState(entry.id)).toBe('saved');
+    });
+
+    it('should set state to error when the save rejects with an unrelated error', async () => {
+      setup(undefined, undefined, {
+        saveBase64ToFile: vi.fn().mockRejectedValue(new Error('disk full')),
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+
+      expect(component.getSaveState(entry.id)).toBe('error');
+    });
+
+    it('should reset state to idle (not error) when the user cancels the save dialog', async () => {
+      setup(undefined, undefined, {
+        saveBase64ToFile: vi.fn().mockRejectedValue(new Error('save cancelled')),
+      });
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+
+      expect(component.getSaveState(entry.id)).toBe('idle');
+    });
+
+    it('should reset save state to idle after timeout', async () => {
+      setup();
+      vi.useFakeTimers();
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+      expect(component.getSaveState(entry.id)).toBe('saved');
+
+      vi.advanceTimersByTime(2000);
+      expect(component.getSaveState(entry.id)).toBe('idle');
+
+      vi.useRealTimers();
     });
   });
 
