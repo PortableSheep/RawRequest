@@ -2,11 +2,12 @@ import { Component, inject } from '@angular/core';
 import type { HistoryItem } from '../../models/http.models';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { PanelVisibilityService } from '../../services/panel-visibility.service';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-history-sidebar',
   standalone: true,
-  imports: [],
+  imports: [IconComponent],
   templateUrl: './history-sidebar.component.html',
   styleUrls: ['./history-sidebar.component.scss']
 })

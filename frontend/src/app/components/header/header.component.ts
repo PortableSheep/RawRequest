@@ -10,10 +10,11 @@ import { StartupService } from '../../services/startup.service';
 import { MockServerService } from '../../services/mock-server.service';
 import { DiagnosticLoggerService } from '../../services/diagnostic-logger.service';
 import { shortcutHint, getVisibleShortcuts, formatKeyCombo } from '../../logic/app/shortcut-catalog';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-header',
-  imports: [FormsModule],
+  imports: [FormsModule, IconComponent],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -246,6 +247,11 @@ export class HeaderComponent {
   handleMockServerClick(): void {
     this.panels.consoleActiveTab.set('mock');
     this.panels.consoleOpen.set(true);
+  }
+
+  handleMockServerClickFromMenu(): void {
+    this.handleMockServerClick();
+    this.closeMoreMenu();
   }
 
   handleSecretsClick(): void {

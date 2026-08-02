@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import type { LoadTestMetrics, ActiveRunProgress } from '../../models/http.models';
 import { LoadTestVisualizationService } from '../../services/load-test-visualization.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-load-test-results-modal',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FocusTrapDirective, IconComponent],
   templateUrl: './load-test-results-modal.component.html',
   styleUrls: ['./load-test-results-modal.component.scss']
 })

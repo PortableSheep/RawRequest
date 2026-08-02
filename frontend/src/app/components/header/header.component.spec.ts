@@ -45,6 +45,8 @@ describe('HeaderComponent', () => {
   let mockFileSave: any;
   let mockToast: any;
   let mockStartup: any;
+  let mockConsoleActiveTab: ReturnType<typeof signal<string>>;
+  let mockConsoleOpen: ReturnType<typeof signal<boolean>>;
 
   beforeEach(async () => {
     const themeMock = {
@@ -71,8 +73,8 @@ describe('HeaderComponent', () => {
       openMockDemoFile: vi.fn().mockResolvedValue(undefined),
       revealInFinder: vi.fn().mockResolvedValue(undefined),
     };
-    const mockConsoleActiveTab = signal('logs');
-    const mockConsoleOpen = signal(false);
+    mockConsoleActiveTab = signal('logs');
+    mockConsoleOpen = signal(false);
     mockPanels = {
       openSecretsModal: vi.fn(),
       showDonationModal: { set: vi.fn() },
@@ -521,6 +523,45 @@ describe('HeaderComponent', () => {
     btn.click();
 
     expect(mockPanels.openSecretsModal).toHaveBeenCalled();
+  });
+
+  // ── Responsive header strategy ──────────────────────────────────────
+
+  it('marks the Secrets and Mock Server topbar buttons as collapsible for narrow widths', () => {
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.rr-topbar__right .rr-btn') as NodeListOf<HTMLButtonElement>;
+    const secretsBtn = Array.from(buttons).find((el) => el.textContent?.includes('Secrets'))!;
+    const mockServerBtn = Array.from(buttons).find((el) => el.textContent?.includes('Mock Server'))!;
+
+    expect(secretsBtn.classList.contains('header-collapsible-action')).toBe(true);
+    expect(mockServerBtn.classList.contains('header-collapsible-action')).toBe(true);
+  });
+
+  it('should call handleMockServerClick from mock server button in topbar', () => {
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.rr-topbar__right .rr-btn') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(buttons).find((el) => el.textContent?.includes('Mock Server'))!;
+    btn.click();
+
+    expect(mockConsoleActiveTab()).toBe('mock');
+    expect(mockConsoleOpen()).toBe(true);
+  });
+
+  it('offers a Mock Server entry in the More menu so the action stays reachable once the topbar button collapses', () => {
+    component.moreMenu = { show: true, x: 0, y: 0 };
+    fixture.detectChanges();
+
+    const items = fixture.nativeElement.querySelectorAll('.rr-menu--more .rr-menu__item') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(items).find((el) => el.textContent?.includes('Mock Server'))!;
+    expect(btn).toBeTruthy();
+
+    btn.click();
+
+    expect(mockConsoleActiveTab()).toBe('mock');
+    expect(mockConsoleOpen()).toBe(true);
+    expect(component.moreMenu.show).toBe(false);
   });
 
   it('should call panels.toggleHistory from more menu', () => {

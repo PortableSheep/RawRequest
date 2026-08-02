@@ -102,3 +102,16 @@
     box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
   }
 }
+
+// Responsive header strategy: below this width the topbar is too dense for
+// every ambient action to fit alongside the tab strip, the env select, and
+// the save/new/open/shortcuts/kebab cluster. Rather than letting buttons
+// wrap or squeeze (or dropping functionality), the least-essential actions
+// collapse into the existing "More actions" overflow menu, which already
+// carries duplicate entries for Secrets and Mock Server for exactly this
+// case.
+@media (max-width: 900px) {
+  .header-collapsible-action {
+    display: none;
+  }
+}
