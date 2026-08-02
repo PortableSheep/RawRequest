@@ -1,71 +1,37 @@
 package app
 
+// SetVariable, GetVariable, and the environment methods below are the
+// stable Wails-bound façade for variable/environment management. They
+// delegate to the concurrency-safe internal/variablestore.Store owned by
+// App (a.vars); the storage, locking, and copy semantics live there so they
+// can be tested independently of App and Wails.
+
 func (a *App) SetVariable(key, value string) {
-	a.variablesMu.Lock()
-	a.variables[key] = value
-	a.variablesMu.Unlock()
+	a.vars.SetVariable(key, value)
 }
 
 func (a *App) GetVariable(key string) string {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	return a.variables[key]
+	return a.vars.GetVariable(key)
 }
 
 func (a *App) SetEnvironment(env string) {
-	a.envMu.Lock()
-	a.currentEnv = env
-	if _, exists := a.environments[env]; !exists {
-		a.environments[env] = make(map[string]string)
-	}
-	a.envMu.Unlock()
+	a.vars.SetEnvironment(env)
 }
 
 func (a *App) SetEnvVariable(key, value string) {
-	a.envMu.Lock()
-	if a.environments[a.currentEnv] == nil {
-		a.environments[a.currentEnv] = make(map[string]string)
-	}
-	a.environments[a.currentEnv][key] = value
-	a.envMu.Unlock()
+	a.vars.SetEnvVariable(key, value)
 }
 
 func (a *App) GetEnvironments() map[string]map[string]string {
-	a.envMu.RLock()
-	defer a.envMu.RUnlock()
-	out := make(map[string]map[string]string, len(a.environments))
-	for env, vars := range a.environments {
-		copied := make(map[string]string, len(vars))
-		for k, v := range vars {
-			copied[k] = v
-		}
-		out[env] = copied
-	}
-	return out
+	return a.vars.Environments()
 }
 
 func (a *App) GetVariables() map[string]string {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	out := make(map[string]string, len(a.variables))
-	for k, v := range a.variables {
-		out[k] = v
-	}
-	return out
+	return a.vars.Variables()
 }
 
 func (a *App) GetEnvVariables(env string) map[string]string {
-	a.envMu.RLock()
-	defer a.envMu.RUnlock()
-	vars, exists := a.environments[env]
-	if !exists || vars == nil {
-		return make(map[string]string)
-	}
-	out := make(map[string]string, len(vars))
-	for k, v := range vars {
-		out[k] = v
-	}
-	return out
+	return a.vars.EnvVariables(env)
 }
 
 func (a *App) AddEnvVariable(key, value string) {
@@ -73,13 +39,5 @@ func (a *App) AddEnvVariable(key, value string) {
 }
 
 func (a *App) RenameEnvironment(oldName, newName string) {
-	a.envMu.Lock()
-	defer a.envMu.Unlock()
-	if vars, exists := a.environments[oldName]; exists {
-		a.environments[newName] = vars
-		delete(a.environments, oldName)
-		if a.currentEnv == oldName {
-			a.currentEnv = newName
-		}
-	}
+	a.vars.RenameEnvironment(oldName, newName)
 }

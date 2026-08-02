@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"strings"
 	"sync"
 
@@ -18,7 +17,7 @@ import (
 	se "rawrequest/internal/scriptexec"
 	sr "rawrequest/internal/scriptruntime"
 	tpl "rawrequest/internal/templating"
-	vj "rawrequest/internal/varsjson"
+	vs "rawrequest/internal/variablestore"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -50,11 +49,7 @@ type WindowState struct {
 
 type App struct {
 	ctx               context.Context
-	variables         map[string]string
-	variablesMu       sync.RWMutex
-	environments      map[string]map[string]string
-	currentEnv        string
-	envMu             sync.RWMutex
+	vars              *vs.Store
 	requestCancels    map[string]context.CancelFunc
 	cancelMutex       sync.Mutex
 	scriptLogs        *rb.Buffer[ScriptLogEntry]
@@ -94,9 +89,7 @@ type ScriptLogEntry struct {
 
 func NewApp(examplesFS ...fs.FS) *App {
 	a := &App{
-		variables:      make(map[string]string),
-		environments:   make(map[string]map[string]string),
-		currentEnv:     "default",
+		vars:           vs.New(),
 		requestCancels: make(map[string]context.CancelFunc),
 		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
@@ -208,26 +201,15 @@ func (a *App) executeScript(rawScript string, ctx *sr.ExecutionContext, stage st
 }
 
 func (a *App) ParseResponseForVariables(responseBody string) {
-	a.variablesMu.Lock()
-	defer a.variablesMu.Unlock()
-	vj.ApplyFromJSON(a.variables, responseBody)
+	a.vars.ApplyFromResponseJSON(responseBody)
 }
 
 func (a *App) getVariable(key string) (string, bool) {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	val, ok := a.variables[key]
-	return val, ok
+	return a.vars.GetVariableOK(key)
 }
 
 func (a *App) variablesSnapshot() map[string]string {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	out := make(map[string]string, len(a.variables))
-	for k, v := range a.variables {
-		out[k] = v
-	}
-	return out
+	return a.vars.Variables()
 }
 
 // ImportCollection imports a Postman or Bruno collection from the given path
@@ -241,16 +223,5 @@ func (a *App) ImportCollection(path string) (importers.ImportResult, error) {
 }
 
 func (a *App) currentEnvVarsSnapshot() map[string]string {
-	a.envMu.RLock()
-	defer a.envMu.RUnlock()
-	if a.environments == nil {
-		return nil
-	}
-	vars := a.environments[a.currentEnv]
-	if vars == nil {
-		return nil
-	}
-	out := make(map[string]string, len(vars))
-	maps.Copy(out, vars)
-	return out
+	return a.vars.CurrentEnvVariables()
 }
