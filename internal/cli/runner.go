@@ -689,6 +689,17 @@ func extractStringHeaders(v interface{}) map[string]string {
 	return nil
 }
 
+// outputResults prints results in the requested format. For OutputJSON, the
+// shape is conditional: a single result (the common case — one request with
+// no expanded @depends chain) is printed as a single JSON object; multiple
+// results (an expanded @depends chain and/or multiple -n names) are printed
+// as a JSON array in the dependency-first execution order produced by
+// RunSelected/requestchain.ResolveOrder, so the last requested request is
+// the last array element. This mirrors the MCP run_request tool's
+// object-vs-array contract (see internal/mcp/server.go's runRequestTool
+// description and handleRunRequest) — both share cli.RunSelected as their
+// execution/ordering source, so callers of either surface see the same
+// shape rule.
 func outputResults(results []ResponseResult, format OutputFormat) {
 	switch format {
 	case OutputQuiet:

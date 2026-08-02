@@ -336,7 +336,12 @@ MCP Options:
   -w, --workspace <dir>  Workspace root for .http file discovery (default: .)
 
 Output Formats:
-  json    JSON response with status, headers, body, and timing
+  json    JSON response with status, headers, body, and timing.
+          Shape is conditional on the run: a single request with no
+          @depends chain prints one JSON object; a run that expands to
+          multiple requests (via @depends and/or repeated -n) prints a
+          JSON array ordered dependencies-first, with the last requested
+          request last.
   body    Response body only
   full    Human-readable format with status and body
   quiet   No output, exit code only (0=success, 1=failure)
