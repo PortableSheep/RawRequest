@@ -1,10 +1,11 @@
-import { Injectable } from '@angular/core';
-import { SendNotification } from '@wailsjs/go/app/App';
+import { Injectable, inject } from '@angular/core';
+import { APP_BRIDGE } from './app-bridge.contract';
 
 @Injectable({
   providedIn: 'root'
 })
 export class NotificationService {
+  private readonly appBridge = inject(APP_BRIDGE);
   private isAppFocused = true;
   private readonly MIN_DURATION_MS = 2000; // Only notify for requests taking > 2 seconds
 
@@ -46,7 +47,7 @@ export class NotificationService {
     }
 
     try {
-      await SendNotification(title, message);
+      await this.appBridge.sendNotification(title, message);
     } catch (error) {
       // Silently fail - notifications are non-critical
       console.warn('Failed to send notification:', error);

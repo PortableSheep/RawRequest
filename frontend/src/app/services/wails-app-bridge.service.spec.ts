@@ -19,6 +19,16 @@ const mockMigrateResponsesFromRunLocationToHttpFile = vi.fn();
 const mockEnsureServiceRunning = vi.fn();
 const mockGetExamplesForFirstRun = vi.fn();
 const mockMarkFirstRunComplete = vi.fn();
+const mockSendNotification = vi.fn();
+const mockCheckForUpdates = vi.fn();
+const mockClearPreparedUpdate = vi.fn();
+const mockGetAppVersion = vi.fn();
+const mockListReleases = vi.fn();
+const mockOpenReleaseURL = vi.fn();
+const mockStartUpdateAndRestart = vi.fn();
+const mockStartMockServer = vi.fn();
+const mockStopMockServer = vi.fn();
+const mockGetMockServerStatus = vi.fn();
 
 vi.mock('@wailsjs/go/app/App', () => ({
   WatchFiles: (...args: any[]) => mockWatchFiles(...args),
@@ -37,6 +47,16 @@ vi.mock('@wailsjs/go/app/App', () => ({
   EnsureServiceRunning: (...args: any[]) => mockEnsureServiceRunning(...args),
   GetExamplesForFirstRun: (...args: any[]) => mockGetExamplesForFirstRun(...args),
   MarkFirstRunComplete: (...args: any[]) => mockMarkFirstRunComplete(...args),
+  SendNotification: (...args: any[]) => mockSendNotification(...args),
+  CheckForUpdates: (...args: any[]) => mockCheckForUpdates(...args),
+  ClearPreparedUpdate: (...args: any[]) => mockClearPreparedUpdate(...args),
+  GetAppVersion: (...args: any[]) => mockGetAppVersion(...args),
+  ListReleases: (...args: any[]) => mockListReleases(...args),
+  OpenReleaseURL: (...args: any[]) => mockOpenReleaseURL(...args),
+  StartUpdateAndRestart: (...args: any[]) => mockStartUpdateAndRestart(...args),
+  StartMockServer: (...args: any[]) => mockStartMockServer(...args),
+  StopMockServer: (...args: any[]) => mockStopMockServer(...args),
+  GetMockServerStatus: (...args: any[]) => mockGetMockServerStatus(...args),
 }));
 
 describe('WailsAppBridgeService', () => {
@@ -143,5 +163,68 @@ describe('WailsAppBridgeService', () => {
     mockMarkFirstRunComplete.mockResolvedValue(undefined);
     await service.markFirstRunComplete();
     expect(mockMarkFirstRunComplete).toHaveBeenCalled();
+  });
+
+  it('delegates sendNotification to SendNotification', async () => {
+    mockSendNotification.mockResolvedValue(undefined);
+    await service.sendNotification('Title', 'Message');
+    expect(mockSendNotification).toHaveBeenCalledWith('Title', 'Message');
+  });
+
+  it('delegates checkForUpdates to CheckForUpdates', async () => {
+    mockCheckForUpdates.mockResolvedValue({ available: true } as any);
+    const result = await service.checkForUpdates();
+    expect(mockCheckForUpdates).toHaveBeenCalled();
+    expect(result.available).toBe(true);
+  });
+
+  it('delegates clearPreparedUpdate to ClearPreparedUpdate', async () => {
+    mockClearPreparedUpdate.mockResolvedValue(undefined);
+    await service.clearPreparedUpdate();
+    expect(mockClearPreparedUpdate).toHaveBeenCalled();
+  });
+
+  it('delegates getAppVersion to GetAppVersion', async () => {
+    mockGetAppVersion.mockResolvedValue('1.2.3');
+    const result = await service.getAppVersion();
+    expect(result).toBe('1.2.3');
+  });
+
+  it('delegates listReleases to ListReleases', async () => {
+    mockListReleases.mockResolvedValue([{ version: '1.0.0' }] as any);
+    const result = await service.listReleases();
+    expect(mockListReleases).toHaveBeenCalled();
+    expect(result).toEqual([{ version: '1.0.0' }]);
+  });
+
+  it('delegates openReleaseURL to OpenReleaseURL', async () => {
+    mockOpenReleaseURL.mockResolvedValue(undefined);
+    await service.openReleaseURL('https://example.com/release');
+    expect(mockOpenReleaseURL).toHaveBeenCalledWith('https://example.com/release');
+  });
+
+  it('delegates startUpdateAndRestart to StartUpdateAndRestart', async () => {
+    mockStartUpdateAndRestart.mockResolvedValue(undefined);
+    await service.startUpdateAndRestart('2.0.0');
+    expect(mockStartUpdateAndRestart).toHaveBeenCalledWith('2.0.0');
+  });
+
+  it('delegates startMockServer to StartMockServer', async () => {
+    mockStartMockServer.mockResolvedValue(undefined);
+    await service.startMockServer('GET /a', '/a.http', 8080, '/tmp/mock.db');
+    expect(mockStartMockServer).toHaveBeenCalledWith('GET /a', '/a.http', 8080, '/tmp/mock.db');
+  });
+
+  it('delegates stopMockServer to StopMockServer', async () => {
+    mockStopMockServer.mockResolvedValue(undefined);
+    await service.stopMockServer();
+    expect(mockStopMockServer).toHaveBeenCalled();
+  });
+
+  it('delegates getMockServerStatus to GetMockServerStatus', async () => {
+    mockGetMockServerStatus.mockResolvedValue({ running: true, port: 8080, dbPath: '/tmp/mock.db' } as any);
+    const result = await service.getMockServerStatus();
+    expect(mockGetMockServerStatus).toHaveBeenCalled();
+    expect(result.running).toBe(true);
   });
 });

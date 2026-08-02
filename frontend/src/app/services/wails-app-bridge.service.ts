@@ -87,4 +87,54 @@ export class WailsAppBridgeService implements AppBridgeContract {
     const { MarkFirstRunComplete } = await import('@wailsjs/go/app/App');
     return MarkFirstRunComplete();
   }
+
+  async sendNotification(title: string, message: string): Promise<void> {
+    const { SendNotification } = await import('@wailsjs/go/app/App');
+    return SendNotification(title, message);
+  }
+
+  async checkForUpdates(): Promise<AppModels.UpdateInfo> {
+    const { CheckForUpdates } = await import('@wailsjs/go/app/App');
+    return CheckForUpdates();
+  }
+
+  async clearPreparedUpdate(): Promise<void> {
+    const { ClearPreparedUpdate } = await import('@wailsjs/go/app/App');
+    return ClearPreparedUpdate();
+  }
+
+  async getAppVersion(): Promise<string> {
+    const { GetAppVersion } = await import('@wailsjs/go/app/App');
+    return GetAppVersion();
+  }
+
+  async listReleases(): Promise<AppModels.ReleaseInfo[]> {
+    const { ListReleases } = await import('@wailsjs/go/app/App');
+    return ListReleases();
+  }
+
+  async openReleaseURL(url: string): Promise<void> {
+    const { OpenReleaseURL } = await import('@wailsjs/go/app/App');
+    return OpenReleaseURL(url);
+  }
+
+  async startUpdateAndRestart(version: string): Promise<void> {
+    const { StartUpdateAndRestart } = await import('@wailsjs/go/app/App');
+    return StartUpdateAndRestart(version);
+  }
+
+  async startMockServer(content: string, filePath: string, port: number, dbPath: string): Promise<void> {
+    const { StartMockServer } = await import('@wailsjs/go/app/App');
+    return StartMockServer(content, filePath, port, dbPath);
+  }
+
+  async stopMockServer(): Promise<void> {
+    const { StopMockServer } = await import('@wailsjs/go/app/App');
+    return StopMockServer();
+  }
+
+  async getMockServerStatus(): Promise<AppModels.MockServerStatus> {
+    const { GetMockServerStatus } = await import('@wailsjs/go/app/App');
+    return GetMockServerStatus();
+  }
 }

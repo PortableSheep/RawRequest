@@ -1,5 +1,4 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
-import { CheckForUpdates, ClearPreparedUpdate, GetAppVersion, ListReleases, OpenReleaseURL, StartUpdateAndRestart } from '@wailsjs/go/app/App';
 import {
   decideUpdateReadyState,
   normalizeUpdateProgressPercent,
@@ -7,6 +6,7 @@ import {
   shouldUseCachedUpdateInfo
 } from './update/update-logic';
 import { EventTransportService } from './event-transport.service';
+import { APP_BRIDGE } from './app-bridge.contract';
 
 export interface UpdateInfo {
   available: boolean;
@@ -36,6 +36,7 @@ const CHECK_INTERVAL_MS = 1 * 60 * 60 * 1000; // 1 hour
 })
 export class UpdateService {
   private readonly events = inject(EventTransportService);
+  private readonly appBridge = inject(APP_BRIDGE);
   private _updateInfo = signal<UpdateInfo | null>(null);
   private _isChecking = signal<boolean>(false);
   private _error = signal<string | null>(null);
@@ -80,7 +81,7 @@ export class UpdateService {
     if (!this.hasWailsBindings()) return;
 
     try {
-      this._appVersion.set(await GetAppVersion());
+      this._appVersion.set(await this.appBridge.getAppVersion());
     } catch {
       this._appVersion.set('unknown');
     }
@@ -93,7 +94,7 @@ export class UpdateService {
         this._isUpdateReady.set(false);
         this._updateReadyVersion.set(null);
         try {
-          void ClearPreparedUpdate();
+          void this.appBridge.clearPreparedUpdate();
         } catch {
           // ignore
         }
@@ -134,7 +135,7 @@ export class UpdateService {
 
   async getVersion(): Promise<string> {
     try {
-      return await GetAppVersion();
+      return await this.appBridge.getAppVersion();
     } catch {
       return 'unknown';
     }
@@ -153,7 +154,7 @@ export class UpdateService {
     this._error.set(null);
 
     try {
-      const info = await CheckForUpdates();
+      const info = await this.appBridge.checkForUpdates();
       this._updateInfo.set(info);
       localStorage.setItem(LAST_CHECK_KEY, Date.now().toString());
 
@@ -179,7 +180,7 @@ export class UpdateService {
     const info = this._updateInfo();
     if (info?.releaseUrl) {
       try {
-        await OpenReleaseURL(info.releaseUrl);
+        await this.appBridge.openReleaseURL(info.releaseUrl);
       } catch (err) {
         console.error('Failed to open release page:', err);
       }
@@ -199,7 +200,7 @@ export class UpdateService {
       this._isUpdating.set(true);
       this._updateStatus.set('Preparing update…');
       this._updateProgress.set(null);
-      await StartUpdateAndRestart(version);
+      await this.appBridge.startUpdateAndRestart(version);
       if (!this._isUpdateReady()) {
         this._isUpdating.set(false);
       }
@@ -217,7 +218,7 @@ export class UpdateService {
 
     this._isLoadingReleases.set(true);
     try {
-      const releases = await ListReleases();
+      const releases = await this.appBridge.listReleases();
       this._availableReleases.set(releases ?? []);
       return releases ?? [];
     } catch (err) {
@@ -235,7 +236,7 @@ export class UpdateService {
     this._updateReadyVersion.set(null);
   try {
     // Best-effort: also clear on-disk prepared artifact/state.
-    void ClearPreparedUpdate();
+    void this.appBridge.clearPreparedUpdate();
   } catch {
     // ignore
   }

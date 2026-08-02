@@ -1,6 +1,6 @@
-import { Injectable, signal, computed } from '@angular/core';
-import { StartMockServer, StopMockServer, GetMockServerStatus } from '@wailsjs/go/app/App';
-import { EventsOn } from '@wailsjs/runtime/runtime';
+import { Injectable, signal, computed, inject } from '@angular/core';
+import { APP_BRIDGE } from './app-bridge.contract';
+import { EventTransportService } from './event-transport.service';
 
 export interface MockServerState {
   running: boolean;
@@ -19,6 +19,8 @@ export interface MockServerLogEntry {
   providedIn: 'root'
 })
 export class MockServerService {
+  private readonly appBridge = inject(APP_BRIDGE);
+  private readonly events = inject(EventTransportService);
   readonly status = signal<MockServerState>({ running: false, port: 8080, dbPath: '' });
   readonly logs = signal<MockServerLogEntry[]>([]);
   
@@ -29,7 +31,7 @@ export class MockServerService {
     
     // Subscribe to mock server logs globally
     try {
-      this.unsubscribeLogEvents = EventsOn('mock-server-log', (log: MockServerLogEntry) => {
+      this.unsubscribeLogEvents = this.events.on('mock-server-log', (log: MockServerLogEntry) => {
         if (log) {
           this.logs.update(entries => [...entries, log]);
         }
@@ -41,7 +43,7 @@ export class MockServerService {
 
   async syncStatus(): Promise<void> {
     try {
-      const state = await GetMockServerStatus();
+      const state = await this.appBridge.getMockServerStatus();
       if (state) {
         this.status.set({
           running: state.running,
@@ -56,7 +58,7 @@ export class MockServerService {
 
   async start(content: string, filePath: string, port: number, dbPath: string): Promise<void> {
     try {
-      await StartMockServer(content, filePath, port, dbPath);
+      await this.appBridge.startMockServer(content, filePath, port, dbPath);
       this.status.set({ running: true, port, dbPath });
       this.logs.set([{
         timestamp: new Date().toLocaleTimeString(),
@@ -78,7 +80,7 @@ export class MockServerService {
 
   async stop(): Promise<void> {
     try {
-      await StopMockServer();
+      await this.appBridge.stopMockServer();
       const current = this.status();
       this.status.set({ running: false, port: current.port, dbPath: current.dbPath });
     } catch (err: any) {
