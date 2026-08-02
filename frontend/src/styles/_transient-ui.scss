@@ -1,0 +1,124 @@
+// Transient UI: the global tooltip (created outside the Angular component
+// tree by `ResponsePanelComponent`), toast/snackbar notifications, and the
+// spinner used for inline loading states.
+/* Global tooltip - rendered outside component hierarchy */
+.global-tooltip {
+  position: fixed;
+  transform: translate(-50%, -100%);
+  padding: 6px 10px;
+  background: #18181b;
+  border: 1px solid #3f3f46;
+  border-radius: var(--rr-radius-sm);
+  font-size: 11px;
+  font-weight: 400;
+  color: #d4d4d8;
+  white-space: nowrap;
+  z-index: 99999;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease-in-out,
+    visibility 0.15s ease-in-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+  &.visible {
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+/* Toast / Snackbar styles */
+.toast-container {
+  position: fixed;
+  bottom: 5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    0 0 12px rgba(0, 0, 0, 0.1);
+  animation: toast-enter 250ms ease-out;
+}
+
+.toast--success {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #6ee7b7;
+}
+
+.toast--error {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+.toast--info {
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+}
+
+.toast--exiting {
+  animation: toast-exit 200ms ease-in forwards;
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.5rem);
+  }
+}
+
+/* Spinner animation */
+@keyframes spinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spinner 0.6s linear infinite;
+}
+
+.spinner--sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 1.5px;
+}

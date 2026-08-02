@@ -1,0 +1,109 @@
+// Tab strip primitive (request-file tabs in the topbar).
+.rr-tabs {
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  align-self: flex-end;
+
+  // Scroll-shadow overflow cue: the shadow gradients only become visible once
+  // there is actual content to scroll to on that side (background-attachment:
+  // local scrolls with the content, scroll stays fixed to the viewport so the
+  // two layers intersect only near a scrollable edge). Pure CSS, no JS.
+  background:
+    linear-gradient(to right, var(--rr-page-bg) 0%, transparent 24px) 0 0,
+    linear-gradient(to left, var(--rr-page-bg) 0%, transparent 24px) 100% 0,
+    linear-gradient(to right, rgba(0, 0, 0, 0.25), transparent 12px) 0 0,
+    linear-gradient(to left, rgba(0, 0, 0, 0.25), transparent 12px) 100% 0;
+  background-repeat: no-repeat;
+  background-size: 24px 100%, 24px 100%, 12px 100%, 12px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+
+.rr-tabs__list {
+  display: flex;
+  gap: 2px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.rr-tab {
+  max-width: 200px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 6px 6px 0 0;
+  border: 1px solid var(--rr-border-color);
+  border-bottom: 0;
+  background: var(--rr-surface-2);
+  color: var(--rr-text-subtle);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
+  position: relative;
+}
+
+.rr-tab:hover {
+  background: var(--rr-surface-3);
+  border-color: var(--rr-border-hover-color);
+  color: var(--rr-text);
+}
+
+.rr-tab--active {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #a5b4fc;
+  z-index: 1;
+}
+
+.rr-tab--closing {
+  animation: rr-tab-close 150ms ease forwards;
+}
+
+.rr-tab--dragging {
+  opacity: 0.55;
+}
+.rr-tab--dragover {
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.7);
+}
+
+.rr-tab__link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.rr-tab__title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: var(--rr-text-sm, 12px);
+}
+
+/* Tab close squeeze animation */
+@keyframes rr-tab-close {
+  from {
+    max-width: 200px;
+    opacity: 1;
+    overflow: hidden;
+  }
+  to {
+    max-width: 0;
+    padding: 0;
+    opacity: 0;
+    overflow: hidden;
+  }
+}
