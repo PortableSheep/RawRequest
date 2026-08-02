@@ -17,25 +17,19 @@ import (
 // storeBinaryBody stores the raw response bytes for a given request ID,
 // replacing any previously stored body.
 func (a *App) storeBinaryBody(requestID string, body []byte) {
-	a.binaryBodiesMu.Lock()
-	defer a.binaryBodiesMu.Unlock()
-	a.binaryBodies[requestID] = body
+	a.binaryBodies.Put(requestID, body)
 }
 
 // clearBinaryBody removes the stored binary body for a given request ID.
 func (a *App) clearBinaryBody(requestID string) {
-	a.binaryBodiesMu.Lock()
-	defer a.binaryBodiesMu.Unlock()
-	delete(a.binaryBodies, requestID)
+	a.binaryBodies.Delete(requestID)
 }
 
 // SaveBinaryResponse opens a native Save dialog and writes the stored binary
 // response body to the file the user selects. contentType and requestURL are
 // used to derive a sensible default filename.
 func (a *App) SaveBinaryResponse(requestID, contentType, requestURL string) (string, error) {
-	a.binaryBodiesMu.Lock()
-	body, exists := a.binaryBodies[requestID]
-	a.binaryBodiesMu.Unlock()
+	body, exists := a.binaryBodies.Get(requestID)
 
 	if !exists {
 		return "", errors.New("no binary response stored for this request")
@@ -69,9 +63,7 @@ func (a *App) SaveBinaryResponse(requestID, contentType, requestURL string) (str
 // SaveBinaryResponseToPath writes the stored binary response body to the
 // given file path without opening a dialog. Used by the service backend.
 func (a *App) SaveBinaryResponseToPath(requestID, destPath string) error {
-	a.binaryBodiesMu.Lock()
-	body, exists := a.binaryBodies[requestID]
-	a.binaryBodiesMu.Unlock()
+	body, exists := a.binaryBodies.Get(requestID)
 
 	if !exists {
 		return errors.New("no binary response stored for this request")

@@ -10,8 +10,10 @@ import (
 	"strings"
 	"sync"
 
+	bbs "rawrequest/internal/binarybodystore"
 	cr "rawrequest/internal/cancelregistry"
 	"rawrequest/internal/importers"
+	po "rawrequest/internal/procowner"
 	rc "rawrequest/internal/requestchain"
 	rp "rawrequest/internal/responseparse"
 	se "rawrequest/internal/scriptexec"
@@ -57,11 +59,9 @@ type App struct {
 	secretVault       *SecretVault
 	secretVaultOnce   sync.Once
 	secretVaultErr    error
-	managedServicePID int
-	managedServiceMu  sync.Mutex
+	managedService    *po.Owner
 	examplesFS        fs.FS
-	binaryBodies      map[string][]byte
-	binaryBodiesMu    sync.Mutex
+	binaryBodies      *bbs.Store
 	windowStateMu     sync.Mutex
 	cachedWindowState WindowState
 	watchedFiles      map[string]watchedFileState
@@ -88,12 +88,13 @@ type ScriptLogEntry = sls.Entry
 
 func NewApp(examplesFS ...fs.FS) *App {
 	a := &App{
-		vars:         vs.New(),
-		cancels:      cr.New(),
-		scriptLogs:   sls.New(maxScriptLogs),
-		eventBroker:  newAppEventBroker(),
-		binaryBodies: make(map[string][]byte),
-		watchedFiles: make(map[string]watchedFileState),
+		vars:           vs.New(),
+		cancels:        cr.New(),
+		scriptLogs:     sls.New(maxScriptLogs),
+		eventBroker:    newAppEventBroker(),
+		managedService: po.New(),
+		binaryBodies:   bbs.New(),
+		watchedFiles:   make(map[string]watchedFileState),
 	}
 	if len(examplesFS) > 0 {
 		a.examplesFS = examplesFS[0]
