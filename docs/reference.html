@@ -22,9 +22,16 @@
   <div class="page">
     <!-- Header/Navigation -->
     <header class="nav" id="navbar">
-      <div class="logo">
-        <a href="index.html"><span class="logo-accent">Raw</span>Request</a>
-      </div>
+      <a class="logo" href="index.html" aria-label="RawRequest home">
+        <img
+          class="logo-mark"
+          src="favicon.svg"
+          alt=""
+          width="28"
+          height="28"
+        />
+        <span class="logo-text">RawRequest</span>
+      </a>
       <nav class="nav-links">
         <a href="index.html">Home</a>
         <a href="#syntax">Directives</a>
@@ -73,7 +80,8 @@
             <h2>Annotations &amp; Directives</h2>
             <p>RawRequest implements an extended JetBrains/VS Code compatible <code>.http</code> format. Request blocks are separated by <code>###</code>, and directives utilize <code>@</code> prefixes to manage state, chaining, and mock server routing.</p>
 
-            <table class="tech-table">
+            <div class="table-scroll">
+              <table class="tech-table">
               <thead>
                 <tr>
                   <th>Directive</th>
@@ -124,6 +132,7 @@
                 </tr>
               </tbody>
             </table>
+            </div>
           </section>
 
           <!-- Section 2: Variables & Secrets -->
@@ -169,7 +178,8 @@ Authorization: Bearer {{authRequest.response.body.token}}</code></pre>
             <h3>2. Runtime Sandbox Schema</h3>
             <p>Inside the JS VM enclosure, the following global structures are automatically populated:</p>
 
-            <table class="tech-table">
+            <div class="table-scroll">
+              <table class="tech-table">
               <thead>
                 <tr>
                   <th>Object</th>
@@ -236,6 +246,7 @@ Authorization: Bearer {{authRequest.response.body.token}}</code></pre>
                 </tr>
               </tbody>
             </table>
+            </div>
 
             <h3>3. Predefined Global Methods</h3>
             <ul>
@@ -328,7 +339,16 @@ rawrequest load api.http -n stressTest --users 100 --duration 1m --fail-rate 0.0
     <!-- Footer -->
     <footer class="footer">
       <div class="footer-left">
-        <div class="logo"><span class="logo-accent">Raw</span>Request</div>
+        <div class="logo">
+          <img
+            class="logo-mark"
+            src="favicon.svg"
+            alt=""
+            width="28"
+            height="28"
+          />
+          <span class="logo-text">RawRequest</span>
+        </div>
         <p class="footer-meta">PolyForm Noncommercial License 1.0.0. Built with Wails, Go, and Angular.</p>
       </div>
       <div class="footer-links">
