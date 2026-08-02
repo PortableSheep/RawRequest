@@ -733,6 +733,60 @@ describe('ResponsePanelComponent', () => {
 
       expect(spy).toHaveBeenCalledWith(entry);
     });
+
+    // Regression: Enter/Space on the nested Replay button used to bubble up
+    // to the disclosure header before the click handler's stopPropagation
+    // could run, toggling the entry open/closed as an unwanted side effect.
+    it('should not toggle the disclosure header when Enter is pressed on the nested Replay button', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const replayBtn = el.querySelector('.response-entry__replay') as HTMLElement;
+      replayBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBe('entry-1');
+    });
+
+    it('should not toggle the disclosure header when Space is pressed on the nested Replay button', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const replayBtn = el.querySelector('.response-entry__replay') as HTMLElement;
+      replayBtn.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBe('entry-1');
+    });
+
+    it('should still toggle the header via keyboard when the header itself is the event target', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBeNull();
+    });
   });
 
   // -----------------------------------------------------------------------
