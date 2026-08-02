@@ -30,12 +30,20 @@ export class MockServerService {
     void this.syncStatus();
     
     // Subscribe to mock server logs globally
+    // mock-server-log is emitted directly by the desktop App process's
+    // mock server via the Wails runtime event bus; it never reaches the
+    // standalone service backend's SSE broker, so this must stay pinned
+    // to 'wails' rather than the 'auto' (SSE-preferring) default.
     try {
-      this.unsubscribeLogEvents = this.events.on('mock-server-log', (log: MockServerLogEntry) => {
-        if (log) {
-          this.logs.update(entries => [...entries, log]);
-        }
-      });
+      this.unsubscribeLogEvents = this.events.on(
+        'mock-server-log',
+        (log: MockServerLogEntry) => {
+          if (log) {
+            this.logs.update(entries => [...entries, log]);
+          }
+        },
+        'wails'
+      );
     } catch (error) {
       console.error("Failed to subscribe to mock-server-log event:", error);
     }

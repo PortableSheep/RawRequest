@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"rawrequest/internal/cli"
+	hcl "rawrequest/internal/httpclientlogic"
 	"rawrequest/internal/secretvaultlogic"
 )
 
@@ -735,7 +735,12 @@ func (s *httpService) handleImportCollection(w http.ResponseWriter, r *http.Requ
 }
 
 type saveBinaryResponsePayload struct {
-	RequestID   string `json:"requestId"`
+	RequestID string `json:"requestId"`
+	// DestPath is accepted only so a non-empty value can be rejected with a
+	// clear 400: this HTTP endpoint has open CORS ('*') and is reachable by
+	// any local page, so honoring a client-supplied destination path would
+	// let it write arbitrary files anywhere on disk the process can reach.
+	// The service always writes to its own generated temp file instead.
 	DestPath    string `json:"destPath"`
 	Base64Body  string `json:"base64Body,omitempty"`
 	ContentType string `json:"contentType,omitempty"`
@@ -744,7 +749,8 @@ type saveBinaryResponsePayload struct {
 
 // errBadRequestBinary wraps an error that should map to 400 instead of the
 // handler's default 500, used to distinguish client input errors (missing
-// source, invalid base64) from server-side write/lookup failures.
+// source, invalid base64, explicit destPath) from server-side write/lookup
+// failures.
 type errBadRequestBinary struct{ err error }
 
 func (e errBadRequestBinary) Error() string { return e.err.Error() }
@@ -752,21 +758,41 @@ func (e errBadRequestBinary) Unwrap() error { return e.err }
 
 // writeBinaryResponsePayload resolves the requested binary data (either from
 // a prior request's stored response, or from an inline base64 body) and
-// writes it to destPath. It returns errBadRequestBinary for client-input
-// errors so the caller can map them to 400 instead of 500.
-func (s *httpService) writeBinaryResponsePayload(payload saveBinaryResponsePayload, destPath string) error {
+// writes it to a service-generated, uniquely-named temp file (0600, via
+// os.CreateTemp) so no caller-supplied path ever reaches a file API. It
+// returns the generated path and errBadRequestBinary for client-input errors
+// so the caller can map them to 400 instead of 500.
+func (s *httpService) writeBinaryResponsePayload(payload saveBinaryResponsePayload) (string, error) {
+	var data []byte
 	switch {
 	case payload.RequestID != "":
-		return s.app.SaveBinaryResponseToPath(payload.RequestID, destPath)
-	case payload.Base64Body != "":
-		data, err := decodeBase64Body(payload.Base64Body)
-		if err != nil {
-			return errBadRequestBinary{err}
+		body, exists := s.app.binaryResponseBytes(payload.RequestID)
+		if !exists {
+			return "", fmt.Errorf("no binary response stored for this request")
 		}
-		return os.WriteFile(destPath, data, 0644)
+		data = body
+	case payload.Base64Body != "":
+		decoded, err := decodeBase64Body(payload.Base64Body)
+		if err != nil {
+			return "", errBadRequestBinary{err}
+		}
+		data = decoded
 	default:
-		return errBadRequestBinary{fmt.Errorf("requestId or base64Body required")}
+		return "", errBadRequestBinary{fmt.Errorf("requestId or base64Body required")}
 	}
+
+	ext := hcl.ExtensionForContentType(payload.ContentType)
+	f, err := os.CreateTemp("", "rawrequest-save-*"+ext)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(data); err != nil {
+		os.Remove(f.Name())
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+	return f.Name(), nil
 }
 
 func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Request) {
@@ -775,13 +801,13 @@ func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	destPath := payload.DestPath
-	if destPath == "" {
-		name := suggestFilename(payload.RequestURL, payload.ContentType)
-		destPath = filepath.Join(os.TempDir(), name)
+	if payload.DestPath != "" {
+		writeServiceError(w, http.StatusBadRequest, fmt.Errorf("destPath is no longer supported; the service always writes exports to a generated temp file"))
+		return
 	}
 
-	if err := s.writeBinaryResponsePayload(payload, destPath); err != nil {
+	path, err := s.writeBinaryResponsePayload(payload)
+	if err != nil {
 		status := http.StatusInternalServerError
 		var badReq errBadRequestBinary
 		if errors.As(err, &badReq) {
@@ -790,5 +816,5 @@ func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Re
 		writeServiceError(w, status, err)
 		return
 	}
-	writeServiceJSON(w, map[string]string{"path": destPath})
+	writeServiceJSON(w, map[string]string{"path": path})
 }

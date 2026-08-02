@@ -20,8 +20,15 @@ func captureStdout(t *testing.T, fn func()) string {
 	if err != nil {
 		t.Fatalf("failed to create pipe: %v", err)
 	}
+	// Register cleanup immediately so both pipe ends are reliably closed
+	// (and stdout restored) even if a later step in this function fails
+	// or panics before reaching the end of the happy path.
+	t.Cleanup(func() {
+		os.Stdout = orig
+		_ = w.Close()
+		_ = r.Close()
+	})
 	os.Stdout = w
-	t.Cleanup(func() { os.Stdout = orig })
 
 	fn()
 

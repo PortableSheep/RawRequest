@@ -338,8 +338,12 @@ describe('WorkspaceStateService', () => {
   });
 
   describe('app bridge integration', () => {
-    it('subscribes to file-externally-modified via the event transport bridge', () => {
-      expect(events.on).toHaveBeenCalledWith('file-externally-modified', expect.any(Function));
+    it("subscribes to file-externally-modified via the event transport bridge, forced to the 'wails' transport", () => {
+      expect(events.on).toHaveBeenCalledWith(
+        'file-externally-modified',
+        expect.any(Function),
+        'wails',
+      );
     });
 
     it('reloads a file when notified of an external modification with no unsaved changes', () => {

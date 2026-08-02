@@ -36,9 +36,18 @@ export class WorkspaceStateService {
       });
     });
 
-    this.events.on('file-externally-modified', (data: { filePath: string; content: string }) => {
-      this.handleExternalFileModification(data.filePath, data.content);
-    });
+    // file-externally-modified is emitted directly by the desktop App
+    // process's file-watcher via the Wails runtime event bus; it never
+    // reaches the standalone service backend's SSE broker, so this must
+    // stay pinned to 'wails' rather than the 'auto' (SSE-preferring)
+    // default.
+    this.events.on(
+      'file-externally-modified',
+      (data: { filePath: string; content: string }) => {
+        this.handleExternalFileModification(data.filePath, data.content);
+      },
+      'wails'
+    );
   }
 
   private handleExternalFileModification(filePath: string, newContent: string): void {

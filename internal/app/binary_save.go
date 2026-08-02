@@ -60,21 +60,12 @@ func (a *App) SaveBinaryResponse(requestID, contentType, requestURL string) (str
 	return path, nil
 }
 
-// SaveBinaryResponseToPath writes the stored binary response body to the
-// given file path without opening a dialog. Used by the service backend.
-func (a *App) SaveBinaryResponseToPath(requestID, destPath string) error {
-	body, exists := a.binaryBodies.Get(requestID)
-
-	if !exists {
-		return errors.New("no binary response stored for this request")
-	}
-
-	dir := filepath.Dir(destPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	return os.WriteFile(destPath, body, 0644)
+// binaryResponseBytes returns the previously stored raw response body for
+// requestID, if any. Used internally by the service backend to resolve
+// binary export data without exposing an arbitrary destination path to
+// callers (see writeBinaryResponsePayload in service_server.go).
+func (a *App) binaryResponseBytes(requestID string) ([]byte, bool) {
+	return a.binaryBodies.Get(requestID)
 }
 
 // SaveBase64ToFile decodes a base64-encoded response body and saves it

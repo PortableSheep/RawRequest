@@ -37,9 +37,13 @@ describe('MockServerService', () => {
     });
   });
 
-  it('subscribes to mock-server-log events via the event transport on construction', () => {
+  it("subscribes to mock-server-log events via the event transport, forced to the 'wails' transport, on construction", () => {
     createService();
-    expect(events.on).toHaveBeenCalledWith('mock-server-log', expect.any(Function));
+    expect(events.on).toHaveBeenCalledWith(
+      'mock-server-log',
+      expect.any(Function),
+      'wails',
+    );
   });
 
   it('appends incoming log events to the log signal', async () => {
