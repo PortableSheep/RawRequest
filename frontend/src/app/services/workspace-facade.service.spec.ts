@@ -3,6 +3,7 @@ import type { FileTab } from '../models/http.models';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
+import { APP_BRIDGE, type AppBridgeContract } from './app-bridge.contract';
 
 function makeFile(overrides: Partial<FileTab> & { id: string }): FileTab {
   return {
@@ -28,17 +29,25 @@ function createService(savedFiles: FileTab[] = []) {
     get: vi.fn().mockReturnValue(undefined),
     delete: vi.fn(),
   };
+  const appBridgeMock: vi.Mocked<Partial<AppBridgeContract>> = {
+    openFileDialog: vi.fn(),
+    readFileContents: vi.fn(),
+    openImportFileDialog: vi.fn(),
+    openImportDirectoryDialog: vi.fn(),
+    importFromPath: vi.fn(),
+  };
 
   const injector = Injector.create({
     providers: [
       WorkspaceFacadeService,
       { provide: HttpService, useValue: httpMock },
       { provide: HistoryStoreService, useValue: historyMock },
+      { provide: APP_BRIDGE, useValue: appBridgeMock },
     ],
   });
 
   const service = runInInjectionContext(injector, () => inject(WorkspaceFacadeService));
-  return { service, httpMock, historyMock };
+  return { service, httpMock, historyMock, appBridgeMock };
 }
 
 describe('WorkspaceFacadeService.initializeFromStorage', () => {
@@ -55,7 +64,8 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
       providers: [
         WorkspaceFacadeService,
         { provide: HttpService, useValue: httpMock },
-        { provide: HistoryStoreService, useValue: {} }
+        { provide: HistoryStoreService, useValue: {} },
+        { provide: APP_BRIDGE, useValue: {} }
       ]
     });
 
@@ -86,7 +96,8 @@ describe('WorkspaceFacadeService.initializeFromStorage', () => {
       providers: [
         WorkspaceFacadeService,
         { provide: HttpService, useValue: httpMock },
-        { provide: HistoryStoreService, useValue: {} }
+        { provide: HistoryStoreService, useValue: {} },
+        { provide: APP_BRIDGE, useValue: {} }
       ]
     });
 
@@ -403,5 +414,104 @@ describe('WorkspaceFacadeService.upsertExamplesTab', () => {
     expect(result.files[1].id).toBe('__examples__');
     expect(result.files[1].content).toBe('GET https://new.com');
     expect(result.currentFileIndex).toBe(1);
+  });
+});
+
+describe('WorkspaceFacadeService.openFilesFromDisk', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('returns an empty array when the dialog is cancelled', async () => {
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openFileDialog as vi.Mock).mockResolvedValue([]);
+
+    const result = await service.openFilesFromDisk('key', []);
+
+    expect(result).toEqual([]);
+    expect(appBridgeMock.readFileContents).not.toHaveBeenCalled();
+  });
+
+  it('reads and adds newly opened files via the app bridge', async () => {
+    const { service, appBridgeMock, httpMock } = createService();
+    (appBridgeMock.openFileDialog as vi.Mock).mockResolvedValue(['/tmp/new.http']);
+    (appBridgeMock.readFileContents as vi.Mock).mockResolvedValue('GET https://example.com');
+
+    const results = await service.openFilesFromDisk('key', []);
+
+    expect(appBridgeMock.readFileContents).toHaveBeenCalledWith('/tmp/new.http');
+    expect(results).toHaveLength(1);
+    expect(results[0].isNewFile).toBe(true);
+    expect(results[0].state.files[0].filePath).toBe('/tmp/new.http');
+    expect(httpMock.saveFiles).toHaveBeenCalled();
+  });
+
+  it('switches to an already-open file instead of re-reading it', async () => {
+    const existing = makeFile({ id: '/tmp/existing.http', filePath: '/tmp/existing.http' });
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openFileDialog as vi.Mock).mockResolvedValue(['/tmp/existing.http']);
+
+    const results = await service.openFilesFromDisk('key', [existing]);
+
+    expect(appBridgeMock.readFileContents).not.toHaveBeenCalled();
+    expect(results).toHaveLength(1);
+    expect(results[0].isNewFile).toBe(false);
+  });
+});
+
+describe('WorkspaceFacadeService.importCollectionFromDisk', () => {
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('uses the file dialog for postman imports', async () => {
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openImportFileDialog as vi.Mock).mockResolvedValue('/tmp/collection.json');
+    (appBridgeMock.importFromPath as vi.Mock).mockResolvedValue({
+      Files: [{ Name: 'imported.http', Content: 'GET https://example.com' }],
+    });
+
+    const result = await service.importCollectionFromDisk('key', [], 'postman');
+
+    expect(appBridgeMock.openImportFileDialog).toHaveBeenCalled();
+    expect(appBridgeMock.openImportDirectoryDialog).not.toHaveBeenCalled();
+    expect(appBridgeMock.importFromPath).toHaveBeenCalledWith('/tmp/collection.json');
+    expect(result?.count).toBe(1);
+    expect(result?.state.files.some((f) => f.name === 'imported.http')).toBe(true);
+  });
+
+  it('uses the directory dialog for bruno imports', async () => {
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openImportDirectoryDialog as vi.Mock).mockResolvedValue('/tmp/bruno-collection');
+    (appBridgeMock.importFromPath as vi.Mock).mockResolvedValue({
+      Files: [{ Name: 'a.http', Content: 'GET /a' }, { Name: 'b.http', Content: 'GET /b' }],
+    });
+
+    const result = await service.importCollectionFromDisk('key', [], 'bruno');
+
+    expect(appBridgeMock.openImportDirectoryDialog).toHaveBeenCalled();
+    expect(appBridgeMock.openImportFileDialog).not.toHaveBeenCalled();
+    expect(appBridgeMock.importFromPath).toHaveBeenCalledWith('/tmp/bruno-collection');
+    expect(result?.count).toBe(2);
+  });
+
+  it('returns null when the dialog is cancelled', async () => {
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openImportFileDialog as vi.Mock).mockResolvedValue('');
+
+    const result = await service.importCollectionFromDisk('key', [], 'postman');
+
+    expect(result).toBeNull();
+    expect(appBridgeMock.importFromPath).not.toHaveBeenCalled();
+  });
+
+  it('returns null when the import produces no files', async () => {
+    const { service, appBridgeMock } = createService();
+    (appBridgeMock.openImportFileDialog as vi.Mock).mockResolvedValue('/tmp/empty.json');
+    (appBridgeMock.importFromPath as vi.Mock).mockResolvedValue({ Files: [] });
+
+    const result = await service.importCollectionFromDisk('key', [], 'postman');
+
+    expect(result).toBeNull();
   });
 });

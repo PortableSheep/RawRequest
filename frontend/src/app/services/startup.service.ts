@@ -5,6 +5,7 @@ import { SecretService } from './secret.service';
 import { ToastService } from './toast.service';
 import { UpdateService } from './update.service';
 import { RequestExecutionService } from './request-execution.service';
+import { APP_BRIDGE } from './app-bridge.contract';
 import { resolveServiceBackendBaseUrl } from './backend-client-config';
 
 @Injectable({ providedIn: 'root' })
@@ -14,6 +15,7 @@ export class StartupService {
   private readonly toast = inject(ToastService);
   readonly updateService = inject(UpdateService);
   private readonly reqExec = inject(RequestExecutionService);
+  private readonly appBridge = inject(APP_BRIDGE);
 
   serviceStartupError: string | null = null;
   private startupInitialized = false;
@@ -69,8 +71,7 @@ export class StartupService {
     const storage = this.safeStorage();
     const baseUrl = resolveServiceBackendBaseUrl(globalThis as any, storage);
     try {
-      const { EnsureServiceRunning } = await import('@wailsjs/go/app/App');
-      await EnsureServiceRunning(baseUrl);
+      await this.appBridge.ensureServiceRunning(baseUrl);
       this.serviceStartupError = null;
       return true;
     } catch (error: any) {
@@ -101,8 +102,7 @@ export class StartupService {
 
   private async checkFirstRun(): Promise<void> {
     try {
-      const { GetExamplesForFirstRun } = await import('@wailsjs/go/app/App');
-      const resp = await GetExamplesForFirstRun();
+      const resp = await this.appBridge.getExamplesForFirstRun();
       const content = resp?.content || '';
       const filePath = resp?.filePath || 'examples.http';
       const isFirstRun = !!resp?.isFirstRun;
@@ -111,8 +111,7 @@ export class StartupService {
         const fileName = 'examples.http';
         this.state.addFileFromContent(fileName, content, filePath);
         try {
-          const { MarkFirstRunComplete } = await import('@wailsjs/go/app/App');
-          await MarkFirstRunComplete();
+          await this.appBridge.markFirstRunComplete();
         } catch (err) {
           console.warn('Failed to mark first run complete:', err);
         }

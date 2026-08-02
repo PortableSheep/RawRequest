@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import type { FileTab } from '../models/http.models';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
+import { APP_BRIDGE } from './app-bridge.contract';
 import { parseHttpFile } from './parser/parse-http-file';
 import { generateFileId, normalizeFileTab } from '../utils/file-tab-utils';
 import { createNewUntitledTab } from './workspace-facade/tab-factories';
@@ -48,6 +49,7 @@ export type ImportCollectionResult = {
 export class WorkspaceFacadeService {
   private readonly http = inject(HttpService);
   private readonly historyStore = inject(HistoryStoreService);
+  private readonly appBridge = inject(APP_BRIDGE);
 
   normalizeFiles(files: FileTab[]): FileTab[] {
     return files.map(file => normalizeFileTab(file));
@@ -360,8 +362,7 @@ export class WorkspaceFacadeService {
   // --- Async I/O methods for file/import dialogs ---
 
   async openFilesFromDisk(lastSessionKey: string, files: FileTab[]): Promise<OpenFileResult[]> {
-    const { OpenFileDialog, ReadFileContents } = await import('@wailsjs/go/app/App');
-    const filePaths = await OpenFileDialog();
+    const filePaths = await this.appBridge.openFileDialog();
     if (!filePaths?.length) return [];
 
     let currentFiles = files;
@@ -375,7 +376,7 @@ export class WorkspaceFacadeService {
         currentFiles = state.files;
         continue;
       }
-      const content = await ReadFileContents(filePath);
+      const content = await this.appBridge.readFileContents(filePath);
       const fileName = basename(filePath) || 'Untitled.http';
       const state = this.addFileFromContentDerived(lastSessionKey, currentFiles, fileName, content, filePath);
       results.push({ state, isNewFile: true });
@@ -392,16 +393,13 @@ export class WorkspaceFacadeService {
   ): Promise<ImportCollectionResult | null> {
     let importPath: string;
     if (type === 'postman') {
-      const { OpenImportFileDialog } = await import('@wailsjs/go/app/App');
-      importPath = await OpenImportFileDialog();
+      importPath = await this.appBridge.openImportFileDialog();
     } else {
-      const { OpenImportDirectoryDialog } = await import('@wailsjs/go/app/App');
-      importPath = await OpenImportDirectoryDialog();
+      importPath = await this.appBridge.openImportDirectoryDialog();
     }
     if (!importPath) return null;
 
-    const { ImportFromPath } = await import('@wailsjs/go/app/App');
-    const result = await ImportFromPath(importPath);
+    const result = await this.appBridge.importFromPath(importPath);
     if (!result?.Files?.length) return null;
 
     let currentFiles = files;
