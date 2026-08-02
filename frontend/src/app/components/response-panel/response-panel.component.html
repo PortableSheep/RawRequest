@@ -95,8 +95,8 @@
                             [attr.aria-expanded]="expandedEntryId() === entry.id"
                             [attr.aria-controls]="'response-entry-details-' + entry.id"
                             (click)="toggleEntry(entry.id)"
-                            (keydown.enter)="toggleEntry(entry.id)"
-                            (keydown.space)="$event.preventDefault(); toggleEntry(entry.id)"
+                            (keydown.enter)="onHeaderActivateKey($event, entry.id)"
+                            (keydown.space)="onHeaderActivateKey($event, entry.id)"
                         >
                             <div class="response-entry__left">
                                 <span class="response-entry__index rr-mono">{{ (idx + 1) | number:'2.0' }}</span>

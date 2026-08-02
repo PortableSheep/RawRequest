@@ -187,6 +187,20 @@ export class ResponsePanelComponent implements OnDestroy {
     this.expandedEntryId.set(this.expandedEntryId() === id ? null : id);
   }
 
+  /**
+   * Keyboard activation handler for the disclosure header. Guards against
+   * nested interactive controls (e.g. the Replay button) bubbling their
+   * Enter/Space keydown up to the header: only toggles when the header
+   * itself was the event target, not a descendant.
+   */
+  onHeaderActivateKey(event: Event, id: string) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    event.preventDefault();
+    this.toggleEntry(id);
+  }
+
   onReplay(entry: ChainEntryPreview, event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
