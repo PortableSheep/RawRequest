@@ -98,7 +98,7 @@ func listRequestsTool() mcp.Tool {
 
 func runRequestTool() mcp.Tool {
 	return mcp.NewTool("run_request",
-		mcp.WithDescription("Execute a named HTTP request from a .http file. Returns the full response including status, headers, body, and timing."),
+		mcp.WithDescription("Execute a named HTTP request from a .http file, including its full @depends chain. Returns the full response including status, headers, body, and timing. Response shape is conditional: if the request has no @depends chain (or the chain is already satisfied), returns a single JSON response object; if @depends expands the run into multiple steps, returns a JSON array of response objects ordered dependencies-first, with the requested request last."),
 		mcp.WithString("file",
 			mcp.Description("Path to the .http file. If omitted, auto-discovers files in workspace."),
 		),
@@ -417,7 +417,11 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 	// Keep the historical single-object JSON shape when the request has no
 	// @depends chain (the common case), and only return an array when the
 	// run actually expanded into multiple steps — so existing callers that
-	// expect one object are unaffected.
+	// expect one object are unaffected. This conditional object-vs-array
+	// contract is documented on the tool description above (see
+	// runRequestTool); when an array is returned, cli.RunSelected/
+	// rc.ResolveOrder guarantee dependency-first ordering, so the requested
+	// request is always the last element.
 	var output interface{}
 	if len(results) == 1 {
 		output = results[0]
