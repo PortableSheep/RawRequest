@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -332,6 +334,60 @@ func TestResolveSecrets(t *testing.T) {
 				t.Errorf("expected %q, got %q", tt.expected, got)
 			}
 		})
+	}
+}
+
+// TestHandleRunRequest_FileVariablePrecedenceOverEnvironment is a regression
+// test for a divergence between CLI and MCP modes: MCP previously merged
+// environment-profile variables directly into the runner's variable map via
+// unconditional SetVariable calls, which silently overwrote same-named
+// file-level (and session) variables. CLI mode has always kept environment
+// variables in a separate lower-priority tier, so file/session variables win
+// on a collision. This test locks in that both modes now agree: a file-level
+// global variable takes precedence over a same-named environment-profile
+// variable.
+func TestHandleRunRequest_FileVariablePrecedenceOverEnvironment(t *testing.T) {
+	const httpFile = `
+@apiKey = fileValue
+
+@env.default.apiKey = envValue
+
+###
+
+@name getThing
+GET {{baseUrl}}/thing?key={{apiKey}}
+`
+	var gotKey string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotKey = r.URL.Query().Get("key")
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	content := "@baseUrl = " + srv.URL + "\n" + httpFile
+	filePath := writeTestFile(t, content)
+
+	h := &handlers{
+		defaultEnv:  "default",
+		version:     "test",
+		sessionVars: make(map[string]string),
+	}
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"file": filePath,
+		"name": "getThing",
+	}
+
+	result, err := h.handleRunRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected tool error: %v", result.Content)
+	}
+	if gotKey != "fileValue" {
+		t.Fatalf("expected file-level variable to win over environment-profile variable, got key=%q", gotKey)
 	}
 }
 
