@@ -511,20 +511,42 @@ func cloneLoadConfig(input map[string]any) map[string]any {
 
 // FindRequestsByName returns requests matching the given names
 func (p *ParsedHttpFile) FindRequestsByName(names []string) []Request {
-	if len(names) == 0 {
-		return p.Requests
+	idxs := p.findIndexesByName(names)
+	if len(idxs) == 0 {
+		return nil
 	}
-	var result []Request
-	nameSet := make(map[string]bool)
+	result := make([]Request, len(idxs))
+	for i, idx := range idxs {
+		result[i] = p.Requests[idx]
+	}
+	return result
+}
+
+// findIndexesByName returns the indices into p.Requests whose name matches
+// (case-insensitively) one of names, in p.Requests order — the same
+// matching semantics FindRequestsByName has always had. An empty names
+// selects every request. This is used by RunSelected to seed
+// requestchain.ResolveOrder with the right starting indices before
+// expanding @depends.
+func (p *ParsedHttpFile) findIndexesByName(names []string) []int {
+	if len(names) == 0 {
+		out := make([]int, len(p.Requests))
+		for i := range p.Requests {
+			out[i] = i
+		}
+		return out
+	}
+	nameSet := make(map[string]bool, len(names))
 	for _, n := range names {
 		nameSet[strings.ToLower(n)] = true
 	}
-	for _, req := range p.Requests {
+	var out []int
+	for i, req := range p.Requests {
 		if nameSet[strings.ToLower(req.Name)] {
-			result = append(result, req)
+			out = append(out, i)
 		}
 	}
-	return result
+	return out
 }
 
 // ListRequests returns a summary of all requests
