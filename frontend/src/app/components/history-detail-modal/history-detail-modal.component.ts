@@ -1,12 +1,14 @@
 import { Component, input, output, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
+import { IconComponent } from '../icon/icon.component';
 import type { HistoryItem, LoadTestMetrics } from '../../models/http.models';
 
 @Component({
   selector: 'app-history-detail-modal',
   standalone: true,
-  imports: [CommonModule, VirtualResponseBodyComponent],
+  imports: [CommonModule, VirtualResponseBodyComponent, FocusTrapDirective, IconComponent],
   templateUrl: './history-detail-modal.component.html',
   styleUrls: ['./history-detail-modal.component.scss']
 })

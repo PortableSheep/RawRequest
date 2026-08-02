@@ -75,6 +75,20 @@
   --rr-font-mono:
     "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
     "Liberation Mono", "Courier New", monospace;
+
+  // Semantic overlay/z-index scale. Layers below 1000 are local stacking
+  // contexts used by regular page chrome (sticky headers, edge triggers,
+  // the base modal shell/backdrop, tooltips, toasts — see their own rules
+  // for those). The 1000+ band below is reserved for dialogs that must
+  // stack *above an already-open modal*, e.g. an inline confirmation
+  // (delete/reset/forgot-password) rendered while its parent modal is
+  // still open. Each nesting level is a backdrop/dialog pair one unit
+  // apart, and each level starts one unit above the previous level's
+  // dialog so a deeper confirmation always wins.
+  --rr-z-modal-nested-1-backdrop: 1000;
+  --rr-z-modal-nested-1: 1001;
+  --rr-z-modal-nested-2-backdrop: 1001;
+  --rr-z-modal-nested-2: 1002;
 }
 
 html,
@@ -858,6 +872,26 @@ html[data-theme="light"] body::before {
   background: rgba(0, 0, 0, 0.6);
 }
 
+// Nested-overlay utilities: apply to a `.rr-modal-shell`/`.rr-modal-backdrop`
+// pair that needs to stack above an already-open modal (e.g. a delete/reset
+// confirmation rendered while its parent modal is still open). See the
+// `--rr-z-modal-nested-*` token comment above for the layering rationale.
+.rr-modal-shell--nested-1 {
+  z-index: var(--rr-z-modal-nested-1);
+}
+
+.rr-modal-backdrop--nested-1 {
+  z-index: var(--rr-z-modal-nested-1-backdrop);
+}
+
+.rr-modal-shell--nested-2 {
+  z-index: var(--rr-z-modal-nested-2);
+}
+
+.rr-modal-backdrop--nested-2 {
+  z-index: var(--rr-z-modal-nested-2-backdrop);
+}
+
 .rr-field {
   display: flex;
   flex-direction: column;
@@ -1209,10 +1243,6 @@ body {
   transition: border-color 80ms ease;
 }
 
-.glass-panel::before {
-  display: none;
-}
-
 html[data-theme="light"] .glass-panel {
   background: var(--rr-surface-2);
   border-color: var(--rr-border-color);
@@ -1229,10 +1259,6 @@ html[data-theme="light"] .glass-panel {
 
 .btn-ambient {
   transition: background 80ms ease, border-color 80ms ease;
-}
-
-.btn-ambient::before {
-  display: none;
 }
 
 .btn-ambient:hover {

@@ -2,11 +2,12 @@ import { Component, EventEmitter, Output, signal, HostListener } from '@angular/
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScriptSnippetService, ScriptSnippet } from '../../services/script-snippet.service';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
 
 @Component({
   selector: 'app-script-snippet-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, FocusTrapDirective],
   templateUrl: './script-snippet-modal.component.html',
   styleUrl: './script-snippet-modal.component.scss'
 })
