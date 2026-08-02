@@ -11,7 +11,7 @@ import {
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { EditorComponent } from "./components/editor/editor.component";
+import { EditorComponent } from "./features/editor";
 import {
   HeaderComponent,
   ResponsePanelComponent,

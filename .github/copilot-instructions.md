@@ -145,6 +145,7 @@ Variables set via `setVar()` do NOT need to be pre-declared with `@varName =` di
 - **Component tests**: Focus on user interaction, not business logic
 - **Service extraction**: When a component manages state or orchestrates complex behavior (layout, keyboard shortcuts, panel visibility, request execution), extract that logic into an `@Injectable` service with its own tests
 - **Wails bindings**: Import from `@wailsjs/go/app/App`, never commit changes to `wailsjs/` (auto-generated)
+- **Feature folders**: Cohesive, feature-owned components/logic/services live under `frontend/src/app/features/<feature>/` (e.g. `features/editor/`), migrated incrementally from the legacy flat `components/` layout. A feature exposes its public surface via `index.ts` (e.g. `EditorComponent`); code outside the feature should import from that barrel rather than reaching into internal files. Genuinely shared UI/core services (e.g. `services/`, `utils/`, `logic/`, `models/`) stay outside any feature folder.
 
 ### Secret Management
 - Secrets stored encrypted in OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
