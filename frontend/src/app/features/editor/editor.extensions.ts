@@ -15,9 +15,16 @@ import { findRequestNameLineNumber } from './editor.component.logic';
 
 export function buildEditorThemeExtension(theme: 'dark' | 'light') {
   const isDark = theme === 'dark';
-  const selectionBackground = isDark ? 'rgba(129, 140, 248, 0.34)' : 'rgba(79, 70, 229, 0.30)';
-  const activeLineBackground = isDark ? 'rgba(99, 102, 241, 0.16)' : 'rgba(79, 70, 229, 0.12)';
-  const activeLineGutterBackground = isDark ? 'rgba(99, 102, 241, 0.20)' : 'rgba(79, 70, 229, 0.16)';
+  const selectionBackground = isDark
+    ? 'rgba(67, 56, 202, 0.40)'
+    : 'rgba(67, 56, 202, 0.26)';
+  const selectionLineBackground = isDark
+    ? 'rgba(99, 102, 241, 0.12)'
+    : 'rgba(79, 70, 229, 0.10)';
+  const selectionText = '#ffffff';
+  const activeLineBackground = isDark ? 'rgba(99, 102, 241, 0.08)' : 'rgba(79, 70, 229, 0.08)';
+  const activeLineGutterBackground = isDark ? 'rgba(99, 102, 241, 0.14)' : 'rgba(79, 70, 229, 0.12)';
+  const activeLineAccent = isDark ? 'rgba(129, 140, 248, 0.85)' : 'rgba(79, 70, 229, 0.55)';
   return [
     EditorView.theme({
       "&": {
@@ -28,7 +35,14 @@ export function buildEditorThemeExtension(theme: 'dark' | 'light') {
         caretColor: "var(--rr-primary)"
       },
       ".cm-cursor, .cm-dropCursor": { borderLeftColor: "var(--rr-primary)" },
-      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection": { backgroundColor: selectionBackground },
+      "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": {
+        backgroundColor: selectionBackground,
+        opacity: "1"
+      },
+      ".cm-content ::selection": {
+        backgroundColor: selectionBackground,
+        color: selectionText
+      },
 
       ".cm-gutters": {
         backgroundColor: "var(--rr-surface-1)",
@@ -38,11 +52,20 @@ export function buildEditorThemeExtension(theme: 'dark' | 'light') {
       ".cm-activeLineGutter": {
         backgroundColor: activeLineGutterBackground
       },
+      "&.cm-has-selection .cm-activeLine, &.cm-has-selection .cm-activeLineGutter": {
+        backgroundColor: "transparent"
+      },
       ".cm-lineNumbers .cm-gutterElement": {
         padding: "0 8px 0 4px",
         minWidth: "32px"
       },
-      ".cm-activeLine": { backgroundColor: activeLineBackground },
+      ".cm-activeLine": {
+        backgroundColor: activeLineBackground,
+        boxShadow: `inset 2px 0 0 ${activeLineAccent}`
+      },
+      ".cm-selection-line": {
+        backgroundColor: selectionLineBackground
+      },
       ".cm-foldPlaceholder": {
         backgroundColor: "transparent",
         border: "none",
@@ -61,6 +84,60 @@ export function buildEditorThemeExtension(theme: 'dark' | 'light') {
     }, { dark: isDark }),
     isDark ? oneDark : []
   ];
+}
+
+export function createSelectedTextHighlighter() {
+  const selectedLine = Decoration.line({ class: 'cm-selection-line' });
+
+  return ViewPlugin.fromClass(class {
+    decorations: DecorationSet;
+    private readonly editorDom: HTMLElement;
+
+    constructor(view: EditorView) {
+      this.editorDom = view.dom;
+      this.decorations = this.buildDecorations(view);
+    }
+
+    update(update: ViewUpdate) {
+      if (update.docChanged || update.selectionSet || update.viewportChanged) {
+        this.decorations = this.buildDecorations(update.view);
+      }
+    }
+
+    buildDecorations(view: EditorView): DecorationSet {
+      const builder = new RangeSetBuilder<Decoration>();
+      const selectedLines = new Set<number>();
+      let hasSelection = false;
+
+      for (const range of view.state.selection.ranges) {
+        if (range.empty) {
+          continue;
+        }
+        hasSelection = true;
+
+        const startLine = view.state.doc.lineAt(range.from).number;
+        const endPos = Math.max(range.from, range.to - 1);
+        const endLine = view.state.doc.lineAt(endPos).number;
+        for (let lineNo = startLine; lineNo <= endLine; lineNo++) {
+          selectedLines.add(lineNo);
+        }
+      }
+
+      for (const lineNo of selectedLines) {
+        const line = view.state.doc.line(lineNo);
+        builder.add(line.from, line.from, selectedLine);
+      }
+
+      this.editorDom.classList.toggle('cm-has-selection', hasSelection);
+      return builder.finish();
+    }
+
+    destroy() {
+      this.editorDom.classList.remove('cm-has-selection');
+    }
+  }, {
+    decorations: (plugin) => plugin.decorations
+  });
 }
 
 export function createDependsLinker(jumpToRequestByName: (name: string) => boolean) {
