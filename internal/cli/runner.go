@@ -262,18 +262,20 @@ func runRequests(opts *Options, version string) int {
 		return 1
 	}
 
-	// Execute requests
-	var results []ResponseResult
+	// Execute requests: resolve @depends ordering and share a positional
+	// response store across the whole run (see RunSelected) so requests
+	// selected together — whether via explicit names or via a dependency
+	// pulled in transitively — see prior responses through
+	// {{requestN.response...}}, matching the Desktop app's chain execution.
+	results, err := RunSelected(parsed, runner, opts.RequestNames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		return 1
+	}
+
 	hasError := false
-
-	for _, req := range requests {
-		result := runner.ExecuteRequest(req)
-		results = append(results, result)
-
-		if result.Error != "" {
-			hasError = true
-		}
-		if result.Status >= 400 {
+	for _, result := range results {
+		if result.Error != "" || result.Status >= 400 {
 			hasError = true
 		}
 	}
@@ -287,8 +289,27 @@ func runRequests(opts *Options, version string) int {
 	return 0
 }
 
-// ExecuteRequest performs a single HTTP request
+// ExecuteRequest performs a single HTTP request. It is equivalent to
+// ExecuteRequestWithResponses with a nil response store, i.e. no
+// {{requestN.response...}} placeholders are resolved (there is no chain
+// context to resolve them against).
 func (r *Runner) ExecuteRequest(req Request) ResponseResult {
+	return r.executeRequest(req, nil)
+}
+
+// ExecuteRequestWithResponses executes req like ExecuteRequest, but also
+// resolves {{requestN.response...}} placeholders in the URL, headers, and
+// body against responseStore before sending the request — the same
+// positional response-store convention requestchain.Execute and
+// templating.Resolve use for the Desktop app's request chains (see
+// templating.ResolveResponseReferences). Callers running multi-request
+// chains (see RunSelected) populate responseStore with each prior request's
+// result before invoking the next.
+func (r *Runner) ExecuteRequestWithResponses(req Request, responseStore map[string]map[string]interface{}) ResponseResult {
+	return r.executeRequest(req, responseStore)
+}
+
+func (r *Runner) executeRequest(req Request, responseStore map[string]map[string]interface{}) ResponseResult {
 	result := ResponseResult{
 		RequestName: req.Name,
 		Method:      req.Method,
@@ -315,17 +336,17 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 	}
 
 	// Resolve variables in URL
-	url := r.resolveVariables(req.URL)
+	url := r.resolveVariablesWithStore(req.URL, responseStore)
 	result.URL = url
 
 	// Resolve variables in headers
 	headers := make(map[string]string)
 	for k, v := range req.Headers {
-		headers[k] = r.resolveVariables(v)
+		headers[k] = r.resolveVariablesWithStore(v, responseStore)
 	}
 
 	// Resolve variables in body
-	body := r.resolveVariables(req.Body)
+	body := r.resolveVariablesWithStore(req.Body, responseStore)
 
 	// Execute pre-script
 	var scriptCtx *sr.ExecutionContext
@@ -496,7 +517,20 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 }
 
 func (r *Runner) resolveVariables(input string) string {
-	result := input
+	return r.resolveVariablesWithStore(input, nil)
+}
+
+// resolveVariablesWithStore resolves the same placeholders resolveVariables
+// does (secrets, CLI/global variables, environment-profile variables,
+// system environment variables), plus — when responseStore is non-nil —
+// {{requestN.response...}} placeholders referencing prior requests in the
+// current chain (see templating.ResolveResponseReferences). This runs as
+// its own pass before the rest of resolution, matching the "secrets, then
+// variables, then env, then system env" sequential-pass shape this function
+// already had; a nil/empty store is a no-op so ExecuteRequest's behavior is
+// unchanged.
+func (r *Runner) resolveVariablesWithStore(input string, responseStore map[string]map[string]interface{}) string {
+	result := tpl.ResolveResponseReferences(input, responseStore)
 
 	// Replace secrets: {{secret:KEY}}
 	result = tpl.ResolveSecrets(result, r.lookupSecret)

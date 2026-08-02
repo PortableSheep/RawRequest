@@ -79,3 +79,72 @@ func TestResolve_UnknownOrUnparseableLeftUnchanged(t *testing.T) {
 		t.Fatalf("unexpected resolve: %q", got)
 	}
 }
+
+// TestResolveResponseReferences_MatchesResolveForRequestPlaceholders locks in
+// that the standalone ResolveResponseReferences function (used by CLI/MCP,
+// which layer their own variable/secret/env resolution on top) resolves
+// requestN.response.* placeholders identically to Resolve's own handling of
+// the same placeholders, since both now share the responseReferenceValue
+// helper.
+func TestResolveResponseReferences_MatchesResolveForRequestPlaceholders(t *testing.T) {
+	store := map[string]map[string]interface{}{
+		"request1": {
+			"status":  200,
+			"headers": map[string]string{"X-Trace": "t123"},
+			"body":    `{"user":{"id":123,"name":"alice"}}`,
+		},
+	}
+
+	cases := []string{
+		"{{request1.response.status}}",
+		"{{request1.response.headers.X-Trace}}",
+		"{{request1.response.body.user.id}}",
+		"{{request1.response.body.user.missing}}",
+		"{{request1.response.body}}",
+		"{{request2.response.body}}",
+	}
+	for _, input := range cases {
+		want := Resolve(input, nil, nil, store)
+		got := ResolveResponseReferences(input, store)
+		if got != want {
+			t.Errorf("ResolveResponseReferences(%q) = %q, want %q (to match Resolve)", input, got, want)
+		}
+	}
+}
+
+// TestResolveResponseReferences_LeavesNonResponsePlaceholdersUntouched
+// verifies ResolveResponseReferences never touches secrets, plain
+// variables, or {{env.*}} placeholders — CLI/MCP need to run their own
+// resolution pass for those, since (unlike Desktop's Resolve) CLI's bare
+// {{key}} also falls back to an environment-profile variable.
+func TestResolveResponseReferences_LeavesNonResponsePlaceholdersUntouched(t *testing.T) {
+	store := map[string]map[string]interface{}{
+		"request1": {"body": "resp-body"},
+	}
+
+	inputs := []string{
+		"{{secret:apiKey}}",
+		"{{token}}",
+		"{{env.baseUrl}}",
+		"{{variables.foo}}",
+		"plain text, no placeholders",
+	}
+	for _, input := range inputs {
+		if got := ResolveResponseReferences(input, store); got != input {
+			t.Errorf("ResolveResponseReferences(%q) = %q, want unchanged", input, got)
+		}
+	}
+}
+
+func TestResolveResponseReferences_EmptyInputOrStoreIsNoop(t *testing.T) {
+	if got := ResolveResponseReferences("", map[string]map[string]interface{}{"request1": {"body": "x"}}); got != "" {
+		t.Fatalf("expected empty input unchanged, got %q", got)
+	}
+	input := "{{request1.response.body}}"
+	if got := ResolveResponseReferences(input, nil); got != input {
+		t.Fatalf("expected nil store to leave placeholder untouched, got %q", got)
+	}
+	if got := ResolveResponseReferences(input, map[string]map[string]interface{}{}); got != input {
+		t.Fatalf("expected empty store to leave placeholder untouched, got %q", got)
+	}
+}

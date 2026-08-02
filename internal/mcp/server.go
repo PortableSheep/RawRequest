@@ -395,7 +395,17 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 		runner.SetEnvVars(envVars)
 	}
 
-	result := runner.ExecuteRequest(requests[0])
+	// Execute the request together with its full @depends chain (if any),
+	// sharing one positional response store across the chain so a dependent
+	// request can reference a dependency's response via
+	// {{requestN.response...}} — matching the Desktop app's chain execution
+	// (requestchain.Execute / templating.Resolve) and CLI's `run` command
+	// (see cli.RunSelected). Previously this ran only requests[0], silently
+	// ignoring @depends entirely.
+	results, err := cli.RunSelected(parsed, runner, []string{name})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error resolving request chain: %s", err)), nil
+	}
 
 	// Persist any variables set by scripts back to session
 	for k, v := range runner.GetVariables() {
@@ -404,7 +414,18 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 		}
 	}
 
-	data, _ := json.MarshalIndent(result, "", "  ")
+	// Keep the historical single-object JSON shape when the request has no
+	// @depends chain (the common case), and only return an array when the
+	// run actually expanded into multiple steps — so existing callers that
+	// expect one object are unaffected.
+	var output interface{}
+	if len(results) == 1 {
+		output = results[0]
+	} else {
+		output = results
+	}
+
+	data, _ := json.MarshalIndent(output, "", "  ")
 	return mcp.NewToolResultText(string(data)), nil
 }
 

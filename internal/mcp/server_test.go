@@ -267,6 +267,135 @@ func TestHandleRunRequestNotFound(t *testing.T) {
 	}
 }
 
+// TestHandleRunRequest_SingleRequestWithoutDependsReturnsSingleObject locks
+// in the backward-compatible JSON shape: run_request historically returned
+// one JSON object (not an array) since it only ever ran a single request.
+// Now that it runs the full @depends chain via cli.RunSelected, a request
+// with no dependencies must still expand to a one-element chain and keep
+// returning a single object, so existing callers/integrations are
+// unaffected.
+func TestHandleRunRequest_SingleRequestWithoutDependsReturnsSingleObject(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(srv.Close)
+
+	content := fmt.Sprintf(`
+###
+
+@name solo
+GET %s
+`, srv.URL)
+	filePath := writeTestFile(t, content)
+
+	h := &handlers{
+		defaultEnv:  "default",
+		version:     "test",
+		sessionVars: make(map[string]string),
+	}
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"file": filePath,
+		"name": "solo",
+	}
+
+	result, err := h.handleRunRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected tool error: %v", result.Content)
+	}
+
+	text := result.Content[0].(mcp.TextContent).Text
+	var single cli.ResponseResult
+	if err := json.Unmarshal([]byte(text), &single); err != nil {
+		t.Fatalf("expected a single JSON object for a request with no @depends, got %s (%v)", text, err)
+	}
+	if single.RequestName != "solo" || single.Status != http.StatusOK {
+		t.Fatalf("unexpected result: %+v", single)
+	}
+}
+
+// TestHandleRunRequest_ExecutesDependencyChainAndResolvesResponse is a
+// characterization test for the fix to a real MCP gap: run_request
+// previously executed only the single named request (requests[0]),
+// completely ignoring @depends. This locks in the new behavior: running a
+// request that @depends on another now executes the dependency first,
+// shares a positional response store so the dependent can reference the
+// dependency's response via {{requestN.response...}} (matching Desktop's
+// requestchain.Execute / templating.Resolve conventions), and returns the
+// full chain as a JSON array in execution order.
+func TestHandleRunRequest_ExecutesDependencyChainAndResolvesResponse(t *testing.T) {
+	loginSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"token":"mcp-chain-token"}`))
+	}))
+	t.Cleanup(loginSrv.Close)
+
+	var gotAuth string
+	userSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	t.Cleanup(userSrv.Close)
+
+	content := fmt.Sprintf(`
+###
+
+@name login
+GET %s
+
+###
+
+@name getUser
+@depends login
+GET %s
+Authorization: Bearer {{request1.response.body.token}}
+`, loginSrv.URL, userSrv.URL)
+
+	filePath := writeTestFile(t, content)
+
+	h := &handlers{
+		defaultEnv:  "default",
+		version:     "test",
+		sessionVars: make(map[string]string),
+	}
+
+	req := mcp.CallToolRequest{}
+	req.Params.Arguments = map[string]interface{}{
+		"file": filePath,
+		"name": "getUser",
+	}
+
+	result, err := h.handleRunRequest(context.Background(), req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.IsError {
+		t.Fatalf("unexpected tool error: %v", result.Content)
+	}
+	if gotAuth != "Bearer mcp-chain-token" {
+		t.Fatalf("expected getUser to resolve login's response via responseStore, got Authorization=%q", gotAuth)
+	}
+
+	text := result.Content[0].(mcp.TextContent).Text
+	var chain []cli.ResponseResult
+	if err := json.Unmarshal([]byte(text), &chain); err != nil {
+		t.Fatalf("expected run_request to return a JSON array for a multi-step chain, got %s (%v)", text, err)
+	}
+	if len(chain) != 2 {
+		t.Fatalf("expected 2 chain results (login + getUser), got %d", len(chain))
+	}
+	if chain[0].RequestName != "login" || chain[1].RequestName != "getUser" {
+		t.Fatalf("expected [login, getUser] execution order, got %+v", chain)
+	}
+}
+
 func TestResolveSecrets(t *testing.T) {
 	mock := &mockSecretResolver{
 		secrets: map[string]map[string]string{
