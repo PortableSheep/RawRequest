@@ -50,6 +50,9 @@ export interface AppBridgeContract {
   startMockServer(content: string, filePath: string, port: number, dbPath: string): Promise<void>;
   stopMockServer(): Promise<void>;
   getMockServerStatus(): Promise<AppModels.MockServerStatus>;
+
+  // Binary response export
+  saveBase64ToFile(base64Data: string, contentType: string, requestUrl: string): Promise<string>;
 }
 
 export const APP_BRIDGE = new InjectionToken<AppBridgeContract>('APP_BRIDGE', {

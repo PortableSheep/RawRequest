@@ -137,4 +137,9 @@ export class WailsAppBridgeService implements AppBridgeContract {
     const { GetMockServerStatus } = await import('@wailsjs/go/app/App');
     return GetMockServerStatus();
   }
+
+  async saveBase64ToFile(base64Data: string, contentType: string, requestUrl: string): Promise<string> {
+    const { SaveBase64ToFile } = await import('@wailsjs/go/app/App');
+    return SaveBase64ToFile(base64Data, contentType, requestUrl);
+  }
 }

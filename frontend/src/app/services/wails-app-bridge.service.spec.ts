@@ -29,6 +29,7 @@ const mockStartUpdateAndRestart = vi.fn();
 const mockStartMockServer = vi.fn();
 const mockStopMockServer = vi.fn();
 const mockGetMockServerStatus = vi.fn();
+const mockSaveBase64ToFile = vi.fn();
 
 vi.mock('@wailsjs/go/app/App', () => ({
   WatchFiles: (...args: any[]) => mockWatchFiles(...args),
@@ -57,6 +58,7 @@ vi.mock('@wailsjs/go/app/App', () => ({
   StartMockServer: (...args: any[]) => mockStartMockServer(...args),
   StopMockServer: (...args: any[]) => mockStopMockServer(...args),
   GetMockServerStatus: (...args: any[]) => mockGetMockServerStatus(...args),
+  SaveBase64ToFile: (...args: any[]) => mockSaveBase64ToFile(...args),
 }));
 
 describe('WailsAppBridgeService', () => {
@@ -226,5 +228,12 @@ describe('WailsAppBridgeService', () => {
     const result = await service.getMockServerStatus();
     expect(mockGetMockServerStatus).toHaveBeenCalled();
     expect(result.running).toBe(true);
+  });
+
+  it('delegates saveBase64ToFile to SaveBase64ToFile', async () => {
+    mockSaveBase64ToFile.mockResolvedValue('/tmp/download.png');
+    const result = await service.saveBase64ToFile('base64data', 'image/png', 'https://example.com/img.png');
+    expect(mockSaveBase64ToFile).toHaveBeenCalledWith('base64data', 'image/png', 'https://example.com/img.png');
+    expect(result).toBe('/tmp/download.png');
   });
 });
