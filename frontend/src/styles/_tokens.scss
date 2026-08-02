@@ -1,0 +1,143 @@
+// Design tokens and theming.
+//
+// All colors, spacing, radii, typography sizes, and the semantic overlay/
+// z-index scale live here as CSS custom properties on `:root`. Components
+// (Angular-encapsulated or global) consume these via `var(--rr-*)` rather
+// than hard-coded values so themes can be swapped by toggling
+// `html[data-theme="light"]`.
+:root {
+  --color-zinc-100: #e8e8eb;
+  --color-zinc-200: #a0a0a8;
+  --color-zinc-400: #8b8b92;
+  --color-zinc-600: #56565c;
+  --color-zinc-800: #2a2a2e;
+  --color-zinc-900: #1c1c1f;
+  --color-blue-500: #6366f1;
+  --color-amber-500: #eab308;
+  --color-emerald-500: #22c55e;
+
+  --rr-primary: #6366f1;
+  --rr-method-put: #818cf8;
+  --rr-text-secondary: #8b8b92;
+  --rr-text-tertiary: #84848b;
+  --rr-warning: #eab308;
+  --rr-accent: #818cf8;
+  --rr-success: #22c55e;
+  --rr-border: var(--rr-border-color);
+  --rr-separator: #6366f1;
+  --rr-panel: var(--rr-surface-2);
+  --rr-muted: var(--rr-text-tertiary);
+
+  --rr-error: #ef4444;
+  --rr-success-light: #4ade80;
+  --rr-warning-light: #facc15;
+  --rr-accent-light: #a5b4fc;
+  --rr-error-light: rgba(251, 113, 133, 0.95);
+  --rr-text-on-primary: #fff;
+
+  --rr-http-get: #22c55e;
+  --rr-http-post: #6366f1;
+  --rr-http-put: #f59e0b;
+  --rr-http-patch: #a855f7;
+  --rr-http-delete: #ef4444;
+  --rr-http-head: #06b6d4;
+  --rr-http-options: #8b5cf6;
+
+  --rr-text-xs: 11px;
+  --rr-text-sm: 12px;
+  --rr-text-base: 13px;
+  --rr-text-lg: 15px;
+  --rr-text-xl: 18px;
+
+  color-scheme: dark;
+
+  --rr-page-bg: #0c0c0e;
+  --rr-page-fg: #e8e8eb;
+  --rr-surface-1: #141416;
+  --rr-surface-2: #1c1c1f;
+  --rr-surface-3: #242428;
+  --rr-border-color: #2a2a2e;
+  --rr-border-hover-color: #3a3a3f;
+  --rr-border-divider-color: #222226;
+  --rr-surface-hover: #242428;
+  --rr-text: #e8e8eb;
+  --rr-text-muted: #a0a0a8;
+  --rr-text-subtle: #8b8b92;
+
+  --rr-radius-sm: 4px;
+  --rr-radius-md: 6px;
+  --rr-radius-lg: 8px;
+  --rr-space-1: 4px;
+  --rr-space-2: 6px;
+  --rr-space-3: 8px;
+  --rr-space-4: 12px;
+  --rr-space-5: 16px;
+  --rr-space-6: 20px;
+  --rr-font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  // Semantic overlay/z-index scale. Layers below 1000 are local stacking
+  // contexts used by regular page chrome (sticky headers, edge triggers,
+  // the base modal shell/backdrop, tooltips, toasts — see their own rules
+  // for those). The 1000+ band below is reserved for dialogs that must
+  // stack *above an already-open modal*, e.g. an inline confirmation
+  // (delete/reset/forgot-password) rendered while its parent modal is
+  // still open. Each nesting level is a backdrop/dialog pair one unit
+  // apart, and each level starts one unit above the previous level's
+  // dialog so a deeper confirmation always wins.
+  --rr-z-modal-nested-1-backdrop: 1000;
+  --rr-z-modal-nested-1: 1001;
+  --rr-z-modal-nested-2-backdrop: 1001;
+  --rr-z-modal-nested-2: 1002;
+}
+
+html[data-theme="light"] {
+  color-scheme: light;
+
+  --color-zinc-100: #1a1a1e;
+  --color-zinc-200: #1a1a1e;
+  --color-zinc-400: #6b6b73;
+  --color-zinc-600: #9b9ba3;
+  --color-zinc-800: #e5e5e9;
+  --color-zinc-900: #f8f8fa;
+
+  --rr-primary: #4f46e5;
+  --rr-warning: #ca8a04;
+  --rr-accent: #6366f1;
+  --rr-success: #16a34a;
+
+  --rr-text-secondary: #4a4a52;
+  --rr-text-tertiary: #5f5f66;
+
+  --rr-page-bg: #f8f8fa;
+  --rr-page-fg: #1a1a1e;
+  --rr-surface-1: #ffffff;
+  --rr-surface-2: #f0f0f3;
+  --rr-surface-3: #e5e5e9;
+  --rr-border-color: #d8d8de;
+  --rr-border-hover-color: #c0c0c8;
+  --rr-border-divider-color: #e0e0e4;
+  --rr-surface-hover: #e5e5e9;
+  --rr-text: #1a1a1e;
+  --rr-text-muted: #4a4a52;
+  --rr-text-subtle: #6b6b73;
+
+  --rr-panel: var(--rr-surface-2);
+  --rr-muted: var(--rr-text-tertiary);
+
+  --rr-error: #dc2626;
+  --rr-success-light: #16a34a;
+  --rr-warning-light: #a16207;
+  --rr-accent-light: #4f46e5;
+  --rr-error-light: #e11d48;
+  --rr-text-on-primary: #fff;
+
+  --rr-http-get: #16a34a;
+  --rr-http-post: #4f46e5;
+  --rr-http-put: #d97706;
+  --rr-http-patch: #7c3aed;
+  --rr-http-delete: #dc2626;
+  --rr-http-head: #0891b2;
+  --rr-http-options: #6d28d9;
+}

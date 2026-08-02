@@ -4,23 +4,14 @@ import { WorkspaceStateService } from './workspace-state.service';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
 import { WorkspaceFacadeService } from './workspace-facade.service';
-
-// Mock Wails imports
-const mockSaveFileContents = vi.fn();
-const mockShowSaveDialog = vi.fn();
-const mockMigrateResponses = vi.fn();
-
-vi.mock('@wailsjs/go/app/App', () => ({
-  SaveFileContents: (...args: any[]) => mockSaveFileContents(...args),
-  ShowSaveDialog: (...args: any[]) => mockShowSaveDialog(...args),
-  MigrateResponsesFromRunLocationToHttpFile: (...args: any[]) => mockMigrateResponses(...args),
-}));
+import { APP_BRIDGE, type AppBridgeContract } from './app-bridge.contract';
 
 describe('FileSaveService', () => {
   let service: FileSaveService;
   let mockState: any;
   let mockHttp: any;
   let mockHistoryStore: any;
+  let appBridgeMock: vi.Mocked<Partial<AppBridgeContract>>;
 
   beforeEach(() => {
     mockState = {
@@ -38,6 +29,11 @@ describe('FileSaveService', () => {
       delete: vi.fn(),
       set: vi.fn(),
     };
+    appBridgeMock = {
+      saveFileContents: vi.fn(),
+      showSaveDialog: vi.fn(),
+      migrateResponsesFromRunLocationToHttpFile: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -46,18 +42,17 @@ describe('FileSaveService', () => {
         { provide: HttpService, useValue: mockHttp },
         { provide: HistoryStoreService, useValue: mockHistoryStore },
         { provide: WorkspaceFacadeService, useValue: {} },
+        { provide: APP_BRIDGE, useValue: appBridgeMock },
       ],
     });
     service = TestBed.inject(FileSaveService);
-
-    vi.clearAllMocks();
   });
 
   describe('saveCurrentFile', () => {
     it('should do nothing if no current file', async () => {
       mockState.getCurrentFile.mockReturnValue(null);
       await service.saveCurrentFile();
-      expect(mockSaveFileContents).not.toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).not.toHaveBeenCalled();
     });
 
     it('should save to existing path without dialog', async () => {
@@ -67,12 +62,12 @@ describe('FileSaveService', () => {
         content: 'GET /api',
         name: 'file.http',
       });
-      mockSaveFileContents.mockResolvedValue(undefined);
+      appBridgeMock.saveFileContents.mockResolvedValue(undefined);
 
       await service.saveCurrentFile();
 
-      expect(mockSaveFileContents).toHaveBeenCalledWith('/test/file.http', 'GET /api');
-      expect(mockShowSaveDialog).not.toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).toHaveBeenCalledWith('/test/file.http', 'GET /api');
+      expect(appBridgeMock.showSaveDialog).not.toHaveBeenCalled();
     });
 
     it('should show save dialog for new files', async () => {
@@ -82,15 +77,15 @@ describe('FileSaveService', () => {
         content: 'POST /api',
         name: 'Untitled',
       });
-      mockShowSaveDialog.mockResolvedValue('/new/path.http');
-      mockSaveFileContents.mockResolvedValue(undefined);
-      mockMigrateResponses.mockResolvedValue(undefined);
+      appBridgeMock.showSaveDialog.mockResolvedValue('/new/path.http');
+      appBridgeMock.saveFileContents.mockResolvedValue(undefined);
+      appBridgeMock.migrateResponsesFromRunLocationToHttpFile.mockResolvedValue(undefined);
       mockState.files.mockReturnValue([{ id: 'new-id' }]);
 
       await service.saveCurrentFile();
 
-      expect(mockShowSaveDialog).toHaveBeenCalled();
-      expect(mockSaveFileContents).toHaveBeenCalledWith('/new/path.http', 'POST /api');
+      expect(appBridgeMock.showSaveDialog).toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).toHaveBeenCalledWith('/new/path.http', 'POST /api');
     });
 
     it('should not save if dialog is cancelled', async () => {
@@ -100,11 +95,11 @@ describe('FileSaveService', () => {
         content: 'POST /api',
         name: 'Untitled',
       });
-      mockShowSaveDialog.mockResolvedValue('');
+      appBridgeMock.showSaveDialog.mockResolvedValue('');
 
       await service.saveCurrentFile();
 
-      expect(mockSaveFileContents).not.toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).not.toHaveBeenCalled();
     });
 
     it('should handle save errors gracefully', async () => {
@@ -114,7 +109,7 @@ describe('FileSaveService', () => {
         content: 'GET /api',
         name: 'file.http',
       });
-      mockSaveFileContents.mockRejectedValue(new Error('disk full'));
+      appBridgeMock.saveFileContents.mockRejectedValue(new Error('disk full'));
       const spy = vi.spyOn(console, 'error').mockImplementation();
 
       await service.saveCurrentFile();
@@ -128,7 +123,7 @@ describe('FileSaveService', () => {
     it('should do nothing if no current file', async () => {
       mockState.getCurrentFile.mockReturnValue(null);
       await service.saveCurrentFileAs();
-      expect(mockShowSaveDialog).not.toHaveBeenCalled();
+      expect(appBridgeMock.showSaveDialog).not.toHaveBeenCalled();
     });
 
     it('should show dialog and save to new path', async () => {
@@ -138,15 +133,15 @@ describe('FileSaveService', () => {
         content: 'GET /api',
         name: 'path.http',
       });
-      mockShowSaveDialog.mockResolvedValue('/new/path.http');
-      mockSaveFileContents.mockResolvedValue(undefined);
+      appBridgeMock.showSaveDialog.mockResolvedValue('/new/path.http');
+      appBridgeMock.saveFileContents.mockResolvedValue(undefined);
       mockState.files.mockReturnValue([{ id: 'new-id' }]);
       mockHttp.loadHistory.mockResolvedValue([]);
 
       await service.saveCurrentFileAs();
 
-      expect(mockShowSaveDialog).toHaveBeenCalled();
-      expect(mockSaveFileContents).toHaveBeenCalledWith('/new/path.http', 'GET /api');
+      expect(appBridgeMock.showSaveDialog).toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).toHaveBeenCalledWith('/new/path.http', 'GET /api');
       expect(mockState.replaceFileAtIndex).toHaveBeenCalled();
       expect(mockHttp.saveFiles).toHaveBeenCalled();
     });
@@ -158,11 +153,11 @@ describe('FileSaveService', () => {
         content: 'GET /api',
         name: 'path.http',
       });
-      mockShowSaveDialog.mockResolvedValue('');
+      appBridgeMock.showSaveDialog.mockResolvedValue('');
 
       await service.saveCurrentFileAs();
 
-      expect(mockSaveFileContents).not.toHaveBeenCalled();
+      expect(appBridgeMock.saveFileContents).not.toHaveBeenCalled();
     });
 
     it('should handle errors gracefully', async () => {
@@ -172,7 +167,7 @@ describe('FileSaveService', () => {
         content: 'GET /api',
         name: 'path.http',
       });
-      mockShowSaveDialog.mockRejectedValue(new Error('dialog error'));
+      appBridgeMock.showSaveDialog.mockRejectedValue(new Error('dialog error'));
       const spy = vi.spyOn(console, 'error').mockImplementation();
 
       await service.saveCurrentFileAs();

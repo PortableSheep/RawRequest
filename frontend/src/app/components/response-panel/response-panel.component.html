@@ -88,7 +88,16 @@
 
                 @for (entry of chainItems; track entry.id; let idx = $index) {
                     <article class="response-entry" [class.response-entry--open]="expandedEntryId() === entry.id">
-                        <div class="response-entry__header" (click)="toggleEntry(entry.id)">
+                        <div
+                            class="response-entry__header"
+                            role="button"
+                            tabindex="0"
+                            [attr.aria-expanded]="expandedEntryId() === entry.id"
+                            [attr.aria-controls]="'response-entry-details-' + entry.id"
+                            (click)="toggleEntry(entry.id)"
+                            (keydown.enter)="onHeaderActivateKey($event, entry.id)"
+                            (keydown.space)="onHeaderActivateKey($event, entry.id)"
+                        >
                             <div class="response-entry__left">
                                 <span class="response-entry__index rr-mono">{{ (idx + 1) | number:'2.0' }}</span>
                                 <div class="response-entry__meta">
@@ -151,9 +160,9 @@
                         </div>
 
                         @if (expandedEntryId() === entry.id) {
-                            <div class="response-entry__details">
+                            <div class="response-entry__details" [id]="'response-entry-details-' + entry.id">
                                 <div class="response-entry__section">
-                                    <button type="button" class="response-entry__section-toggle" (click)="toggleRequestSection(entry.id)">
+                                    <button type="button" class="response-entry__section-toggle" [attr.aria-expanded]="!isRequestCollapsed(entry.id)" (click)="toggleRequestSection(entry.id)">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm response-entry__section-chev" [class.response-entry__section-chev--open]="!isRequestCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                                         Request Details
                                     </button>
@@ -189,7 +198,7 @@
                                     @if (entry.response) {
                                         @if (entry.response!.assertions?.length) {
                                             <div class="response-entry__block">
-                                                <button type="button" class="response-entry__section-toggle response-entry__section-toggle--full" (click)="toggleAssertionsSection(entry.id)">
+                                                <button type="button" class="response-entry__section-toggle response-entry__section-toggle--full" [attr.aria-expanded]="!isAssertionsCollapsed(entry.id)" (click)="toggleAssertionsSection(entry.id)">
                                                     <span class="response-entry__section-toggle-left">
                                                         <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--sm response-entry__section-chev" [class.response-entry__section-chev--open]="!isAssertionsCollapsed(entry.id)" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
                                                         Assertions

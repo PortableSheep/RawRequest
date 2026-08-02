@@ -17,25 +17,19 @@ import (
 // storeBinaryBody stores the raw response bytes for a given request ID,
 // replacing any previously stored body.
 func (a *App) storeBinaryBody(requestID string, body []byte) {
-	a.binaryBodiesMu.Lock()
-	defer a.binaryBodiesMu.Unlock()
-	a.binaryBodies[requestID] = body
+	a.binaryBodies.Put(requestID, body)
 }
 
 // clearBinaryBody removes the stored binary body for a given request ID.
 func (a *App) clearBinaryBody(requestID string) {
-	a.binaryBodiesMu.Lock()
-	defer a.binaryBodiesMu.Unlock()
-	delete(a.binaryBodies, requestID)
+	a.binaryBodies.Delete(requestID)
 }
 
 // SaveBinaryResponse opens a native Save dialog and writes the stored binary
 // response body to the file the user selects. contentType and requestURL are
 // used to derive a sensible default filename.
 func (a *App) SaveBinaryResponse(requestID, contentType, requestURL string) (string, error) {
-	a.binaryBodiesMu.Lock()
-	body, exists := a.binaryBodies[requestID]
-	a.binaryBodiesMu.Unlock()
+	body, exists := a.binaryBodies.Get(requestID)
 
 	if !exists {
 		return "", errors.New("no binary response stored for this request")
@@ -66,23 +60,12 @@ func (a *App) SaveBinaryResponse(requestID, contentType, requestURL string) (str
 	return path, nil
 }
 
-// SaveBinaryResponseToPath writes the stored binary response body to the
-// given file path without opening a dialog. Used by the service backend.
-func (a *App) SaveBinaryResponseToPath(requestID, destPath string) error {
-	a.binaryBodiesMu.Lock()
-	body, exists := a.binaryBodies[requestID]
-	a.binaryBodiesMu.Unlock()
-
-	if !exists {
-		return errors.New("no binary response stored for this request")
-	}
-
-	dir := filepath.Dir(destPath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory: %w", err)
-	}
-
-	return os.WriteFile(destPath, body, 0644)
+// binaryResponseBytes returns the previously stored raw response body for
+// requestID, if any. Used internally by the service backend to resolve
+// binary export data without exposing an arbitrary destination path to
+// callers (see writeBinaryResponsePayload in service_server.go).
+func (a *App) binaryResponseBytes(requestID string) ([]byte, bool) {
+	return a.binaryBodies.Get(requestID)
 }
 
 // SaveBase64ToFile decodes a base64-encoded response body and saves it

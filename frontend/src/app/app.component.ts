@@ -11,8 +11,7 @@ import {
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { EditorComponent } from "./components/editor/editor.component";
-import { RequestManagerComponent } from "./components/request-manager/request-manager.component";
+import { EditorComponent } from "./features/editor";
 import {
   HeaderComponent,
   ResponsePanelComponent,
@@ -32,9 +31,6 @@ import { ToastContainerComponent } from "./components/toast-container/toast-cont
 import { VersionManagerComponent } from "./components/version-manager/version-manager.component";
 import {
   FileTab,
-  ResponseData,
-  HistoryItem,
-  ActiveRunProgress,
   ChainEntryPreview,
 } from "./models/http.models";
 import { SecretService } from "./services/secret.service";
@@ -64,7 +60,6 @@ import { DiagnosticLoggerService } from "./services/diagnostic-logger.service";
     CommonModule,
     FormsModule,
     EditorComponent,
-    RequestManagerComponent,
     HeaderComponent,
     ResponsePanelComponent,
     HistorySidebarComponent,
@@ -105,13 +100,10 @@ export class AppComponent implements OnInit, OnDestroy {
   readonly shortcutHint = shortcutHint;
 
   @ViewChild("mainSplit") mainSplitEl?: ElementRef<HTMLElement>;
-  @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
   @ViewChild("editorComponent") editorComponent!: EditorComponent;
   @ViewChild("snippetModal") snippetModal!: ScriptSnippetModalComponent;
 
   // Delegated signal accessors for template bindings
-  get filesSignal() { return this.ws.files; }
-  get currentFileIndexSignal() { return this.ws.currentFileIndex; }
   get currentFileView() { return this.ws.currentFileView; }
   get currentEnv() { return this.ws.currentEnv; }
   get currentFileRequestNames() { return this.ws.currentFileRequestNames; }
@@ -200,19 +192,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Workspace state delegation ---
 
-  onFilesChange(files: FileTab[]) {
-    this.ws.onFilesChange(files);
-  }
-
-  onCurrentFileIndexChange(index: number) {
-    this.ws.onCurrentFileIndexChange(index);
-  }
-
-  onCurrentEnvChange(env: string) {
-    this.ws.onCurrentEnvChange(env);
-  }
-
-  // Debounced editor content change
   onEditorContentChange(content: string) {
     if (this.parseDebounceTimer) {
       clearTimeout(this.parseDebounceTimer);
@@ -227,7 +206,6 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Request execution ---
 
   onRequestExecute(requestIndex: number) {
-    this.reqExec.setDelegate(this.requestManager);
     this.reqExec.onRequestExecute(
       requestIndex,
       this.ws.files(),
@@ -238,7 +216,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onReplayRequest(entry: ChainEntryPreview) {
-    this.reqExec.setDelegate(this.requestManager);
     this.reqExec.onReplayRequest(
       entry,
       this.ws.files(),
@@ -246,18 +223,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.ws.currentEnv(),
       this.cdr,
     );
-  }
-
-  onRequestExecuted(result: { requestIndex: number; response: ResponseData }) {
-    this.reqExec.onRequestExecuted(result);
-  }
-
-  onRequestProgress(progress: ActiveRunProgress) {
-    this.reqExec.onRequestProgress(progress);
-  }
-
-  onHistoryUpdated(event: { fileId: string; history: HistoryItem[] }) {
-    this.ws.onHistoryUpdated(event);
   }
 
   // --- UI handlers ---

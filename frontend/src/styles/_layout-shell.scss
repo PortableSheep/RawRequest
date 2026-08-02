@@ -1,0 +1,179 @@
+// Application shell and page layout.
+//
+// These rules stay global rather than moving into `app.component.scss`:
+// `.rr-topbar` (and `.rr-topbar__right`) is rendered by the standalone
+// `HeaderComponent`, a *child* of `AppComponent`. Angular's emulated view
+// encapsulation only attributes the host component's own template elements,
+// not a child component's — so scoping this partial to `app.component.scss`
+// would silently break the header's layout. Keeping the whole shell/layout
+// concern together here (rather than splitting "app-owned" vs
+// "header-owned" rules across scopes) keeps the cascade easy to reason
+// about and avoids an encapsulation footgun.
+.rr-app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: transparent;
+  color: var(--rr-text);
+}
+
+.rr-app__main {
+  flex: 1;
+  position: relative;
+}
+
+.rr-service-blocking {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.rr-service-blocking__card {
+  width: min(620px, 100%);
+  border-radius: var(--rr-radius-md);
+  border: 1px solid rgba(234, 179, 8, 0.45);
+  background: var(--rr-surface-2);
+  padding: 18px;
+}
+
+.rr-service-blocking__title {
+  margin: 0 0 10px;
+  font-size: 18px;
+}
+
+.rr-service-blocking__message {
+  margin: 0;
+  font-size: 13px;
+  color: var(--rr-text-subtle);
+}
+
+.rr-service-blocking__hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--rr-text-tertiary);
+}
+
+.rr-service-blocking__actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.rr-shell {
+  width: 100%;
+  margin: 0 auto;
+  padding: var(--rr-space-4);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.rr-history-edge-trigger {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .rr-history-edge-trigger {
+    position: fixed;
+    top: 50%;
+    right: 0;
+    transform: translateY(-50%);
+    width: 34px;
+    height: 56px;
+    border: 1px solid var(--rr-border-hover-color);
+    border-right: 0;
+    border-top-left-radius: var(--rr-radius-md);
+    border-bottom-left-radius: var(--rr-radius-md);
+    background: var(--rr-surface-2);
+    color: var(--rr-text-subtle);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 19;
+    transition: color 80ms ease, background 80ms ease;
+  }
+
+  .rr-history-edge-trigger:hover {
+    color: var(--rr-text);
+    background: var(--rr-surface-1);
+  }
+}
+
+.rr-split {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--rr-space-4);
+  height: 100%;
+}
+
+@media (min-width: 1024px) {
+  .rr-split {
+    gap: 0;
+  }
+}
+
+.rr-split__separator {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .rr-split__separator {
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    cursor: col-resize;
+    user-select: none;
+  }
+}
+
+.rr-split__separator-handle {
+  width: 10px;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.rr-split__separator-line {
+  width: 1px;
+  background: var(--rr-border-color);
+}
+
+.rr-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  height: 38px;
+  padding: 0 var(--rr-space-4);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--rr-space-3);
+  border-bottom: 1px solid var(--rr-border-color);
+  background: var(--rr-page-bg);
+}
+
+.rr-topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rr-main-pane {
+  max-height: calc(100vh - 50px - 40px);
+  min-height: calc(100vh - 50px - 40px);
+}
+
+@media (min-width: 1024px) {
+  .rr-main-pane--left {
+    padding-right: 8px;
+  }
+  .rr-main-pane--right {
+    padding-left: 8px;
+  }
+}

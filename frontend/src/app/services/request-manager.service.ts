@@ -1,7 +1,10 @@
-import { Component, input, output, inject } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { Subject } from 'rxjs';
 
-import { HttpService } from '../../services/http.service';
-import { NotificationService } from '../../services/notification.service';
+import { HttpService } from './http.service';
+import { NotificationService } from './notification.service';
+import { MockServerService } from './mock-server.service';
+import { WorkspaceStateService } from './workspace-state.service';
 import {
   Request,
   FileTab,
@@ -11,10 +14,10 @@ import {
   ChainEntryPreview,
   ResponsePreview,
   ActiveRunProgress
-} from '../../models/http.models';
-import { getActiveEnvNameForFile, getCombinedVariablesForFile } from './env-vars';
-import { buildRequestChain } from './request-chain';
-import { buildChainItems, ensureRequestPreview, toResponsePreview } from './chain-items';
+} from '../models/http.models';
+import { getActiveEnvNameForFile, getCombinedVariablesForFile } from './request-manager/env-vars';
+import { buildRequestChain } from './request-manager/request-chain';
+import { buildChainItems, ensureRequestPreview, toResponsePreview } from './request-manager/chain-items';
 import {
   applyResponseDataForRequest,
   buildCancelledResponse,
@@ -24,37 +27,50 @@ import {
   buildRequestId,
   decideLoadTestStatusText,
   shouldSkipDuplicateExecution
-} from './request-manager.logic';
+} from './request-manager/request-manager.logic';
 
-import { MockServerService } from '../../services/mock-server.service';
-
-@Component({
-  selector: 'app-request-manager',
-  standalone: true,
-  imports: [],
-  template: ``,
-  styles: []
+/**
+ * Orchestrates request execution (single, chained, and load-test requests).
+ *
+ * This replaces the former `RequestManagerComponent` — a component with an
+ * empty template that existed only to be looked up via `@ViewChild` and
+ * registered as a delegate on `RequestExecutionService`. As a plain
+ * injectable service it reads workspace state directly from
+ * `WorkspaceStateService` instead of receiving `files`/`currentFileIndex`/
+ * `currentEnv` as component inputs, and pushes file/history updates back
+ * through `WorkspaceStateService` directly instead of round-tripping through
+ * component outputs and `AppComponent` handlers. `RequestExecutionService`
+ * subscribes to `requestExecuted$`/`requestProgress$` to stay in sync,
+ * removing the `@ViewChild` + `setDelegate` lifecycle/timing coupling.
+ */
+@Injectable({
+  providedIn: 'root'
 })
-export class RequestManagerComponent {
-  private httpService = inject(HttpService);
-  private notificationService = inject(NotificationService);
-  private mockServer = inject(MockServerService);
+export class RequestManagerService {
+  private readonly httpService = inject(HttpService);
+  private readonly notificationService = inject(NotificationService);
+  private readonly mockServer = inject(MockServerService);
+  private readonly ws = inject(WorkspaceStateService);
 
-  files = input.required<FileTab[]>();
-  currentFileIndex = input.required<number>();
-  currentEnv = input.required<string>();
-
-  filesChange = output<FileTab[]>();
-  currentFileIndexChange = output<number>();
-  currentEnvChange = output<string>();
-  requestExecuted = output<{ requestIndex: number; response: ResponseData }>();
-  requestProgress = output<ActiveRunProgress>();
-  historyUpdated = output<{ fileId: string; history: HistoryItem[] }>();
+  readonly requestExecuted = new Subject<{ requestIndex: number; response: ResponseData }>();
+  readonly requestProgress = new Subject<ActiveRunProgress>();
 
   private history: HistoryItem[] = [];
   private executingRequest = false;
   private activeRequestId: string | null = null;
   private lastExecutedRequestIndex: number | null = null;
+
+  private files(): FileTab[] {
+    return this.ws.files();
+  }
+
+  private currentFileIndex(): number {
+    return this.ws.currentFileIndex();
+  }
+
+  private currentEnv(): string {
+    return this.ws.currentEnv();
+  }
 
   async executeRequestByIndex(requestIndex: number, requestId?: string): Promise<void> {
     if (
@@ -111,7 +127,7 @@ export class RequestManagerComponent {
       const responseWithChain = { ...response, chainItems };
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, responseWithChain);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
       const historyItem: HistoryItem = buildHistoryItem({
         now: new Date(),
@@ -123,7 +139,7 @@ export class RequestManagerComponent {
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: request.noHistory });
 
       this.notificationService.notifyRequestComplete(request.name, response.status, response.responseTime);
-      this.requestExecuted.emit({ requestIndex, response: responseWithChain });
+      this.requestExecuted.next({ requestIndex, response: responseWithChain });
     } catch (error: any) {
       if (this.isCancellationError(error)) {
         this.handleCancelledRequest(currentFile.id, request, requestIndex);
@@ -139,7 +155,7 @@ export class RequestManagerComponent {
       const decoratedError = { ...errorResponse, chainItems: errorChain };
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedError);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
       const errorHistoryItem: HistoryItem = buildHistoryItem({
         now: new Date(),
@@ -149,7 +165,7 @@ export class RequestManagerComponent {
       });
       await this.pushHistoryEntry(currentFile.id, errorHistoryItem, currentFile.filePath, { noHistory: request.noHistory });
 
-      this.requestExecuted.emit({ requestIndex, response: decoratedError });
+      this.requestExecuted.next({ requestIndex, response: decoratedError });
     } finally {
       this.executingRequest = false;
       this.activeRequestId = null;
@@ -196,7 +212,7 @@ export class RequestManagerComponent {
       const decoratedLastResponse = { ...lastResponse, chainItems };
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedLastResponse);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
       const historyItem: HistoryItem = buildHistoryItem({
         now: new Date(),
@@ -211,7 +227,7 @@ export class RequestManagerComponent {
       const allSuccessful = responses.every(r => r && r.status >= 200 && r.status < 300);
       this.notificationService.notifyChainComplete(responses.length, totalDuration, allSuccessful);
 
-      this.requestExecuted.emit({ requestIndex, response: decoratedLastResponse });
+      this.requestExecuted.next({ requestIndex, response: decoratedLastResponse });
     } catch (error: any) {
       if (this.isCancellationError(error)) {
         this.handleCancelledRequest(currentFile.id, request, requestIndex);
@@ -225,9 +241,9 @@ export class RequestManagerComponent {
       });
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
-      this.requestExecuted.emit({ requestIndex, response: errorResponse });
+      this.requestExecuted.next({ requestIndex, response: errorResponse });
     } finally {
       this.executingRequest = false;
     }
@@ -266,7 +282,7 @@ export class RequestManagerComponent {
         variables,
         envName,
         requestId,
-        progress => this.requestProgress.emit(progress)
+        progress => this.requestProgress.next(progress)
       );
       const metrics = this.httpService.calculateLoadTestMetrics(results);
 
@@ -282,10 +298,10 @@ export class RequestManagerComponent {
       });
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, summaryResponse);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
       // Emit results for display in modal
-      this.requestExecuted.emit({
+      this.requestExecuted.next({
         requestIndex,
         response: { ...summaryResponse, loadTestMetrics: metrics } as any
       });
@@ -316,9 +332,9 @@ export class RequestManagerComponent {
       });
 
       const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
-      this.filesChange.emit(updatedFiles);
+      this.ws.onFilesChange(updatedFiles);
 
-      this.requestExecuted.emit({ requestIndex, response: errorResponse });
+      this.requestExecuted.next({ requestIndex, response: errorResponse });
     } finally {
       this.executingRequest = false;
     }
@@ -327,7 +343,7 @@ export class RequestManagerComponent {
   private async pushHistoryEntry(fileId: string, entry: HistoryItem, filePath?: string, options?: { noHistory?: boolean }) {
     const history = await this.httpService.addToHistory(fileId, entry, filePath, options);
     this.history = history;
-    this.historyUpdated.emit({ fileId, history });
+    this.ws.onHistoryUpdated({ fileId, history });
   }
 
   async cancelActiveRequest(): Promise<void> {
@@ -350,8 +366,8 @@ export class RequestManagerComponent {
     const cancelledResponse = buildCancelledResponse();
 
     const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, cancelledResponse);
-    this.filesChange.emit(updatedFiles);
+    this.ws.onFilesChange(updatedFiles);
 
-    this.requestExecuted.emit({ requestIndex, response: cancelledResponse });
+    this.requestExecuted.next({ requestIndex, response: cancelledResponse });
   }
 }

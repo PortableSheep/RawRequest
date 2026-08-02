@@ -170,7 +170,7 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 		}
 
 		responseData := deps.ParseResponse(resultRaw)
-		responseStore[fmt.Sprintf("request%d", i+1)] = responseData
+		responseStore[ResponseStoreKey(i)] = responseData
 
 		if deps.ApplyVarsFromBody != nil {
 			if responseBody, exists := responseData["body"].(string); exists {

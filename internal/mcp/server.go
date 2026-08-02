@@ -98,7 +98,7 @@ func listRequestsTool() mcp.Tool {
 
 func runRequestTool() mcp.Tool {
 	return mcp.NewTool("run_request",
-		mcp.WithDescription("Execute a named HTTP request from a .http file. Returns the full response including status, headers, body, and timing."),
+		mcp.WithDescription("Execute a named HTTP request from a .http file, including its full @depends chain. Returns the full response including status, headers, body, and timing. Response shape is conditional: if the request has no @depends chain (or the chain is already satisfied), returns a single JSON response object; if @depends expands the run into multiple steps, returns a JSON array of response objects ordered dependencies-first, with the requested request last."),
 		mcp.WithString("file",
 			mcp.Description("Path to the .http file. If omitted, auto-discovers files in workspace."),
 		),
@@ -384,14 +384,28 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 		}
 	}
 
-	// Load environment variables
+	// Load environment-profile variables. These are kept in the runner's
+	// separate envVars tier (not merged into session/file variables) so
+	// resolution precedence matches CLI mode exactly: session and file
+	// variables win over a same-named environment-profile value. Previously
+	// this loop called SetVariable directly, which unconditionally
+	// overwrote session/file variables with the environment-profile value —
+	// the opposite precedence from CLI — for any colliding key.
 	if envVars, ok := parsed.Environments[env]; ok {
-		for k, v := range envVars {
-			runner.SetVariable(k, v)
-		}
+		runner.SetEnvVars(envVars)
 	}
 
-	result := runner.ExecuteRequest(requests[0])
+	// Execute the request together with its full @depends chain (if any),
+	// sharing one positional response store across the chain so a dependent
+	// request can reference a dependency's response via
+	// {{requestN.response...}} — matching the Desktop app's chain execution
+	// (requestchain.Execute / templating.Resolve) and CLI's `run` command
+	// (see cli.RunSelected). Previously this ran only requests[0], silently
+	// ignoring @depends entirely.
+	results, err := cli.RunSelected(parsed, runner, []string{name})
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("Error resolving request chain: %s", err)), nil
+	}
 
 	// Persist any variables set by scripts back to session
 	for k, v := range runner.GetVariables() {
@@ -400,7 +414,22 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 		}
 	}
 
-	data, _ := json.MarshalIndent(result, "", "  ")
+	// Keep the historical single-object JSON shape when the request has no
+	// @depends chain (the common case), and only return an array when the
+	// run actually expanded into multiple steps — so existing callers that
+	// expect one object are unaffected. This conditional object-vs-array
+	// contract is documented on the tool description above (see
+	// runRequestTool); when an array is returned, cli.RunSelected/
+	// rc.ResolveOrder guarantee dependency-first ordering, so the requested
+	// request is always the last element.
+	var output interface{}
+	if len(results) == 1 {
+		output = results[0]
+	} else {
+		output = results
+	}
+
+	data, _ := json.MarshalIndent(output, "", "  ")
 	return mcp.NewToolResultText(string(data)), nil
 }
 

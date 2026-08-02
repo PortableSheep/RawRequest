@@ -253,6 +253,10 @@ RawRequest Desktop incorporates several advanced, premium editor features to kee
 
 ## Development
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, dev workflow, and test
+commands, and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the backend
+and frontend architecture reference.
+
 ### Dev Workflow
 ```bash
 # Setup Node dependencies

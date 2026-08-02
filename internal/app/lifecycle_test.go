@@ -53,17 +53,21 @@ func TestShutdownReturnsJoinedCleanupError(t *testing.T) {
 	}
 }
 
-func TestClearManagedServicePIDClearsOnlyMatchingPID(t *testing.T) {
+// TestStopManagedServiceDelegatesToOwner locks in the App-level wiring to
+// internal/procowner: stopManagedService (App's stopManagedSvcFn shutdown
+// hook) must clear whatever PID is currently owned. PID/mutex lifecycle
+// semantics themselves (matching-PID clears, concurrent access, real-process
+// kill) are covered by internal/procowner's own tests.
+func TestStopManagedServiceDelegatesToOwner(t *testing.T) {
 	app := NewApp()
-	app.managedServicePID = 1234
+	// A PID this large is virtually guaranteed not to correspond to a real
+	// process, so Stop's best-effort kill is a safe no-op here.
+	app.managedService.Set(1 << 30)
 
-	app.clearManagedServicePID(4321)
-	if got := app.managedServicePID; got != 1234 {
-		t.Fatalf("managedServicePID after non-matching clear = %d, want 1234", got)
+	if err := app.stopManagedService(); err != nil {
+		t.Fatalf("stopManagedService() = %v, want nil", err)
 	}
-
-	app.clearManagedServicePID(1234)
-	if got := app.managedServicePID; got != 0 {
-		t.Fatalf("managedServicePID after matching clear = %d, want 0", got)
+	if got := app.managedService.Get(); got != 0 {
+		t.Fatalf("managedService PID after stopManagedService = %d, want 0", got)
 	}
 }

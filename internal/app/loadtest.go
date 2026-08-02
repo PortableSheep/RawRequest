@@ -48,8 +48,7 @@ func (a *App) startLoadTest(requestID, method, url, headersJSON, body, loadConfi
 		return err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	a.registerCancel(requestID, cancel)
+	ctx, release := a.cancels.Track(context.Background(), requestID)
 
 	go func() {
 		defer func() {
@@ -59,16 +58,15 @@ func (a *App) startLoadTest(requestID, method, url, headersJSON, body, loadConfi
 					"message":   "Load test panicked",
 				})
 			}
-			cancel()
-			a.clearCancel(requestID)
+			release()
 		}()
-		a.runLoadTest(ctx, cancel, requestID, method, url, headersJSON, body, norm)
+		a.runLoadTest(ctx, requestID, method, url, headersJSON, body, norm)
 	}()
 
 	return nil
 }
 
-func (a *App) runLoadTest(ctx context.Context, _ context.CancelFunc, requestID, method, url, headersJSON, body string, cfg lt.NormalizedConfig) {
+func (a *App) runLoadTest(ctx context.Context, requestID, method, url, headersJSON, body string, cfg lt.NormalizedConfig) {
 	start := time.Now()
 	startMs := start.UnixMilli()
 	var plannedDurationMs *int64

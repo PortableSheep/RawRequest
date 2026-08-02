@@ -1,3 +1,8 @@
+// Component-scoped chrome only. CodeMirror's theme/syntax overrides
+// (`.cm-*` selectors) live in the global `styles/_editor-syntax.scss`
+// partial, not here — CodeMirror renders outside Angular's view tree,
+// so those rules can't be encapsulated per-component. See that file's
+// header comment for the full rationale.
 :host {
   display: block;
   height: 100%;

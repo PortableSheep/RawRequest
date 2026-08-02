@@ -156,6 +156,10 @@
   background: var(--rr-surface-3);
 }
 
+.response-entry__header:focus-visible {
+  outline-offset: -2px;
+}
+
 .response-entry__left {
   display: flex;
   align-items: center;
@@ -730,7 +734,6 @@
   padding: 4px 8px;
   border-radius: var(--rr-radius-sm);
   cursor: pointer;
-  outline: none;
   text-align: left;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;

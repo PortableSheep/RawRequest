@@ -4,6 +4,8 @@ import { generateFileId, normalizeFileTab } from '../utils/file-tab-utils';
 import { WorkspaceFacadeService } from './workspace-facade.service';
 import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
+import { APP_BRIDGE } from './app-bridge.contract';
+import { EventTransportService } from './event-transport.service';
 import {
   deriveAppStateFromWorkspaceUpdate,
 } from '../logic/app/workspace-update.logic';
@@ -20,27 +22,32 @@ export class WorkspaceStateService {
   private readonly workspace = inject(WorkspaceFacadeService);
   private readonly httpService = inject(HttpService);
   private readonly historyStore = inject(HistoryStoreService);
+  private readonly appBridge = inject(APP_BRIDGE);
+  private readonly events = inject(EventTransportService);
 
   constructor() {
     effect(() => {
       const paths = this.files()
         .map((f) => f.filePath)
         .filter((p): p is string => !!p && p.length > 0);
-      
-      import('@wailsjs/go/app/App').then(({ WatchFiles }) => {
-        void WatchFiles(paths);
-      }).catch((err) => {
+
+      this.appBridge.watchFiles(paths).catch((err) => {
         console.warn('Failed to call WatchFiles:', err);
       });
     });
 
-    import('@wailsjs/runtime/runtime').then(({ EventsOn }) => {
-      EventsOn('file-externally-modified', (data: { filePath: string; content: string }) => {
+    // file-externally-modified is emitted directly by the desktop App
+    // process's file-watcher via the Wails runtime event bus; it never
+    // reaches the standalone service backend's SSE broker, so this must
+    // stay pinned to 'wails' rather than the 'auto' (SSE-preferring)
+    // default.
+    this.events.on(
+      'file-externally-modified',
+      (data: { filePath: string; content: string }) => {
         this.handleExternalFileModification(data.filePath, data.content);
-      });
-    }).catch((err) => {
-      console.warn('Failed to register file change listener:', err);
-    });
+      },
+      'wails'
+    );
   }
 
   private handleExternalFileModification(filePath: string, newContent: string): void {
@@ -349,8 +356,7 @@ export class WorkspaceStateService {
 
   /** Open/upsert the examples tab. */
   async openExamplesFile(): Promise<void> {
-    const { GetExamplesFile } = await import('@wailsjs/go/app/App');
-    const result = await GetExamplesFile();
+    const result = await this.appBridge.getExamplesFile();
     const content = result?.content || '';
     const name = result?.filePath || 'Examples.http';
 
@@ -368,8 +374,7 @@ export class WorkspaceStateService {
 
   /** Open/upsert the mock demo tab. */
   async openMockDemoFile(): Promise<void> {
-    const { GetMockDemoFile } = await import('@wailsjs/go/app/App');
-    const result = await GetMockDemoFile();
+    const result = await this.appBridge.getMockDemoFile();
     const content = result?.content || '';
     const name = result?.filePath || 'mock_demo.http';
 
@@ -427,7 +432,6 @@ export class WorkspaceStateService {
     if (!file?.filePath) {
       throw new Error('File has not been saved to disk yet.');
     }
-    const { RevealInFinder } = await import('@wailsjs/go/app/App');
-    await RevealInFinder(file.filePath);
+    await this.appBridge.revealInFinder(file.filePath);
   }
 }

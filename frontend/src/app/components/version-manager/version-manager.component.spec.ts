@@ -152,4 +152,35 @@ describe('VersionManagerComponent', () => {
     fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.version-manager')).toBeNull();
   });
+
+  describe('Escape key', () => {
+    it('should close the modal on Escape', () => {
+      mockPanels.showVersionManager.set(true);
+      fixture.detectChanges();
+
+      component.handleEscape();
+
+      expect(mockPanels.showVersionManager()).toBe(false);
+    });
+
+    it('should cancel the install confirmation instead of closing the modal on Escape', () => {
+      mockPanels.showVersionManager.set(true);
+      fixture.detectChanges();
+      component.confirmVersion = { version: '1.1.0', name: '', publishedAt: '', releaseUrl: '', isCurrent: false };
+
+      component.handleEscape();
+
+      expect(component.confirmVersion).toBeNull();
+      expect(mockPanels.showVersionManager()).toBe(true);
+    });
+
+    it('should do nothing on Escape when modal is closed', () => {
+      mockPanels.showVersionManager.set(false);
+      fixture.detectChanges();
+
+      component.handleEscape();
+
+      expect(mockPanels.showVersionManager()).toBe(false);
+    });
+  });
 });

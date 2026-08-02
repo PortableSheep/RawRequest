@@ -7,18 +7,20 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
-	"maps"
 	"strings"
 	"sync"
 
+	bbs "rawrequest/internal/binarybodystore"
+	cr "rawrequest/internal/cancelregistry"
 	"rawrequest/internal/importers"
+	po "rawrequest/internal/procowner"
 	rc "rawrequest/internal/requestchain"
 	rp "rawrequest/internal/responseparse"
-	rb "rawrequest/internal/ringbuffer"
 	se "rawrequest/internal/scriptexec"
+	sls "rawrequest/internal/scriptlogstore"
 	sr "rawrequest/internal/scriptruntime"
 	tpl "rawrequest/internal/templating"
-	vj "rawrequest/internal/varsjson"
+	vs "rawrequest/internal/variablestore"
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -50,24 +52,16 @@ type WindowState struct {
 
 type App struct {
 	ctx               context.Context
-	variables         map[string]string
-	variablesMu       sync.RWMutex
-	environments      map[string]map[string]string
-	currentEnv        string
-	envMu             sync.RWMutex
-	requestCancels    map[string]context.CancelFunc
-	cancelMutex       sync.Mutex
-	scriptLogs        *rb.Buffer[ScriptLogEntry]
-	scriptLogMutex    sync.Mutex
+	vars              *vs.Store
+	cancels           *cr.Registry
+	scriptLogs        *sls.Store
 	eventBroker       *appEventBroker
 	secretVault       *SecretVault
 	secretVaultOnce   sync.Once
 	secretVaultErr    error
-	managedServicePID int
-	managedServiceMu  sync.Mutex
+	managedService    *po.Owner
 	examplesFS        fs.FS
-	binaryBodies      map[string][]byte
-	binaryBodiesMu    sync.Mutex
+	binaryBodies      *bbs.Store
 	windowStateMu     sync.Mutex
 	cachedWindowState WindowState
 	watchedFiles      map[string]watchedFileState
@@ -85,22 +79,21 @@ const (
 	maxScriptLogs            = 500
 )
 
-type ScriptLogEntry struct {
-	Timestamp string `json:"timestamp"`
-	Level     string `json:"level"`
-	Source    string `json:"source"`
-	Message   string `json:"message"`
-}
+// ScriptLogEntry is the Wails-bound representation of a single script log
+// line. It is a type alias for internal/scriptlogstore.Entry, which owns
+// the actual storage/buffering logic, so JSON marshaling and existing
+// callers (frontend bindings, service_server.go) are unaffected by the
+// extraction.
+type ScriptLogEntry = sls.Entry
 
 func NewApp(examplesFS ...fs.FS) *App {
 	a := &App{
-		variables:      make(map[string]string),
-		environments:   make(map[string]map[string]string),
-		currentEnv:     "default",
-		requestCancels: make(map[string]context.CancelFunc),
-		scriptLogs:     rb.New[ScriptLogEntry](maxScriptLogs),
+		vars:           vs.New(),
+		cancels:        cr.New(),
+		scriptLogs:     sls.New(maxScriptLogs),
 		eventBroker:    newAppEventBroker(),
-		binaryBodies:   make(map[string][]byte),
+		managedService: po.New(),
+		binaryBodies:   bbs.New(),
 		watchedFiles:   make(map[string]watchedFileState),
 	}
 	if len(examplesFS) > 0 {
@@ -165,10 +158,8 @@ func (a *App) executeRequests(requests []map[string]any) string {
 }
 
 func (a *App) executeRequestsWithID(requestID string, requests []map[string]interface{}) string {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	a.registerCancel(requestID, cancel)
-	defer a.clearCancel(requestID)
+	ctx, release := a.cancels.Track(context.Background(), requestID)
+	defer release()
 	return a.executeRequestsWithContext(ctx, requests)
 }
 
@@ -208,26 +199,15 @@ func (a *App) executeScript(rawScript string, ctx *sr.ExecutionContext, stage st
 }
 
 func (a *App) ParseResponseForVariables(responseBody string) {
-	a.variablesMu.Lock()
-	defer a.variablesMu.Unlock()
-	vj.ApplyFromJSON(a.variables, responseBody)
+	a.vars.ApplyFromResponseJSON(responseBody)
 }
 
 func (a *App) getVariable(key string) (string, bool) {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	val, ok := a.variables[key]
-	return val, ok
+	return a.vars.GetVariableOK(key)
 }
 
 func (a *App) variablesSnapshot() map[string]string {
-	a.variablesMu.RLock()
-	defer a.variablesMu.RUnlock()
-	out := make(map[string]string, len(a.variables))
-	for k, v := range a.variables {
-		out[k] = v
-	}
-	return out
+	return a.vars.Variables()
 }
 
 // ImportCollection imports a Postman or Bruno collection from the given path
@@ -241,16 +221,5 @@ func (a *App) ImportCollection(path string) (importers.ImportResult, error) {
 }
 
 func (a *App) currentEnvVarsSnapshot() map[string]string {
-	a.envMu.RLock()
-	defer a.envMu.RUnlock()
-	if a.environments == nil {
-		return nil
-	}
-	vars := a.environments[a.currentEnv]
-	if vars == nil {
-		return nil
-	}
-	out := make(map[string]string, len(vars))
-	maps.Copy(out, vars)
-	return out
+	return a.vars.CurrentEnvVariables()
 }

@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"rawrequest/internal/mockserver"
 	se "rawrequest/internal/scriptexec"
 	sr "rawrequest/internal/scriptruntime"
+	tpl "rawrequest/internal/templating"
 )
 
 // SecretResolver can retrieve secret values by environment and key.
@@ -262,18 +262,20 @@ func runRequests(opts *Options, version string) int {
 		return 1
 	}
 
-	// Execute requests
-	var results []ResponseResult
+	// Execute requests: resolve @depends ordering and share a positional
+	// response store across the whole run (see RunSelected) so requests
+	// selected together — whether via explicit names or via a dependency
+	// pulled in transitively — see prior responses through
+	// {{requestN.response...}}, matching the Desktop app's chain execution.
+	results, err := RunSelected(parsed, runner, opts.RequestNames)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %s\n", err)
+		return 1
+	}
+
 	hasError := false
-
-	for _, req := range requests {
-		result := runner.ExecuteRequest(req)
-		results = append(results, result)
-
-		if result.Error != "" {
-			hasError = true
-		}
-		if result.Status >= 400 {
+	for _, result := range results {
+		if result.Error != "" || result.Status >= 400 {
 			hasError = true
 		}
 	}
@@ -287,8 +289,27 @@ func runRequests(opts *Options, version string) int {
 	return 0
 }
 
-// ExecuteRequest performs a single HTTP request
+// ExecuteRequest performs a single HTTP request. It is equivalent to
+// ExecuteRequestWithResponses with a nil response store, i.e. no
+// {{requestN.response...}} placeholders are resolved (there is no chain
+// context to resolve them against).
 func (r *Runner) ExecuteRequest(req Request) ResponseResult {
+	return r.executeRequest(req, nil)
+}
+
+// ExecuteRequestWithResponses executes req like ExecuteRequest, but also
+// resolves {{requestN.response...}} placeholders in the URL, headers, and
+// body against responseStore before sending the request — the same
+// positional response-store convention requestchain.Execute and
+// templating.Resolve use for the Desktop app's request chains (see
+// templating.ResolveResponseReferences). Callers running multi-request
+// chains (see RunSelected) populate responseStore with each prior request's
+// result before invoking the next.
+func (r *Runner) ExecuteRequestWithResponses(req Request, responseStore map[string]map[string]interface{}) ResponseResult {
+	return r.executeRequest(req, responseStore)
+}
+
+func (r *Runner) executeRequest(req Request, responseStore map[string]map[string]interface{}) ResponseResult {
 	result := ResponseResult{
 		RequestName: req.Name,
 		Method:      req.Method,
@@ -315,17 +336,17 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 	}
 
 	// Resolve variables in URL
-	url := r.resolveVariables(req.URL)
+	url := r.resolveVariablesWithStore(req.URL, responseStore)
 	result.URL = url
 
 	// Resolve variables in headers
 	headers := make(map[string]string)
 	for k, v := range req.Headers {
-		headers[k] = r.resolveVariables(v)
+		headers[k] = r.resolveVariablesWithStore(v, responseStore)
 	}
 
 	// Resolve variables in body
-	body := r.resolveVariables(req.Body)
+	body := r.resolveVariablesWithStore(req.Body, responseStore)
 
 	// Execute pre-script
 	var scriptCtx *sr.ExecutionContext
@@ -496,10 +517,23 @@ func (r *Runner) ExecuteRequest(req Request) ResponseResult {
 }
 
 func (r *Runner) resolveVariables(input string) string {
-	result := input
+	return r.resolveVariablesWithStore(input, nil)
+}
+
+// resolveVariablesWithStore resolves the same placeholders resolveVariables
+// does (secrets, CLI/global variables, environment-profile variables,
+// system environment variables), plus — when responseStore is non-nil —
+// {{requestN.response...}} placeholders referencing prior requests in the
+// current chain (see templating.ResolveResponseReferences). This runs as
+// its own pass before the rest of resolution, matching the "secrets, then
+// variables, then env, then system env" sequential-pass shape this function
+// already had; a nil/empty store is a no-op so ExecuteRequest's behavior is
+// unchanged.
+func (r *Runner) resolveVariablesWithStore(input string, responseStore map[string]map[string]interface{}) string {
+	result := tpl.ResolveResponseReferences(input, responseStore)
 
 	// Replace secrets: {{secret:KEY}}
-	result = r.resolveSecrets(result)
+	result = tpl.ResolveSecrets(result, r.lookupSecret)
 
 	// Replace variables from CLI args and file
 	for k, v := range r.variables {
@@ -512,43 +546,32 @@ func (r *Runner) resolveVariables(input string) string {
 	}
 
 	// Replace system environment variables
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			result = strings.ReplaceAll(result, "{{env."+parts[0]+"}}", parts[1])
-		}
-	}
+	result = tpl.ResolveSystemEnviron(result, os.Environ())
 
 	return result
 }
 
-var secretPattern = regexp.MustCompile(`\{\{\s*secret:([^}\r\n]+?)\s*\}\}`)
-
-func (r *Runner) resolveSecrets(input string) string {
+// lookupSecret adapts the runner's secretResolver + active environment into
+// the shared templating.SecretLookup signature used by tpl.ResolveSecrets.
+// It preserves the original fallback semantics: try the active environment
+// first, then fall back to "default" if not found there.
+func (r *Runner) lookupSecret(key string) (string, bool) {
 	if r.secretResolver == nil {
-		return input
+		return "", false
 	}
-	return secretPattern.ReplaceAllStringFunc(input, func(match string) string {
-		sub := secretPattern.FindStringSubmatch(match)
-		if len(sub) < 2 {
-			return match
-		}
-		key := strings.TrimSpace(sub[1])
-		env := r.environment
-		if env == "" {
-			env = "default"
-		}
-		// Try environment-specific first, then fall back to default
-		val, err := r.secretResolver.GetSecret(env, key)
-		if err != nil && env != "default" {
-			val, err = r.secretResolver.GetSecret("default", key)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)
-			return match
-		}
-		return val
-	})
+	env := r.environment
+	if env == "" {
+		env = "default"
+	}
+	val, err := r.secretResolver.GetSecret(env, key)
+	if err != nil && env != "default" {
+		val, err = r.secretResolver.GetSecret("default", key)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)
+		return "", false
+	}
+	return val, true
 }
 
 // SetSecretResolver sets the secret resolver for {{secret:KEY}} placeholders.
@@ -559,6 +582,18 @@ func (r *Runner) SetSecretResolver(sr SecretResolver) {
 // SetEnvironment sets the active environment name.
 func (r *Runner) SetEnvironment(env string) {
 	r.environment = env
+}
+
+// SetEnvVars replaces the runner's active-environment-profile variables
+// (e.g. loaded from an .http file's @env.<profile>.<key> declarations).
+// These are consulted for bare {{key}} placeholders after CLI/global
+// variables, matching the precedence used by runRequests. Callers that
+// build a Runner directly (e.g. the MCP server) must use this instead of
+// SetVariable for environment-profile values, so that file/session
+// variables retain priority over the same-named environment profile key —
+// keeping precedence consistent across CLI and MCP.
+func (r *Runner) SetEnvVars(vars map[string]string) {
+	r.envVars = vars
 }
 
 // SetVariable sets a runtime variable.
@@ -654,6 +689,17 @@ func extractStringHeaders(v interface{}) map[string]string {
 	return nil
 }
 
+// outputResults prints results in the requested format. For OutputJSON, the
+// shape is conditional: a single result (the common case — one request with
+// no expanded @depends chain) is printed as a single JSON object; multiple
+// results (an expanded @depends chain and/or multiple -n names) are printed
+// as a JSON array in the dependency-first execution order produced by
+// RunSelected/requestchain.ResolveOrder, so the last requested request is
+// the last array element. This mirrors the MCP run_request tool's
+// object-vs-array contract (see internal/mcp/server.go's runRequestTool
+// description and handleRunRequest) — both share cli.RunSelected as their
+// execution/ordering source, so callers of either surface see the same
+// shape rule.
 func outputResults(results []ResponseResult, format OutputFormat) {
 	switch format {
 	case OutputQuiet:
