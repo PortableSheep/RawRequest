@@ -22,18 +22,14 @@ func (a *App) sendRequest(method, url, headersJson, body string) string {
 }
 
 func (a *App) sendRequestWithID(requestID, method, url, headersJson, body string) string {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	a.registerCancel(requestID, cancel)
-	defer a.clearCancel(requestID)
+	ctx, release := a.cancels.Track(context.Background(), requestID)
+	defer release()
 	return a.performRequest(ctx, requestID, method, url, headersJson, body, 0)
 }
 
 func (a *App) sendRequestWithTimeout(requestID, method, url, headersJson, body string, timeoutMs int) string {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	a.registerCancel(requestID, cancel)
-	defer a.clearCancel(requestID)
+	ctx, release := a.cancels.Track(context.Background(), requestID)
+	defer release()
 	return a.performRequest(ctx, requestID, method, url, headersJson, body, timeoutMs)
 }
 
@@ -166,41 +162,14 @@ func (a *App) performRequest(ctx context.Context, requestID, method, url, header
 	)
 }
 
-func (a *App) registerCancel(requestID string, cancel context.CancelFunc) {
-	if requestID == "" {
-		return
-	}
-
-	a.cancelMutex.Lock()
-	a.requestCancels[requestID] = cancel
-	a.cancelMutex.Unlock()
-}
-
-func (a *App) clearCancel(requestID string) {
-	if requestID == "" {
-		return
-	}
-
-	a.cancelMutex.Lock()
-	delete(a.requestCancels, requestID)
-	a.cancelMutex.Unlock()
-}
-
+// cancelRequest is the internal cancellation façade used by App's
+// service-server endpoint (service_server.go). Registration and cleanup for
+// in-flight requests happen via a.cancels.Track at each execution call site
+// (http_client.go, app.go, loadtest.go); cancelRequest only needs to look up
+// and invoke the registered cancel func, which
+// internal/cancelregistry.Registry does safely for concurrent use.
 func (a *App) cancelRequest(requestID string) {
-	if requestID == "" {
-		return
-	}
-
-	a.cancelMutex.Lock()
-	cancel, exists := a.requestCancels[requestID]
-	if exists {
-		delete(a.requestCancels, requestID)
-	}
-	a.cancelMutex.Unlock()
-
-	if exists {
-		cancel()
-	}
+	a.cancels.Cancel(requestID)
 }
 
 func (a *App) readBodyWithProgress(ctx context.Context, resp *http.Response, requestID string) ([]byte, error) {
