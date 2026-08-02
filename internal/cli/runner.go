@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -18,6 +17,7 @@ import (
 	"rawrequest/internal/mockserver"
 	se "rawrequest/internal/scriptexec"
 	sr "rawrequest/internal/scriptruntime"
+	tpl "rawrequest/internal/templating"
 )
 
 // SecretResolver can retrieve secret values by environment and key.
@@ -499,7 +499,7 @@ func (r *Runner) resolveVariables(input string) string {
 	result := input
 
 	// Replace secrets: {{secret:KEY}}
-	result = r.resolveSecrets(result)
+	result = tpl.ResolveSecrets(result, r.lookupSecret)
 
 	// Replace variables from CLI args and file
 	for k, v := range r.variables {
@@ -512,43 +512,32 @@ func (r *Runner) resolveVariables(input string) string {
 	}
 
 	// Replace system environment variables
-	for _, env := range os.Environ() {
-		parts := strings.SplitN(env, "=", 2)
-		if len(parts) == 2 {
-			result = strings.ReplaceAll(result, "{{env."+parts[0]+"}}", parts[1])
-		}
-	}
+	result = tpl.ResolveSystemEnviron(result, os.Environ())
 
 	return result
 }
 
-var secretPattern = regexp.MustCompile(`\{\{\s*secret:([^}\r\n]+?)\s*\}\}`)
-
-func (r *Runner) resolveSecrets(input string) string {
+// lookupSecret adapts the runner's secretResolver + active environment into
+// the shared templating.SecretLookup signature used by tpl.ResolveSecrets.
+// It preserves the original fallback semantics: try the active environment
+// first, then fall back to "default" if not found there.
+func (r *Runner) lookupSecret(key string) (string, bool) {
 	if r.secretResolver == nil {
-		return input
+		return "", false
 	}
-	return secretPattern.ReplaceAllStringFunc(input, func(match string) string {
-		sub := secretPattern.FindStringSubmatch(match)
-		if len(sub) < 2 {
-			return match
-		}
-		key := strings.TrimSpace(sub[1])
-		env := r.environment
-		if env == "" {
-			env = "default"
-		}
-		// Try environment-specific first, then fall back to default
-		val, err := r.secretResolver.GetSecret(env, key)
-		if err != nil && env != "default" {
-			val, err = r.secretResolver.GetSecret("default", key)
-		}
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)
-			return match
-		}
-		return val
-	})
+	env := r.environment
+	if env == "" {
+		env = "default"
+	}
+	val, err := r.secretResolver.GetSecret(env, key)
+	if err != nil && env != "default" {
+		val, err = r.secretResolver.GetSecret("default", key)
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)
+		return "", false
+	}
+	return val, true
 }
 
 // SetSecretResolver sets the secret resolver for {{secret:KEY}} placeholders.
@@ -559,6 +548,18 @@ func (r *Runner) SetSecretResolver(sr SecretResolver) {
 // SetEnvironment sets the active environment name.
 func (r *Runner) SetEnvironment(env string) {
 	r.environment = env
+}
+
+// SetEnvVars replaces the runner's active-environment-profile variables
+// (e.g. loaded from an .http file's @env.<profile>.<key> declarations).
+// These are consulted for bare {{key}} placeholders after CLI/global
+// variables, matching the precedence used by runRequests. Callers that
+// build a Runner directly (e.g. the MCP server) must use this instead of
+// SetVariable for environment-profile values, so that file/session
+// variables retain priority over the same-named environment profile key —
+// keeping precedence consistent across CLI and MCP.
+func (r *Runner) SetEnvVars(vars map[string]string) {
+	r.envVars = vars
 }
 
 // SetVariable sets a runtime variable.

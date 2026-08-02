@@ -384,11 +384,15 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 		}
 	}
 
-	// Load environment variables
+	// Load environment-profile variables. These are kept in the runner's
+	// separate envVars tier (not merged into session/file variables) so
+	// resolution precedence matches CLI mode exactly: session and file
+	// variables win over a same-named environment-profile value. Previously
+	// this loop called SetVariable directly, which unconditionally
+	// overwrote session/file variables with the environment-profile value —
+	// the opposite precedence from CLI — for any colliding key.
 	if envVars, ok := parsed.Environments[env]; ok {
-		for k, v := range envVars {
-			runner.SetVariable(k, v)
-		}
+		runner.SetEnvVars(envVars)
 	}
 
 	result := runner.ExecuteRequest(requests[0])
