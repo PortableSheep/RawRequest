@@ -1,0 +1,81 @@
+// Form control primitives: selects, text inputs, and field/label wrappers.
+.rr-select {
+  height: 28px;
+  padding: 0 28px 0 12px;
+  border-radius: var(--rr-radius-sm);
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2);
+  color: var(--rr-text);
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  outline: none;
+  transition:
+    border-color 80ms ease,
+    background 80ms ease;
+}
+
+.rr-select:hover {
+  border-color: var(--rr-border-hover-color);
+  background: var(--rr-surface-3);
+}
+
+.rr-select-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rr-select-wrap__chev {
+  pointer-events: none;
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rr-text-subtle);
+}
+
+.rr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rr-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--rr-text-subtle);
+}
+
+.rr-input {
+  width: 100%;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--rr-radius-sm);
+  border: 1px solid var(--rr-border-hover-color);
+  background: var(--rr-surface-2);
+  color: var(--rr-text);
+  font-size: 13px;
+  outline: none;
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.rr-input::placeholder {
+  color: var(--rr-text-tertiary);
+}
+
+.rr-input:focus {
+  border-color: rgba(99, 102, 241, 0.65);
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+}
+
+.rr-help {
+  font-size: 11px;
+  color: var(--rr-text-tertiary);
+}

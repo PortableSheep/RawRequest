@@ -1,0 +1,145 @@
+// Reset, base element styles, and small cross-cutting utility classes.
+//
+// This is everything that isn't a themeable token (see `_tokens.scss`) and
+// isn't a `rr-*` UI primitive: the box-sizing reset, `html`/`body` base
+// rules (including the light-theme backdrop override), global scrollbar and
+// selection styling, the keyboard focus ring, and a handful of one-off
+// utility classes (visually-hidden helpers, monospace/color text helpers)
+// used across many feature areas.
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background-color: var(--rr-page-bg);
+  color: var(--rr-page-fg);
+  font-family:
+    "Inter",
+    system-ui,
+    -apple-system,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  position: relative;
+  overscroll-behavior: none;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  background: var(--rr-page-bg);
+}
+
+html[data-theme="light"] body::before {
+  background: var(--rr-page-bg);
+}
+
+.rr-sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.rr-no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+.rr-mono {
+  font-family: var(--rr-font-mono);
+}
+
+.rr-color-primary {
+  color: var(--rr-primary);
+}
+.rr-color-accent {
+  color: var(--rr-accent);
+}
+.rr-color-success {
+  color: var(--rr-success);
+}
+.rr-color-warning {
+  color: var(--rr-warning);
+}
+
+/* IDE-like text rendering */
+html,
+body {
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Consistent keyboard focus ring across the app (no new colors) */
+:where(
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"],
+  [tabindex]
+):focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.8);
+  outline-offset: 2px;
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(42, 42, 46, 0.25);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-zinc-600);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-zinc-400);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+/* Selection Styling */
+::selection {
+  background: rgba(255, 255, 255, 0.25);
+  color: inherit;
+}
+
+// Legacy visually-hidden utility, kept as-is during this reorg: no template
+// currently references the un-prefixed `.sr-only` name (everything uses
+// `.rr-sr-only` above instead) and it omits `!important`, so it may be
+// vestigial. Left untouched here — removing dead CSS is a separate,
+// deliberately deferred cleanup, not part of this file-structure change.
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

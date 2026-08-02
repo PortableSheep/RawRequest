@@ -1,0 +1,157 @@
+// Button and icon primitives shared across the app (`rr-btn`, icon buttons,
+// standalone icon color/size utilities, and the `btn-ambient` hover-affect
+// helper applied alongside `rr-btn` in several components).
+.rr-btn {
+  appearance: none;
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2);
+  color: var(--rr-text);
+  border-radius: var(--rr-radius-sm);
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 40ms ease,
+    background 80ms ease,
+    border-color 80ms ease,
+    color 80ms ease;
+}
+
+.rr-btn:hover {
+  background: var(--rr-surface-3);
+  border-color: var(--rr-border-hover-color);
+}
+
+.rr-btn:active {
+  transform: scale(0.97);
+}
+
+.rr-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.rr-btn--ghost {
+  background: transparent;
+}
+
+.rr-btn--ghost-active {
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--rr-primary);
+}
+
+.rr-btn--pill {
+  border-radius: 999px;
+}
+
+.rr-btn--primary {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+}
+
+.rr-btn--primary:hover {
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.18);
+  color: #fff;
+}
+
+.rr-btn--danger {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fb7185;
+}
+
+.rr-btn--danger:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+  background: rgba(239, 68, 68, 0.22);
+  color: #fff;
+}
+
+.rr-btn__icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+}
+
+.btn-ambient {
+  transition: background 80ms ease, border-color 80ms ease;
+}
+
+.btn-ambient:hover {
+  background: var(--rr-surface-hover);
+  transform: none;
+}
+
+.rr-icon-btn {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rr-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--rr-text-subtle);
+  cursor: pointer;
+  transition:
+    background 80ms ease,
+    color 80ms ease,
+    border-color 80ms ease;
+}
+
+.rr-icon-btn:hover {
+  background: var(--rr-surface-3);
+  color: var(--rr-text);
+}
+
+.rr-icon-btn--danger:hover {
+  color: #fb7185;
+}
+
+.rr-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.rr-icon--muted {
+  color: var(--rr-text-tertiary);
+}
+.rr-icon--primary {
+  color: var(--rr-primary);
+}
+.rr-icon--accent {
+  color: var(--rr-accent);
+}
+.rr-icon--success {
+  color: var(--rr-success);
+}
+.rr-icon--warning {
+  color: var(--rr-warning);
+}
+.rr-icon--danger {
+  color: #ef4444;
+}
+
+.rr-icon--sm {
+  width: 12px;
+  height: 12px;
+}
+
+.rr-icon--md {
+  width: 20px;
+  height: 20px;
+}
+
+.rr-icon--lg {
+  width: 28px;
+  height: 28px;
+}
