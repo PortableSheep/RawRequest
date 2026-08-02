@@ -27,7 +27,11 @@ html[data-theme="light"] .cm-gutters {
 
 html[data-theme="light"] .cm-activeLine,
 html[data-theme="light"] .cm-activeLineGutter {
-  background-color: rgba(79, 70, 229, 0.12) !important;
+  background-color: rgba(79, 70, 229, 0.08) !important;
+}
+
+html[data-theme="light"] .cm-activeLine {
+  box-shadow: inset 2px 0 0 rgba(79, 70, 229, 0.55) !important;
 }
 
 html[data-theme="light"] .cm-cursor,
@@ -36,12 +40,29 @@ html[data-theme="light"] .cm-dropCursor {
 }
 
 html[data-theme="light"] .cm-selectionBackground {
-  background-color: rgba(79, 70, 229, 0.30) !important;
+  background-color: rgba(67, 56, 202, 0.26) !important;
+  opacity: 1 !important;
 }
 
-/* Dark theme (default) selection: white overlay for contrast on any background */
 .cm-selectionBackground {
-  background-color: rgba(255, 255, 255, 0.2) !important;
+  background-color: rgba(67, 56, 202, 0.40) !important;
+  opacity: 1 !important;
+}
+
+.cm-editor.cm-has-selection .cm-activeLine,
+.cm-editor.cm-has-selection .cm-activeLineGutter,
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-activeLine,
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-activeLineGutter {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.cm-editor.cm-has-selection .cm-selection-line {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+}
+
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-selection-line {
+  background-color: rgba(79, 70, 229, 0.10) !important;
 }
 
 .cm-line.cm-last-executed-request,

@@ -2,7 +2,7 @@ import { Component, ChangeDetectionStrategy, ElementRef, ViewChild, AfterViewIni
 
 import { basicSetup, EditorView } from 'codemirror';
 import { EditorState, Compartment, Prec } from '@codemirror/state';
-import { keymap, tooltips } from '@codemirror/view';
+import { drawSelection, keymap, tooltips } from '@codemirror/view';
 import { LanguageSupport, LRLanguage } from '@codemirror/language';
 import {
   search,
@@ -35,6 +35,7 @@ import {
   createRequestBlockIndexer,
   createRequestFolding,
   createRequestHighlighter,
+  createSelectedTextHighlighter,
   jumpToRequestByName
 } from './editor.extensions';
 
@@ -345,7 +346,9 @@ export class EditorComponent implements AfterViewInit, OnDestroy {
         ),
         createRequestFolding(),
         search({ top: true }),
+        drawSelection(),
         createRequestHighlighter(),
+        createSelectedTextHighlighter(),
         this.executedRequestHighlightCompartment.of(
           createLastExecutedRequestHighlighter(this.lastExecutedRequestIndex())
         ),
