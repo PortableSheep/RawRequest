@@ -1,0 +1,203 @@
+// Modal/dialog and dropdown-menu primitives, including the nested-overlay
+// z-index utilities and shared open/close animations.
+.rr-modal-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.rr-modal {
+  width: 100%;
+  max-height: 90vh;
+  overflow: hidden;
+  border-radius: var(--rr-radius-lg);
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+}
+
+.rr-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-1);
+}
+
+.rr-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--rr-text);
+}
+
+.rr-modal__close {
+  width: 28px;
+  height: 28px;
+}
+
+.rr-modal__body {
+  flex: 1;
+  overflow: auto;
+  padding: 14px;
+  background: var(--rr-surface-1);
+}
+
+.rr-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2);
+}
+
+.rr-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+// Nested-overlay utilities: apply to a `.rr-modal-shell`/`.rr-modal-backdrop`
+// pair that needs to stack above an already-open modal (e.g. a delete/reset
+// confirmation rendered while its parent modal is still open). See the
+// `--rr-z-modal-nested-*` token comment in `_tokens.scss` for the layering
+// rationale. These must stay defined after the base `.rr-modal-shell`/
+// `.rr-modal-backdrop` rules above (equal specificity — source order
+// decides the winner on elements carrying both classes).
+.rr-modal-shell--nested-1 {
+  z-index: var(--rr-z-modal-nested-1);
+}
+
+.rr-modal-backdrop--nested-1 {
+  z-index: var(--rr-z-modal-nested-1-backdrop);
+}
+
+.rr-modal-shell--nested-2 {
+  z-index: var(--rr-z-modal-nested-2);
+}
+
+.rr-modal-backdrop--nested-2 {
+  z-index: var(--rr-z-modal-nested-2-backdrop);
+}
+
+.rr-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+}
+
+.rr-menu {
+  position: fixed;
+  z-index: 101;
+  min-width: 160px;
+  padding: 6px;
+  background: var(--rr-surface-2);
+  border: 1px solid var(--rr-border-hover-color);
+  border-radius: var(--rr-radius-md);
+  box-shadow: 0 18px 35px rgba(0, 0, 0, 0.45);
+  animation: rr-dropdown-in 100ms ease;
+  transform-origin: top center;
+}
+
+.rr-menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: var(--rr-radius-sm);
+  border: 0;
+  background: transparent;
+  color: var(--rr-text);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 80ms ease,
+    color 80ms ease;
+}
+
+.rr-menu__item:hover {
+  background: var(--rr-surface-3);
+}
+
+.rr-menu__note {
+  padding: 10px;
+  color: var(--rr-text-subtle);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.rr-menu__sep {
+  height: 1px;
+  margin: 6px 2px;
+  background: var(--rr-border-hover-color);
+}
+
+/* Modal animation keyframes */
+@keyframes modal-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes rr-modal-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-backdrop-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-animated {
+  animation: modal-fade-in 120ms ease-out;
+}
+
+.modal-backdrop-animated {
+  animation: modal-backdrop-fade 100ms ease-out;
+}
+
+.rr-modal--closing {
+  animation: rr-modal-out 80ms ease forwards;
+}
+
+/* Dropdown / menu open animation */
+@keyframes rr-dropdown-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}

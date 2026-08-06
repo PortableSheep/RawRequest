@@ -7,6 +7,7 @@ export type StorageLike = {
 
 export type FileTabsStorageLogger = {
   error?: (...args: any[]) => void;
+  warn?: (...args: any[]) => void;
 };
 
 export function loadFileTabsFromStorage(
@@ -31,9 +32,31 @@ export function saveFileTabsToStorage(
   storage: StorageLike,
   logger: FileTabsStorageLogger = {}
 ): void {
+  const compactTabs = files.map((file) => {
+    const { savedContent: _savedContent, ...rest } = file;
+    return rest as FileTab;
+  });
+
   try {
-    storage.setItem(storageKey, JSON.stringify(files));
+    storage.setItem(storageKey, JSON.stringify(compactTabs));
   } catch (error) {
-    logger.error?.('Error saving files:', error);
+    const isQuotaExceeded =
+      typeof DOMException !== 'undefined' &&
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED');
+
+    if (!isQuotaExceeded) {
+      logger.error?.('Error saving files:', error);
+      return;
+    }
+
+    logger.warn?.('Storage quota exceeded while saving tabs; retrying with compact payload');
+
+    try {
+      const reducedTabs = compactTabs.map((file) => ({ ...file, responseData: {} }));
+      storage.setItem(storageKey, JSON.stringify(reducedTabs));
+    } catch (retryError) {
+      logger.error?.('Error saving files:', retryError);
+    }
   }
 }

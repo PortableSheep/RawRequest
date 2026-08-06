@@ -1,0 +1,437 @@
+// CodeMirror editor theme overrides and syntax-highlighting classes.
+//
+// Two independent global-scope requirements are covered by this file:
+//
+// 1. CodeMirror (used by the `.http` file editor) renders its DOM tree
+//    outside Angular's component view tree, so classes it applies to lines/
+//    tokens (`.cm-*`) cannot be targeted by Angular's emulated view
+//    encapsulation — they must be plain global selectors. The editor
+//    component also installs a CodeMirror theme extension in TypeScript;
+//    these CSS rules exist only to keep the editor surface aligned with the
+//    app's design tokens (see `_tokens.scss`) and to layer in method/role
+//    based syntax coloring.
+// 2. `json-key`/`json-string`/... and `xml-tag`/`xml-attr`/... are produced
+//    by `SyntaxHighlightPipe`/the syntax-highlight worker as raw HTML
+//    strings bound via `[innerHTML]` in the response viewer — again outside
+//    Angular's style-scoping mechanism, so they must stay global too.
+html[data-theme="light"] .cm-editor {
+  background-color: var(--rr-surface-1) !important;
+  color: var(--rr-text) !important;
+}
+
+html[data-theme="light"] .cm-gutters {
+  background-color: var(--rr-surface-1) !important;
+  border-right: 1px solid var(--rr-border-color) !important;
+  color: var(--rr-text-tertiary) !important;
+}
+
+html[data-theme="light"] .cm-activeLine,
+html[data-theme="light"] .cm-activeLineGutter {
+  background-color: rgba(79, 70, 229, 0.08) !important;
+}
+
+html[data-theme="light"] .cm-activeLine {
+  box-shadow: inset 2px 0 0 rgba(79, 70, 229, 0.55) !important;
+}
+
+html[data-theme="light"] .cm-cursor,
+html[data-theme="light"] .cm-dropCursor {
+  border-left-color: var(--rr-primary) !important;
+}
+
+html[data-theme="light"] .cm-selectionBackground {
+  background-color: rgba(67, 56, 202, 0.26) !important;
+  opacity: 1 !important;
+}
+
+.cm-selectionBackground {
+  background-color: rgba(67, 56, 202, 0.40) !important;
+  opacity: 1 !important;
+}
+
+.cm-editor.cm-has-selection .cm-activeLine,
+.cm-editor.cm-has-selection .cm-activeLineGutter,
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-activeLine,
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-activeLineGutter {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.cm-editor.cm-has-selection .cm-selection-line {
+  background-color: rgba(99, 102, 241, 0.12) !important;
+}
+
+html[data-theme="light"] .cm-editor.cm-has-selection .cm-selection-line {
+  background-color: rgba(79, 70, 229, 0.10) !important;
+}
+
+.cm-line.cm-last-executed-request,
+.cm-line.cm-last-executed-request.cm-script-line,
+.cm-line.cm-last-executed-request.cm-payload-line {
+  background-color: rgba(74, 222, 128, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.95);
+}
+
+/* Method-colored variants for the executed block */
+.cm-line.cm-last-executed-request--get,
+.cm-line.cm-last-executed-request--get.cm-script-line,
+.cm-line.cm-last-executed-request--get.cm-payload-line {
+  background-color: rgba(34, 197, 94, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(34, 197, 94, 0.95);
+}
+.cm-line.cm-last-executed-request--post,
+.cm-line.cm-last-executed-request--post.cm-script-line,
+.cm-line.cm-last-executed-request--post.cm-payload-line {
+  background-color: rgba(99, 102, 241, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(99, 102, 241, 0.95);
+}
+.cm-line.cm-last-executed-request--put,
+.cm-line.cm-last-executed-request--put.cm-script-line,
+.cm-line.cm-last-executed-request--put.cm-payload-line {
+  background-color: rgba(245, 158, 11, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(245, 158, 11, 0.95);
+}
+.cm-line.cm-last-executed-request--patch,
+.cm-line.cm-last-executed-request--patch.cm-script-line,
+.cm-line.cm-last-executed-request--patch.cm-payload-line {
+  background-color: rgba(168, 85, 247, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(168, 85, 247, 0.95);
+}
+.cm-line.cm-last-executed-request--delete,
+.cm-line.cm-last-executed-request--delete.cm-script-line,
+.cm-line.cm-last-executed-request--delete.cm-payload-line {
+  background-color: rgba(239, 68, 68, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(239, 68, 68, 0.95);
+}
+.cm-line.cm-last-executed-request--head,
+.cm-line.cm-last-executed-request--head.cm-script-line,
+.cm-line.cm-last-executed-request--head.cm-payload-line {
+  background-color: rgba(6, 182, 212, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(6, 182, 212, 0.95);
+}
+.cm-line.cm-last-executed-request--options,
+.cm-line.cm-last-executed-request--options.cm-script-line,
+.cm-line.cm-last-executed-request--options.cm-payload-line {
+  background-color: rgba(139, 92, 246, 0.24) !important;
+  box-shadow: inset 3px 0 0 rgba(139, 92, 246, 0.95);
+}
+
+html[data-theme="light"] .cm-line.cm-last-executed-request,
+html[data-theme="light"] .cm-line.cm-last-executed-request.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request.cm-payload-line {
+  background-color: rgba(34, 197, 94, 0.20) !important;
+  box-shadow: inset 3px 0 0 rgba(21, 128, 61, 0.95);
+}
+
+html[data-theme="light"] .cm-line.cm-last-executed-request--get,
+html[data-theme="light"] .cm-line.cm-last-executed-request--get.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--get.cm-payload-line {
+  background-color: rgba(34, 197, 94, 0.20) !important;
+  box-shadow: inset 3px 0 0 rgba(21, 128, 61, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--post,
+html[data-theme="light"] .cm-line.cm-last-executed-request--post.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--post.cm-payload-line {
+  background-color: rgba(79, 70, 229, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(79, 70, 229, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--put,
+html[data-theme="light"] .cm-line.cm-last-executed-request--put.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--put.cm-payload-line {
+  background-color: rgba(217, 119, 6, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(217, 119, 6, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch,
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--patch.cm-payload-line {
+  background-color: rgba(124, 58, 237, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(124, 58, 237, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete,
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--delete.cm-payload-line {
+  background-color: rgba(220, 38, 38, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(220, 38, 38, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--head,
+html[data-theme="light"] .cm-line.cm-last-executed-request--head.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--head.cm-payload-line {
+  background-color: rgba(8, 145, 178, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(8, 145, 178, 0.95);
+}
+html[data-theme="light"] .cm-line.cm-last-executed-request--options,
+html[data-theme="light"] .cm-line.cm-last-executed-request--options.cm-script-line,
+html[data-theme="light"] .cm-line.cm-last-executed-request--options.cm-payload-line {
+  background-color: rgba(109, 40, 217, 0.18) !important;
+  box-shadow: inset 3px 0 0 rgba(109, 40, 217, 0.95);
+}
+
+html[data-theme="light"] .cm-line.cm-payload-line {
+  background-color: transparent;
+}
+
+html[data-theme="light"] .cm-line.cm-script-line {
+  background-color: transparent;
+}
+
+html[data-theme="light"] .cm-http-comment {
+  color: #6b7280 !important;
+}
+
+.cm-http-method {
+  font-weight: 700;
+}
+.cm-http-method--get { color: var(--rr-http-get) !important; }
+.cm-http-method--post { color: var(--rr-http-post) !important; }
+.cm-http-method--put { color: var(--rr-http-put) !important; }
+.cm-http-method--patch { color: var(--rr-http-patch) !important; }
+.cm-http-method--delete { color: var(--rr-http-delete) !important; }
+.cm-http-method--head { color: var(--rr-http-head) !important; }
+.cm-http-method--options { color: var(--rr-http-options) !important; }
+.cm-http-method--trace { color: var(--rr-text-secondary) !important; }
+.cm-http-method--connect { color: var(--rr-text-secondary) !important; }
+
+.cm-http-header {
+  color: var(--rr-text-secondary) !important;
+}
+
+.cm-variable {
+  color: var(--rr-warning) !important;
+  font-style: italic;
+}
+
+.cm-environment {
+  color: var(--rr-accent) !important;
+  font-weight: 700;
+}
+
+.cm-annotation {
+  color: var(--rr-text-tertiary) !important;
+  font-weight: 600;
+}
+
+.cm-global-var {
+  color: var(--rr-warning) !important;
+  font-weight: 600;
+}
+
+.cm-load-key {
+  color: #a5b4fc;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.cm-request-name {
+  color: var(--rr-accent) !important;
+  font-weight: 700;
+}
+
+/* Request blocks: subtle marker on method line to imply foldable block */
+.cm-line.cm-request-start {
+  border-left: 2px solid rgba(99, 102, 241, 0.65);
+  padding-left: 6px;
+  margin-left: -6px;
+  background-color: rgba(99, 102, 241, 0.04);
+}
+
+/* Body/payload lines */
+.cm-line.cm-payload-line {
+  background-color: transparent;
+}
+
+/* Script block lines */
+.cm-line.cm-script-line {
+  background-color: transparent;
+}
+
+/* Comment lines (# but not ###): dimmed and italic */
+.cm-http-comment {
+  color: #7a7a85 !important;
+  font-style: italic;
+}
+
+/* Lightweight JSON highlighting inside payload lines */
+.cm-json-key {
+  color: #a5b4fc !important;
+  font-weight: 600;
+}
+
+.cm-json-string {
+  color: var(--rr-accent) !important;
+}
+
+.cm-json-number {
+  color: var(--rr-warning) !important;
+}
+
+.cm-json-literal {
+  color: var(--rr-text-secondary) !important;
+  font-weight: 600;
+}
+
+/* Separator lines: dashed rule with method-colored name tint */
+.cm-line.cm-separator {
+  color: var(--rr-separator) !important;
+}
+.cm-line.cm-separator::after {
+  content: '';
+  display: block;
+  height: 0;
+  border-bottom: 1px dashed var(--rr-text-tertiary);
+  margin-top: 4px;
+  pointer-events: none;
+}
+
+/* Method-colored separator name tints */
+.cm-line.cm-separator--get { color: var(--rr-http-get) !important; }
+.cm-line.cm-separator--post { color: var(--rr-http-post) !important; }
+.cm-line.cm-separator--put { color: var(--rr-http-put) !important; }
+.cm-line.cm-separator--patch { color: var(--rr-http-patch) !important; }
+.cm-line.cm-separator--delete { color: var(--rr-http-delete) !important; }
+.cm-line.cm-separator--head { color: var(--rr-http-head) !important; }
+.cm-line.cm-separator--options { color: var(--rr-http-options) !important; }
+
+/* Back-compat (if any mark-based separators remain elsewhere) */
+.cm-separator {
+  color: var(--rr-separator) !important;
+}
+
+/* Script block syntax highlighting */
+.cm-script-marker {
+  color: #c678dd !important;
+  font-weight: 700;
+}
+
+.cm-js-keyword {
+  color: #c678dd !important;
+}
+
+.cm-js-builtin {
+  color: #e5c07b !important;
+}
+
+.cm-js-helper {
+  color: #61afef !important;
+  font-weight: 600;
+}
+
+.cm-js-string {
+  color: #98c379 !important;
+}
+
+.cm-js-number {
+  color: #d19a66 !important;
+}
+
+.cm-js-comment {
+  color: #7a7a85 !important;
+  font-style: italic;
+}
+
+.cm-js-function {
+  color: #61afef !important;
+}
+
+.gutter-chain-icon,
+.gutter-lightning-icon {
+  cursor: default;
+  font-size: 14px;
+  line-height: 1;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+
+.gutter-play-btn {
+  background: transparent;
+  color: var(--rr-success);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: var(--rr-radius-sm);
+  transition: background 80ms ease, color 80ms ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    color: #4ade80;
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  &:disabled {
+    color: var(--rr-text-tertiary);
+    cursor: not-allowed;
+    transform: none;
+    background: transparent;
+  }
+
+  &.loading {
+    color: var(--rr-text-tertiary);
+    pointer-events: none;
+
+    &::after {
+      content: "";
+      position: absolute;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 2px solid var(--rr-border);
+      border-top-color: var(--rr-primary);
+      animation: editor-spinner 0.8s linear infinite;
+    }
+
+    /* Hide the play icon when loading */
+    svg,
+    span {
+      opacity: 0;
+    }
+  }
+}
+
+@keyframes editor-spinner {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.json-key {
+  color: var(--rr-primary);
+}
+.json-string {
+  color: var(--rr-success);
+}
+.json-boolean {
+  color: var(--rr-accent);
+}
+.json-null {
+  color: var(--rr-warning);
+}
+
+.json-number {
+  color: var(--rr-warning);
+}
+
+.xml-tag {
+  color: var(--rr-primary);
+}
+
+.xml-attr {
+  color: var(--rr-warning);
+}
+
+.xml-string {
+  color: var(--rr-success);
+}

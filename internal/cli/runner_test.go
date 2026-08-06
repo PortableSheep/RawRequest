@@ -234,6 +234,36 @@ func (f secretResolverFunc) GetSecret(env, key string) (string, error) {
 	return f(env, key)
 }
 
+// TestResolveForTest_VariablesTakePrecedenceOverEnvVars is a characterization
+// test locking in the runner's documented resolution order: global/session
+// variables win over a same-named environment-profile variable set via
+// SetEnvVars. MCP's handler now delegates to SetEnvVars specifically so it
+// shares this precedence instead of reimplementing its own (previously
+// divergent) merge order.
+func TestResolveForTest_VariablesTakePrecedenceOverEnvVars(t *testing.T) {
+	runner := NewRunner(&Options{
+		Variables: map[string]string{"apiKey": "fileValue"},
+	}, "test")
+	runner.SetEnvVars(map[string]string{"apiKey": "envValue", "onlyInEnv": "envOnly"})
+
+	if got := runner.ResolveForTest("key={{apiKey}}"); got != "key=fileValue" {
+		t.Fatalf("expected file/global variable to win, got %q", got)
+	}
+	if got := runner.ResolveForTest("other={{onlyInEnv}}"); got != "other=envOnly" {
+		t.Fatalf("expected env-only variable to resolve, got %q", got)
+	}
+}
+
+func TestResolveForTest_SystemEnvVar(t *testing.T) {
+	t.Setenv("RAWREQUEST_RUNNER_TEST_VAR", "from-os-env")
+	runner := NewRunner(&Options{Variables: make(map[string]string)}, "test")
+
+	got := runner.ResolveForTest("v={{env.RAWREQUEST_RUNNER_TEST_VAR}}")
+	if got != "v=from-os-env" {
+		t.Fatalf("expected system env var to resolve, got %q", got)
+	}
+}
+
 func TestExecuteRequest_LogCallbackInvoked(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

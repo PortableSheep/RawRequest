@@ -1,0 +1,65 @@
+// Small status/label indicator primitives: badges and status chips.
+.rr-badge {
+  height: 28px;
+  padding: 0 8px;
+  border-radius: var(--rr-radius-sm);
+  border: 1px solid var(--rr-border-color);
+  background: var(--rr-surface-2);
+  color: var(--rr-text-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+
+  &--clickable {
+    cursor: pointer;
+    transition: background 80ms ease, border-color 80ms ease;
+
+    &:hover {
+      background: var(--rr-surface-hover, rgba(255, 255, 255, 0.08));
+      border-color: var(--rr-border-hover, rgba(255, 255, 255, 0.15));
+    }
+  }
+}
+
+.rr-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid var(--rr-border-hover-color);
+  background: var(--rr-surface-3);
+  color: var(--rr-text);
+}
+
+.rr-status--pending {
+  color: var(--rr-text-subtle);
+  background: var(--rr-surface-3);
+}
+
+.rr-status--success {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: #4ade80;
+}
+
+.rr-status--warning {
+  border-color: rgba(234, 179, 8, 0.35);
+  background: rgba(234, 179, 8, 0.12);
+  color: #facc15;
+}
+
+.rr-status--error {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.12);
+  color: rgba(251, 113, 133, 0.95);
+}
+
+.rr-status--neutral {
+  color: var(--rr-text-subtle);
+}

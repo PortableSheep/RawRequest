@@ -161,6 +161,7 @@ export class LoadTestVisualizationService {
           activeRequestType: activeRequestType(),
           activeUsers: this.activeRunProgress?.activeUsers,
         });
+        this.notifyRegisteredViews();
 
         if (actions.usersSample !== null) {
           this.pushLoadUsersSample(actions.usersSample);

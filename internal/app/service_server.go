@@ -3,14 +3,15 @@ package app
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"rawrequest/internal/cli"
+	hcl "rawrequest/internal/httpclientlogic"
 	"rawrequest/internal/secretvaultlogic"
 )
 
@@ -55,56 +56,79 @@ type httpService struct {
 	app *App
 }
 
+// registerRoutes wires every transport route to its handler. GET-only
+// endpoints (health, the SSE stream) register directly since each has its
+// own method handling; every other route is POST-only and is registered via
+// post(), which centralizes the "reject non-POST with 405" behavior instead
+// of repeating a method check inside each handler.
 func (s *httpService) registerRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/health", s.handleHealth)
 	mux.HandleFunc("/v1/events", s.handleEvents)
-	mux.HandleFunc("/v1/send-request", s.handleSendRequest)
-	mux.HandleFunc("/v1/send-request-with-id", s.handleSendRequestWithID)
-	mux.HandleFunc("/v1/send-request-with-timeout", s.handleSendRequestWithTimeout)
-	mux.HandleFunc("/v1/execute-requests", s.handleExecuteRequests)
-	mux.HandleFunc("/v1/execute-requests-with-id", s.handleExecuteRequestsWithID)
-	mux.HandleFunc("/v1/cancel-request", s.handleCancelRequest)
-	mux.HandleFunc("/v1/start-load-test", s.handleStartLoadTest)
-	mux.HandleFunc("/v1/set-variable", s.handleSetVariable)
-	mux.HandleFunc("/v1/get-variable", s.handleGetVariable)
-	mux.HandleFunc("/v1/get-script-logs", s.handleGetScriptLogs)
-	mux.HandleFunc("/v1/clear-script-logs", s.handleClearScriptLogs)
-	mux.HandleFunc("/v1/record-script-log", s.handleRecordScriptLog)
-	mux.HandleFunc("/v1/load-file-history-from-dir", s.handleLoadFileHistoryFromDir)
-	mux.HandleFunc("/v1/load-file-history-from-run-location", s.handleLoadFileHistoryFromRunLocation)
-	mux.HandleFunc("/v1/save-response-file", s.handleSaveResponseFile)
-	mux.HandleFunc("/v1/save-response-file-to-run-location", s.handleSaveResponseFileToRunLocation)
+
+	post := func(pattern string, handler http.HandlerFunc) {
+		mux.HandleFunc(pattern, requirePostMethod(handler))
+	}
+
+	post("/v1/send-request", s.handleSendRequest)
+	post("/v1/send-request-with-id", s.handleSendRequestWithID)
+	post("/v1/send-request-with-timeout", s.handleSendRequestWithTimeout)
+	post("/v1/execute-requests", s.handleExecuteRequests)
+	post("/v1/execute-requests-with-id", s.handleExecuteRequestsWithID)
+	post("/v1/cancel-request", s.handleCancelRequest)
+	post("/v1/start-load-test", s.handleStartLoadTest)
+	post("/v1/set-variable", s.handleSetVariable)
+	post("/v1/get-variable", s.handleGetVariable)
+	post("/v1/get-script-logs", s.handleGetScriptLogs)
+	post("/v1/clear-script-logs", s.handleClearScriptLogs)
+	post("/v1/record-script-log", s.handleRecordScriptLog)
+	post("/v1/load-file-history-from-dir", s.handleLoadFileHistoryFromDir)
+	post("/v1/load-file-history-from-run-location", s.handleLoadFileHistoryFromRunLocation)
+	post("/v1/save-response-file", s.handleSaveResponseFile)
+	post("/v1/save-response-file-to-run-location", s.handleSaveResponseFileToRunLocation)
 
 	// Secret management
-	mux.HandleFunc("/v1/list-secrets", s.handleListSecrets)
-	mux.HandleFunc("/v1/save-secret", s.handleSaveSecret)
-	mux.HandleFunc("/v1/delete-secret", s.handleDeleteSecret)
-	mux.HandleFunc("/v1/get-secret-value", s.handleGetSecretValue)
-	mux.HandleFunc("/v1/get-vault-info", s.handleGetVaultInfo)
-	mux.HandleFunc("/v1/has-master-password", s.handleHasMasterPassword)
-	mux.HandleFunc("/v1/set-master-password", s.handleSetMasterPassword)
-	mux.HandleFunc("/v1/verify-master-password", s.handleVerifyMasterPassword)
-	mux.HandleFunc("/v1/reset-vault", s.handleResetVault)
-	mux.HandleFunc("/v1/export-secrets", s.handleExportSecrets)
-	mux.HandleFunc("/v1/get-enterprise-config", s.handleGetEnterpriseConfig)
-	mux.HandleFunc("/v1/save-enterprise-config", s.handleSaveEnterpriseConfig)
-	mux.HandleFunc("/v1/test-enterprise-secret", s.handleTestEnterpriseSecret)
-	mux.HandleFunc("/v1/open-enterprise-config", s.handleOpenEnterpriseConfig)
+	post("/v1/list-secrets", s.handleListSecrets)
+	post("/v1/save-secret", s.handleSaveSecret)
+	post("/v1/delete-secret", s.handleDeleteSecret)
+	post("/v1/get-secret-value", s.handleGetSecretValue)
+	post("/v1/get-vault-info", s.handleGetVaultInfo)
+	post("/v1/has-master-password", s.handleHasMasterPassword)
+	post("/v1/set-master-password", s.handleSetMasterPassword)
+	post("/v1/verify-master-password", s.handleVerifyMasterPassword)
+	post("/v1/reset-vault", s.handleResetVault)
+	post("/v1/export-secrets", s.handleExportSecrets)
+	post("/v1/get-enterprise-config", s.handleGetEnterpriseConfig)
+	post("/v1/save-enterprise-config", s.handleSaveEnterpriseConfig)
+	post("/v1/test-enterprise-secret", s.handleTestEnterpriseSecret)
+	post("/v1/open-enterprise-config", s.handleOpenEnterpriseConfig)
 
 	// Environment management
-	mux.HandleFunc("/v1/get-environments", s.handleGetEnvironments)
-	mux.HandleFunc("/v1/set-environment", s.handleSetEnvironment)
-	mux.HandleFunc("/v1/get-env-variables", s.handleGetEnvVariables)
-	mux.HandleFunc("/v1/set-env-variable", s.handleSetEnvVariable)
-	mux.HandleFunc("/v1/get-variables", s.handleGetVariables)
-	mux.HandleFunc("/v1/add-env-variable", s.handleAddEnvVariable)
-	mux.HandleFunc("/v1/rename-environment", s.handleRenameEnvironment)
+	post("/v1/get-environments", s.handleGetEnvironments)
+	post("/v1/set-environment", s.handleSetEnvironment)
+	post("/v1/get-env-variables", s.handleGetEnvVariables)
+	post("/v1/set-env-variable", s.handleSetEnvVariable)
+	post("/v1/get-variables", s.handleGetVariables)
+	post("/v1/add-env-variable", s.handleAddEnvVariable)
+	post("/v1/rename-environment", s.handleRenameEnvironment)
 
 	// Import
-	mux.HandleFunc("/v1/import-collection", s.handleImportCollection)
+	post("/v1/import-collection", s.handleImportCollection)
 
 	// Binary response save
-	mux.HandleFunc("/v1/save-binary-response", s.handleSaveBinaryResponse)
+	post("/v1/save-binary-response", s.handleSaveBinaryResponse)
+}
+
+// requirePostMethod wraps a handler so that any non-POST request is rejected
+// with 405 before the handler body runs, centralizing the method check that
+// used to be duplicated at the top of every POST-only handler.
+func requirePostMethod(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		next(w, r)
+	}
 }
 
 func withServiceCORS(next http.Handler) http.Handler {
@@ -177,12 +201,50 @@ func (s *httpService) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *httpService) requirePost(w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return false
+// decodeJSONBody decodes the request body as JSON into a new T, rejecting
+// unknown fields (see decodeServicePayload). On failure it writes a 400 and
+// returns ok=false so callers can simply `return` without duplicating the
+// error response boilerplate that used to appear in every handler.
+func decodeJSONBody[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
+	var payload T
+	if err := decodeServicePayload(r, &payload); err != nil {
+		writeServiceError(w, http.StatusBadRequest, err)
+		return payload, false
 	}
-	return true
+	return payload, true
+}
+
+// writeJSONOrError writes result as JSON on success, or maps a non-nil err
+// to errStatus and writes it as the response body. This is the shared
+// "call -> map error -> encode" tail for handlers whose app call returns
+// (result, error).
+func writeJSONOrError[T any](w http.ResponseWriter, result T, err error, errStatus int) {
+	if err != nil {
+		writeServiceError(w, errStatus, err)
+		return
+	}
+	writeServiceJSON(w, result)
+}
+
+// writeTextOrError is writeJSONOrError's plain-text counterpart, used by
+// handlers that return a bare string result (e.g. secret values).
+func writeTextOrError(w http.ResponseWriter, result string, err error, errStatus int) {
+	if err != nil {
+		writeServiceError(w, errStatus, err)
+		return
+	}
+	writeServiceText(w, result)
+}
+
+// writeNoContentOrError writes 204 on success (err == nil), or maps a
+// non-nil err to errStatus. Used by handlers whose app call only returns an
+// error (no result payload).
+func writeNoContentOrError(w http.ResponseWriter, err error, errStatus int) {
+	if err != nil {
+		writeServiceError(w, errStatus, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func decodeServicePayload(r *http.Request, dst any) error {
@@ -220,12 +282,8 @@ type sendRequestPayload struct {
 }
 
 func (s *httpService) handleSendRequest(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload sendRequestPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[sendRequestPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.sendRequest(payload.Method, payload.URL, payload.HeadersJSON, payload.Body))
@@ -240,12 +298,8 @@ type sendRequestWithIDPayload struct {
 }
 
 func (s *httpService) handleSendRequestWithID(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload sendRequestWithIDPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[sendRequestWithIDPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.sendRequestWithID(payload.ID, payload.Method, payload.URL, payload.HeadersJSON, payload.Body))
@@ -261,12 +315,8 @@ type sendRequestWithTimeoutPayload struct {
 }
 
 func (s *httpService) handleSendRequestWithTimeout(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload sendRequestWithTimeoutPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[sendRequestWithTimeoutPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.sendRequestWithTimeout(payload.ID, payload.Method, payload.URL, payload.HeadersJSON, payload.Body, payload.TimeoutMs))
@@ -277,12 +327,8 @@ type executeRequestsPayload struct {
 }
 
 func (s *httpService) handleExecuteRequests(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload executeRequestsPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[executeRequestsPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.executeRequests(payload.Requests))
@@ -294,12 +340,8 @@ type executeRequestsWithIDPayload struct {
 }
 
 func (s *httpService) handleExecuteRequestsWithID(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload executeRequestsWithIDPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[executeRequestsWithIDPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.executeRequestsWithID(payload.ID, payload.Requests))
@@ -310,12 +352,8 @@ type cancelRequestPayload struct {
 }
 
 func (s *httpService) handleCancelRequest(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload cancelRequestPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[cancelRequestPayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.cancelRequest(payload.RequestID)
@@ -332,19 +370,12 @@ type startLoadTestPayload struct {
 }
 
 func (s *httpService) handleStartLoadTest(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
+	payload, ok := decodeJSONBody[startLoadTestPayload](w, r)
+	if !ok {
 		return
 	}
-	var payload startLoadTestPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := s.app.startLoadTest(payload.RequestID, payload.Method, payload.URL, payload.HeadersJSON, payload.Body, payload.LoadConfigJSON); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	err := s.app.startLoadTest(payload.RequestID, payload.Method, payload.URL, payload.HeadersJSON, payload.Body, payload.LoadConfigJSON)
+	writeNoContentOrError(w, err, http.StatusBadRequest)
 }
 
 type setVariablePayload struct {
@@ -353,12 +384,8 @@ type setVariablePayload struct {
 }
 
 func (s *httpService) handleSetVariable(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload setVariablePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[setVariablePayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.SetVariable(payload.Key, payload.Value)
@@ -370,36 +397,22 @@ type getVariablePayload struct {
 }
 
 func (s *httpService) handleGetVariable(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload getVariablePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[getVariablePayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.GetVariable(payload.Key))
 }
 
 func (s *httpService) handleGetScriptLogs(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	writeServiceJSON(w, s.app.GetScriptLogs())
 }
 
 func (s *httpService) handleClearScriptLogs(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	s.app.ClearScriptLogs()
@@ -413,12 +426,8 @@ type recordScriptLogPayload struct {
 }
 
 func (s *httpService) handleRecordScriptLog(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload recordScriptLogPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[recordScriptLogPayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.RecordScriptLog(payload.Level, payload.Source, payload.Message)
@@ -431,12 +440,8 @@ type loadFileHistoryFromDirPayload struct {
 }
 
 func (s *httpService) handleLoadFileHistoryFromDir(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload loadFileHistoryFromDirPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[loadFileHistoryFromDirPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.LoadFileHistoryFromDir(payload.FileID, payload.Dir))
@@ -447,12 +452,8 @@ type loadFileHistoryFromRunLocationPayload struct {
 }
 
 func (s *httpService) handleLoadFileHistoryFromRunLocation(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload loadFileHistoryFromRunLocationPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[loadFileHistoryFromRunLocationPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceText(w, s.app.LoadFileHistoryFromRunLocation(payload.FileID))
@@ -464,20 +465,12 @@ type saveResponseFilePayload struct {
 }
 
 func (s *httpService) handleSaveResponseFile(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload saveResponseFilePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[saveResponseFilePayload](w, r)
+	if !ok {
 		return
 	}
 	path, err := s.app.SaveResponseFile(payload.RequestFilePath, payload.ResponseJSON)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceText(w, path)
+	writeTextOrError(w, path, err, http.StatusInternalServerError)
 }
 
 type saveResponseFileToRunLocationPayload struct {
@@ -486,39 +479,22 @@ type saveResponseFileToRunLocationPayload struct {
 }
 
 func (s *httpService) handleSaveResponseFileToRunLocation(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload saveResponseFileToRunLocationPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[saveResponseFileToRunLocationPayload](w, r)
+	if !ok {
 		return
 	}
 	path, err := s.app.SaveResponseFileToRunLocation(payload.FileID, payload.ResponseJSON)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceText(w, path)
+	writeTextOrError(w, path, err, http.StatusInternalServerError)
 }
 
 // --- Secret management handlers ---
 
 func (s *httpService) handleListSecrets(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.ListSecrets()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 type saveSecretPayload struct {
@@ -528,20 +504,12 @@ type saveSecretPayload struct {
 }
 
 func (s *httpService) handleSaveSecret(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload saveSecretPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[saveSecretPayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.SaveSecret(payload.Env, payload.Key, payload.Value)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 type deleteSecretPayload struct {
@@ -550,20 +518,12 @@ type deleteSecretPayload struct {
 }
 
 func (s *httpService) handleDeleteSecret(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload deleteSecretPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[deleteSecretPayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.DeleteSecret(payload.Env, payload.Key)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 type getSecretValuePayload struct {
@@ -572,54 +532,28 @@ type getSecretValuePayload struct {
 }
 
 func (s *httpService) handleGetSecretValue(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload getSecretValuePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[getSecretValuePayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.GetSecretValue(payload.Env, payload.Key)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceText(w, result)
+	writeTextOrError(w, result, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleGetVaultInfo(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.GetVaultInfo()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleHasMasterPassword(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.HasMasterPassword()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, map[string]bool{"result": result})
+	writeJSONOrError(w, map[string]bool{"result": result}, err, http.StatusInternalServerError)
 }
 
 type setMasterPasswordPayload struct {
@@ -627,19 +561,12 @@ type setMasterPasswordPayload struct {
 }
 
 func (s *httpService) handleSetMasterPassword(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
+	payload, ok := decodeJSONBody[setMasterPasswordPayload](w, r)
+	if !ok {
 		return
 	}
-	var payload setMasterPasswordPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := s.app.SetMasterPassword(payload.Password); err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	err := s.app.SetMasterPassword(payload.Password)
+	writeNoContentOrError(w, err, http.StatusInternalServerError)
 }
 
 type verifyMasterPasswordPayload struct {
@@ -647,87 +574,45 @@ type verifyMasterPasswordPayload struct {
 }
 
 func (s *httpService) handleVerifyMasterPassword(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload verifyMasterPasswordPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[verifyMasterPasswordPayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.VerifyMasterPassword(payload.Password)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, map[string]bool{"result": result})
+	writeJSONOrError(w, map[string]bool{"result": result}, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleResetVault(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.ResetVault()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleExportSecrets(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.ExportSecrets()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleGetEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	result, err := s.app.GetEnterpriseConfig()
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleSaveEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
+	payload, ok := decodeJSONBody[secretvaultlogic.EnterpriseConfig](w, r)
+	if !ok {
 		return
 	}
-	var payload secretvaultlogic.EnterpriseConfig
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := s.app.SaveEnterpriseConfig(&payload); err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	err := s.app.SaveEnterpriseConfig(&payload)
+	writeNoContentOrError(w, err, http.StatusInternalServerError)
 }
 
 type testEnterpriseSecretPayload struct {
@@ -735,47 +620,26 @@ type testEnterpriseSecretPayload struct {
 }
 
 func (s *httpService) handleTestEnterpriseSecret(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload testEnterpriseSecretPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[testEnterpriseSecretPayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.TestEnterpriseSecret(payload.Key)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, map[string]string{"result": result})
+	writeJSONOrError(w, map[string]string{"result": result}, err, http.StatusInternalServerError)
 }
 
 func (s *httpService) handleOpenEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
-		return
-	}
-	if err := s.app.OpenEnterpriseConfig(); err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
+	err := s.app.OpenEnterpriseConfig()
+	writeNoContentOrError(w, err, http.StatusInternalServerError)
 }
 
 // --- Environment management handlers ---
 
 func (s *httpService) handleGetEnvironments(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	writeServiceJSON(w, s.app.GetEnvironments())
@@ -786,12 +650,8 @@ type setEnvironmentPayload struct {
 }
 
 func (s *httpService) handleSetEnvironment(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload setEnvironmentPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[setEnvironmentPayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.SetEnvironment(payload.Env)
@@ -803,12 +663,8 @@ type getEnvVariablesPayload struct {
 }
 
 func (s *httpService) handleGetEnvVariables(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload getEnvVariablesPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[getEnvVariablesPayload](w, r)
+	if !ok {
 		return
 	}
 	writeServiceJSON(w, s.app.GetEnvVariables(payload.Env))
@@ -820,12 +676,8 @@ type setEnvVariablePayload struct {
 }
 
 func (s *httpService) handleSetEnvVariable(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload setEnvVariablePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[setEnvVariablePayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.SetEnvVariable(payload.Key, payload.Value)
@@ -833,12 +685,7 @@ func (s *httpService) handleSetEnvVariable(w http.ResponseWriter, r *http.Reques
 }
 
 func (s *httpService) handleGetVariables(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload struct{}
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
 		return
 	}
 	writeServiceJSON(w, s.app.GetVariables())
@@ -850,12 +697,8 @@ type addEnvVariablePayload struct {
 }
 
 func (s *httpService) handleAddEnvVariable(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload addEnvVariablePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[addEnvVariablePayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.AddEnvVariable(payload.Key, payload.Value)
@@ -868,12 +711,8 @@ type renameEnvironmentPayload struct {
 }
 
 func (s *httpService) handleRenameEnvironment(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload renameEnvironmentPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[renameEnvironmentPayload](w, r)
+	if !ok {
 		return
 	}
 	s.app.RenameEnvironment(payload.OldName, payload.NewName)
@@ -887,85 +726,95 @@ type importCollectionPayload struct {
 }
 
 func (s *httpService) handleImportCollection(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
-	}
-	var payload importCollectionPayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+	payload, ok := decodeJSONBody[importCollectionPayload](w, r)
+	if !ok {
 		return
 	}
 	result, err := s.app.ImportFromPath(payload.Path)
-	if err != nil {
-		writeServiceError(w, http.StatusInternalServerError, err)
-		return
-	}
-	writeServiceJSON(w, result)
+	writeJSONOrError(w, result, err, http.StatusInternalServerError)
 }
 
 type saveBinaryResponsePayload struct {
-	RequestID   string `json:"requestId"`
+	RequestID string `json:"requestId"`
+	// DestPath is accepted only so a non-empty value can be rejected with a
+	// clear 400: this HTTP endpoint has open CORS ('*') and is reachable by
+	// any local page, so honoring a client-supplied destination path would
+	// let it write arbitrary files anywhere on disk the process can reach.
+	// The service always writes to its own generated temp file instead.
 	DestPath    string `json:"destPath"`
 	Base64Body  string `json:"base64Body,omitempty"`
 	ContentType string `json:"contentType,omitempty"`
 	RequestURL  string `json:"requestUrl,omitempty"`
 }
 
-func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Request) {
-	if !s.requirePost(w, r) {
-		return
+// errBadRequestBinary wraps an error that should map to 400 instead of the
+// handler's default 500, used to distinguish client input errors (missing
+// source, invalid base64, explicit destPath) from server-side write/lookup
+// failures.
+type errBadRequestBinary struct{ err error }
+
+func (e errBadRequestBinary) Error() string { return e.err.Error() }
+func (e errBadRequestBinary) Unwrap() error { return e.err }
+
+// writeBinaryResponsePayload resolves the requested binary data (either from
+// a prior request's stored response, or from an inline base64 body) and
+// writes it to a service-generated, uniquely-named temp file (0600, via
+// os.CreateTemp) so no caller-supplied path ever reaches a file API. It
+// returns the generated path and errBadRequestBinary for client-input errors
+// so the caller can map them to 400 instead of 500.
+func (s *httpService) writeBinaryResponsePayload(payload saveBinaryResponsePayload) (string, error) {
+	var data []byte
+	switch {
+	case payload.RequestID != "":
+		body, exists := s.app.binaryResponseBytes(payload.RequestID)
+		if !exists {
+			return "", fmt.Errorf("no binary response stored for this request")
+		}
+		data = body
+	case payload.Base64Body != "":
+		decoded, err := decodeBase64Body(payload.Base64Body)
+		if err != nil {
+			return "", errBadRequestBinary{err}
+		}
+		data = decoded
+	default:
+		return "", errBadRequestBinary{fmt.Errorf("requestId or base64Body required")}
 	}
-	var payload saveBinaryResponsePayload
-	if err := decodeServicePayload(r, &payload); err != nil {
-		writeServiceError(w, http.StatusBadRequest, err)
+
+	ext := hcl.ExtensionForContentType(payload.ContentType)
+	f, err := os.CreateTemp("", "rawrequest-save-*"+ext)
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.Write(data); err != nil {
+		os.Remove(f.Name())
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+	return f.Name(), nil
+}
+
+func (s *httpService) handleSaveBinaryResponse(w http.ResponseWriter, r *http.Request) {
+	payload, ok := decodeJSONBody[saveBinaryResponsePayload](w, r)
+	if !ok {
 		return
 	}
 
 	if payload.DestPath != "" {
-		if payload.RequestID != "" {
-			if err := s.app.SaveBinaryResponseToPath(payload.RequestID, payload.DestPath); err != nil {
-				writeServiceError(w, http.StatusInternalServerError, err)
-				return
-			}
-		} else if payload.Base64Body != "" {
-			data, err := decodeBase64Body(payload.Base64Body)
-			if err != nil {
-				writeServiceError(w, http.StatusBadRequest, err)
-				return
-			}
-			if err := os.WriteFile(payload.DestPath, data, 0644); err != nil {
-				writeServiceError(w, http.StatusInternalServerError, err)
-				return
-			}
-		} else {
-			writeServiceError(w, http.StatusBadRequest, fmt.Errorf("requestId or base64Body required"))
-			return
-		}
-		writeServiceJSON(w, map[string]string{"path": payload.DestPath})
-	} else {
-		tmpDir := os.TempDir()
-		name := suggestFilename(payload.RequestURL, payload.ContentType)
-		tmpPath := filepath.Join(tmpDir, name)
-
-		if payload.RequestID != "" {
-			if err := s.app.SaveBinaryResponseToPath(payload.RequestID, tmpPath); err != nil {
-				writeServiceError(w, http.StatusInternalServerError, err)
-				return
-			}
-		} else if payload.Base64Body != "" {
-			data, err := decodeBase64Body(payload.Base64Body)
-			if err != nil {
-				writeServiceError(w, http.StatusBadRequest, err)
-				return
-			}
-			if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-				writeServiceError(w, http.StatusInternalServerError, err)
-				return
-			}
-		} else {
-			writeServiceError(w, http.StatusBadRequest, fmt.Errorf("requestId or base64Body required"))
-			return
-		}
-		writeServiceJSON(w, map[string]string{"path": tmpPath})
+		writeServiceError(w, http.StatusBadRequest, fmt.Errorf("destPath is no longer supported; the service always writes exports to a generated temp file"))
+		return
 	}
+
+	path, err := s.writeBinaryResponsePayload(payload)
+	if err != nil {
+		status := http.StatusInternalServerError
+		var badReq errBadRequestBinary
+		if errors.As(err, &badReq) {
+			status = http.StatusBadRequest
+		}
+		writeServiceError(w, status, err)
+		return
+	}
+	writeServiceJSON(w, map[string]string{"path": path})
 }

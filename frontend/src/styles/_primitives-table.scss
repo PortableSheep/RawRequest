@@ -1,0 +1,32 @@
+// Table primitive.
+.rr-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.rr-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--rr-text-tertiary);
+  padding: 10px 14px;
+  background: var(--rr-surface-2);
+  border-bottom: 1px solid var(--rr-border-color);
+}
+
+.rr-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--rr-border-divider-color);
+  color: var(--rr-text-subtle);
+  font-size: 12.5px;
+}
+
+.rr-table tbody tr:hover td {
+  background: var(--rr-surface-3);
+}

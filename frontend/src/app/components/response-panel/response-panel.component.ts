@@ -4,6 +4,7 @@ import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-r
 import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
+import { APP_BRIDGE } from '../../services/app-bridge.contract';
 
 import {
   formatBytesForResponsePanel,
@@ -31,6 +32,7 @@ export interface DownloadProgress {
 export class ResponsePanelComponent implements OnDestroy {
   private readonly ws = inject(WorkspaceStateService);
   private readonly reqExec = inject(RequestExecutionService);
+  private readonly appBridge = inject(APP_BRIDGE);
 
   readonly responseData = computed(() => {
     const activeFile = this.ws.currentFileView();
@@ -187,6 +189,20 @@ export class ResponsePanelComponent implements OnDestroy {
     this.expandedEntryId.set(this.expandedEntryId() === id ? null : id);
   }
 
+  /**
+   * Keyboard activation handler for the disclosure header. Guards against
+   * nested interactive controls (e.g. the Replay button) bubbling their
+   * Enter/Space keydown up to the header: only toggles when the header
+   * itself was the event target, not a descendant.
+   */
+  onHeaderActivateKey(event: Event, id: string) {
+    if (event.target !== event.currentTarget) {
+      return;
+    }
+    event.preventDefault();
+    this.toggleEntry(id);
+  }
+
   onReplay(entry: ChainEntryPreview, event: MouseEvent) {
     event.preventDefault();
     event.stopPropagation();
@@ -311,10 +327,9 @@ export class ResponsePanelComponent implements OnDestroy {
     this.setSaveState(entry.id, 'saving');
 
     try {
-      const { SaveBase64ToFile } = await import('@wailsjs/go/app/App');
       const contentType = entry.response.contentType || '';
       const requestUrl = entry.request?.url || '';
-      await SaveBase64ToFile(entry.response.body, contentType, requestUrl);
+      await this.appBridge.saveBase64ToFile(entry.response.body, contentType, requestUrl);
       this.setSaveState(entry.id, 'saved');
     } catch (error: any) {
       if (error?.message?.includes('save cancelled') || error?.includes?.('save cancelled')) {

@@ -14,7 +14,7 @@ jobs:
   build-macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Get version (from release branch)
         id: version
@@ -89,6 +89,27 @@ jobs:
         run: |
           VERSION=${{ steps.version.outputs.version }}
           ./scripts/package_homebrew.sh v${VERSION}
+
+      - name: Verify standalone CLI carries distinct identifier
+        # The standalone rawrequest CLI must NOT share its code-signing
+        # identifier with the GUI bundle (CFBundleIdentifier=dev.rawrequest.app).
+        # When they collide, macOS LaunchServices treats a long-lived
+        # `rawrequest mcp` child as the bundle's running instance and refuses
+        # to launch the GUI. scripts/package_homebrew.sh ad-hoc resigns the
+        # CLI with dev.rawrequest.cli; this step guards against regressions.
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          CLI="./dist/releases/RawRequest-v${VERSION}/rawrequest"
+          if [ ! -f "$CLI" ]; then
+            echo "Standalone CLI not found at $CLI"
+            exit 1
+          fi
+          IDENT=$(codesign -dv "$CLI" 2>&1 | awk -F= '/^Identifier=/{print $2}')
+          echo "Standalone CLI identifier: $IDENT"
+          if [ "$IDENT" != "dev.rawrequest.cli" ]; then
+            echo "ERROR: standalone CLI identifier must be dev.rawrequest.cli (got: $IDENT)"
+            exit 1
+          fi
 
       - name: Sign app bundle
         run: |
@@ -198,7 +219,7 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Get version (from release branch)
         id: version
@@ -303,7 +324,7 @@ jobs:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           token: ${{ secrets.TOKEN }}

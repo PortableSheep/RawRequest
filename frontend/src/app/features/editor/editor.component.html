@@ -1,0 +1,34 @@
+
+<div
+	#wrapper
+	class="editor editor-wrapper"
+	[class.editor-wrapper--busy]="isBusy()"
+	[attr.aria-busy]="isBusy()"
+>
+	<app-editor-search-panel [isBusy]="isBusy()" />
+
+	<div #editor class="editor__surface rr-mono"></div>
+
+	@if (editorContextMenu.show) {
+		<div class="rr-menu-backdrop" (click)="closeEditorContextMenu()" (contextmenu)="$event.preventDefault(); closeEditorContextMenu()"></div>
+		<div
+			class="rr-menu"
+			[style.left.px]="editorContextMenu.x"
+			[style.top.px]="editorContextMenu.y"
+		>
+			<button type="button" class="rr-menu__item" (click)="cutSelection()">
+				<span>Cut</span>
+			</button>
+			<button type="button" class="rr-menu__item" (click)="copySelection()">
+				<span>Copy</span>
+			</button>
+			<button type="button" class="rr-menu__item" (click)="pasteFromClipboard()">
+				<span>Paste</span>
+			</button>
+			<div class="rr-menu__sep"></div>
+			<button type="button" class="rr-menu__item" (click)="selectAll()">
+				<span>Select All</span>
+			</button>
+		</div>
+	}
+</div>

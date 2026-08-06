@@ -1,15 +1,13 @@
 @if (item()) {
   <div class="rr-modal-shell">
-    <div class="rr-modal history-detail-modal modal-animated" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+    <div class="rr-modal history-detail-modal modal-animated" appFocusTrap role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
       <div class="rr-modal__header">
         <div class="history-detail-modal__headline">
           <span class="history-detail-modal__method rr-mono" [attr.data-method]="item()!.method">{{ item()!.method }}</span>
           <h5 id="history-modal-title" class="history-detail-modal__url rr-mono" [title]="item()!.url">{{ item()!.url }}</h5>
         </div>
         <button type="button" class="rr-icon-btn rr-modal__close" (click)="onClose.emit()" aria-label="Close modal">
-          <svg xmlns="http://www.w3.org/2000/svg" class="rr-icon rr-icon--md" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6L6 18M6 6l12 12"></path>
-          </svg>
+          <app-icon name="close" class="rr-icon rr-icon--md"></app-icon>
         </button>
       </div>
 

@@ -6,16 +6,7 @@ import { SecretService } from './secret.service';
 import { ToastService } from './toast.service';
 import { UpdateService } from './update.service';
 import { RequestExecutionService } from './request-execution.service';
-
-const mockEnsureServiceRunning = vi.fn();
-const mockGetExamplesForFirstRun = vi.fn();
-const mockMarkFirstRunComplete = vi.fn();
-
-vi.mock('@wailsjs/go/app/App', () => ({
-  EnsureServiceRunning: (...args: any[]) => mockEnsureServiceRunning(...args),
-  GetExamplesForFirstRun: (...args: any[]) => mockGetExamplesForFirstRun(...args),
-  MarkFirstRunComplete: (...args: any[]) => mockMarkFirstRunComplete(...args),
-}));
+import { APP_BRIDGE, type AppBridgeContract } from './app-bridge.contract';
 
 describe('StartupService', () => {
   let service: StartupService;
@@ -24,6 +15,7 @@ describe('StartupService', () => {
   let mockToast: any;
   let mockUpdate: any;
   let mockReqExec: any;
+  let appBridgeMock: vi.Mocked<Partial<AppBridgeContract>>;
   let destroy$: Subject<void>;
 
   beforeEach(() => {
@@ -48,6 +40,11 @@ describe('StartupService', () => {
       subscribeToDownloadProgress: vi.fn(),
       queuedExecutionRequested: new Subject(),
     };
+    appBridgeMock = {
+      ensureServiceRunning: vi.fn(),
+      getExamplesForFirstRun: vi.fn(),
+      markFirstRunComplete: vi.fn(),
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -57,12 +54,11 @@ describe('StartupService', () => {
         { provide: ToastService, useValue: mockToast },
         { provide: UpdateService, useValue: mockUpdate },
         { provide: RequestExecutionService, useValue: mockReqExec },
+        { provide: APP_BRIDGE, useValue: appBridgeMock },
       ],
     });
     service = TestBed.inject(StartupService);
     destroy$ = new Subject<void>();
-
-    vi.clearAllMocks();
   });
 
   afterEach(() => {
@@ -72,8 +68,8 @@ describe('StartupService', () => {
 
   describe('bootstrap', () => {
     it('should initialize when backend is ready', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       await service.bootstrap(destroy$, vi.fn());
 
@@ -83,7 +79,7 @@ describe('StartupService', () => {
     });
 
     it('should not initialize if backend fails', async () => {
-      mockEnsureServiceRunning.mockRejectedValue(new Error('connection refused'));
+      appBridgeMock.ensureServiceRunning.mockRejectedValue(new Error('connection refused'));
 
       await service.bootstrap(destroy$, vi.fn());
 
@@ -92,8 +88,8 @@ describe('StartupService', () => {
     });
 
     it('should only bootstrap once', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       await service.bootstrap(destroy$, vi.fn());
       await service.bootstrap(destroy$, vi.fn());
@@ -102,8 +98,8 @@ describe('StartupService', () => {
     });
 
     it('should subscribe to download progress', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       await service.bootstrap(destroy$, vi.fn());
 
@@ -111,8 +107,8 @@ describe('StartupService', () => {
     });
 
     it('should wire queued execution callback', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
       const onExecute = vi.fn();
 
       await service.bootstrap(destroy$, onExecute);
@@ -128,13 +124,13 @@ describe('StartupService', () => {
 
   describe('first run', () => {
     it('should add examples file on first run', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({
         isFirstRun: true,
         content: 'GET /hello',
         filePath: '/examples.http',
       });
-      mockMarkFirstRunComplete.mockResolvedValue(undefined);
+      appBridgeMock.markFirstRunComplete.mockResolvedValue(undefined);
 
       await service.bootstrap(destroy$, vi.fn());
       // checkFirstRun is fire-and-forget; flush microtasks
@@ -145,12 +141,12 @@ describe('StartupService', () => {
         'GET /hello',
         '/examples.http',
       );
-      expect(mockMarkFirstRunComplete).toHaveBeenCalled();
+      expect(appBridgeMock.markFirstRunComplete).toHaveBeenCalled();
     });
 
     it('should not add examples if not first run', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       await service.bootstrap(destroy$, vi.fn());
 
@@ -160,12 +156,12 @@ describe('StartupService', () => {
 
   describe('retryServiceStartup', () => {
     it('should clear error and re-bootstrap', async () => {
-      mockEnsureServiceRunning.mockRejectedValueOnce(new Error('fail'));
+      appBridgeMock.ensureServiceRunning.mockRejectedValueOnce(new Error('fail'));
       await service.bootstrap(destroy$, vi.fn());
       expect(service.serviceStartupError).not.toBeNull();
 
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       service.retryServiceStartup(destroy$, vi.fn());
 
@@ -175,8 +171,8 @@ describe('StartupService', () => {
 
   describe('master password warning', () => {
     it('should show toast when master password warning fires', async () => {
-      mockEnsureServiceRunning.mockResolvedValue(undefined);
-      mockGetExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
+      appBridgeMock.ensureServiceRunning.mockResolvedValue(undefined);
+      appBridgeMock.getExamplesForFirstRun.mockResolvedValue({ isFirstRun: false });
 
       await service.bootstrap(destroy$, vi.fn());
 

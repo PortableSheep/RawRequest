@@ -5,6 +5,8 @@ import { SecretService } from '../../services/secret.service';
 import { ToastService } from '../../services/toast.service';
 import { PanelVisibilityService } from '../../services/panel-visibility.service';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
+import { IconComponent } from '../icon/icon.component';
 import {
   SecretRow, SortColumn, SortDirection,
   buildSecretRows, sortSecretRows, filterSecretRows, countSecretUsage, toggleSort
@@ -20,7 +22,7 @@ import {
 @Component({
   selector: 'app-secrets-modal',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, FocusTrapDirective, IconComponent],
   templateUrl: './secrets-modal.component.html',
   styleUrls: ['./secrets-modal.component.scss']
 })

@@ -72,4 +72,8 @@ export class CommandPaletteComponent {
   getMethodClass(method: string): string {
     return `rr-palette-method rr-palette-method--${method.toLowerCase()}`;
   }
+
+  optionId(index: number): string {
+    return `rr-palette-option-${index}`;
+  }
 }
