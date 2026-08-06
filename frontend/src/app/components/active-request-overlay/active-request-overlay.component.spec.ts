@@ -19,6 +19,7 @@ describe("ActiveRequestOverlayComponent", () => {
     id: "req-1",
     label: "Test Request",
     requestIndex: 0,
+    request: { method: "GET", url: "https://example.com", headers: {}, name: "Test" },
     canCancel: true,
     type: "single",
     startedAt: Date.now(),

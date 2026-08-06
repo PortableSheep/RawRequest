@@ -15,6 +15,18 @@
   background: var(--rr-surface-1);
 }
 
+.editor-wrapper--busy {
+  .editor__surface,
+  ::ng-deep .cm-editor {
+    pointer-events: none;
+  }
+
+  ::ng-deep .cm-scroller {
+    overflow: hidden;
+    touch-action: none;
+  }
+}
+
 .editor__surface {
   height: 100%;
   font-size: 13px;

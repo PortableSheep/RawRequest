@@ -262,6 +262,7 @@ describe('RequestExecutionService', () => {
         id: 'xyz',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -278,6 +279,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'load',
         startedAt: Date.now(),
@@ -347,19 +349,21 @@ describe('RequestExecutionService', () => {
       expect(service.getActiveRequestDetails(file)).toBeNull();
     });
 
-    it('should return request at active index', () => {
+    it('should return the request snapshot captured when execution started', () => {
       const req = makeRequest({ name: 'test' });
+      const capturedRequest = makeRequest({ name: 'test', url: 'https://original.example' });
       service.activeRequestInfo = {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: capturedRequest,
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
       };
 
       const file = makeFileTab({ requests: [req] });
-      expect(service.getActiveRequestDetails(file)).toEqual(req);
+      expect(service.getActiveRequestDetails(file)).toBe(capturedRequest);
     });
   });
 
@@ -377,6 +381,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -396,6 +401,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -412,6 +418,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -431,6 +438,7 @@ describe('RequestExecutionService', () => {
         id: 'req-1',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -457,6 +465,7 @@ describe('RequestExecutionService', () => {
         id: 'req-1',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -500,6 +509,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'load',
         startedAt: Date.now(),

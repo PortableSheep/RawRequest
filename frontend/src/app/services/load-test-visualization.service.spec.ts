@@ -71,5 +71,23 @@ describe('LoadTestVisualizationService', () => {
       ).not.toThrow();
       service.stopActiveRunTick();
     });
+
+    it('notifies registered views on each timer tick for elapsed-time updates', () => {
+      vi.useFakeTimers();
+      const hostCdr = { detectChanges: vi.fn() } as unknown as ChangeDetectorRef;
+      const overlayCdr = { detectChanges: vi.fn() } as unknown as ChangeDetectorRef;
+      service.registerCdr(overlayCdr);
+
+      service.startActiveRunTick(
+        () => true,
+        () => 'single',
+        hostCdr,
+      );
+      vi.advanceTimersByTime(200);
+
+      expect(overlayCdr.detectChanges).toHaveBeenCalled();
+      service.stopActiveRunTick();
+      vi.useRealTimers();
+    });
   });
 });

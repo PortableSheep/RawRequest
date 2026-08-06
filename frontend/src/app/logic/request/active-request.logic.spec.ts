@@ -29,6 +29,8 @@ describe('active-request.logic', () => {
     const info = buildActiveRequestInfo('file-1', 3, baseReq, 1700000000000);
     expect(info.type).toBe('single');
     expect(info.requestIndex).toBe(3);
+    expect(info.request).toEqual(baseReq);
+    expect(info.request).not.toBe(baseReq);
     expect(info.canCancel).toBe(true);
     expect(info.startedAt).toBe(1700000000000);
     expect(info.id).toContain('file-1');

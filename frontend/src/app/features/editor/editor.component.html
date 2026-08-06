@@ -1,5 +1,10 @@
 
-<div #wrapper class="editor editor-wrapper">
+<div
+	#wrapper
+	class="editor editor-wrapper"
+	[class.editor-wrapper--busy]="isBusy()"
+	[attr.aria-busy]="isBusy()"
+>
 	<app-editor-search-panel [isBusy]="isBusy()" />
 
 	<div #editor class="editor__surface rr-mono"></div>

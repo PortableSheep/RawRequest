@@ -251,7 +251,7 @@ export class RequestExecutionService {
     if (!this.activeRequestInfo) {
       return null;
     }
-    return currentFile.requests?.[this.activeRequestInfo.requestIndex] || null;
+    return this.activeRequestInfo.request;
   }
 
   getActiveRequestPreview(currentFile: FileTab): string {
