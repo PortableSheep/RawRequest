@@ -143,6 +143,30 @@
   background: var(--rr-surface-1);
 }
 
+.history-detail-modal__panel-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
+.history-detail-modal__copy {
+  height: 24px;
+  padding: 0 8px;
+  font-size: 10px;
+}
+
+.history-detail-modal__copy[data-state='copied'] {
+  border-color: rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--rr-success-light);
+}
+
+.history-detail-modal__copy[data-state='error'] {
+  border-color: rgba(244, 63, 94, 0.35);
+  background: rgba(244, 63, 94, 0.12);
+  color: rgba(251, 113, 133, 0.95);
+}
+
 .history-detail-modal__notice {
   margin-bottom: 10px;
 }

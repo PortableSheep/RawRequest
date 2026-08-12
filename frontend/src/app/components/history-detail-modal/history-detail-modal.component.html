@@ -264,12 +264,36 @@
 
         @if (isLoadTest() && activeTab === 'raw') {
           <div id="tabpanel-raw" role="tabpanel" aria-labelledby="tab-raw" class="history-detail-modal__panel">
+            <div class="history-detail-modal__panel-toolbar">
+              <button
+                type="button"
+                class="rr-btn rr-btn--ghost history-detail-modal__copy"
+                [attr.data-state]="copyState()"
+                [disabled]="!getRawJson()"
+                (click)="copyVisibleResponse()"
+                aria-label="Copy response body"
+              >
+                {{ copyState() === 'copied' ? 'Copied' : copyState() === 'error' ? 'Failed' : 'Copy' }}
+              </button>
+            </div>
             <app-virtual-response-body [body]="getRawJson()" class="history-modal-body"></app-virtual-response-body>
           </div>
         }
 
         @if (!isLoadTest() && activeTab === 'body') {
           <div id="tabpanel-body" role="tabpanel" aria-labelledby="tab-body" class="history-detail-modal__panel">
+            <div class="history-detail-modal__panel-toolbar">
+              <button
+                type="button"
+                class="rr-btn rr-btn--ghost history-detail-modal__copy"
+                [attr.data-state]="copyState()"
+                [disabled]="!getFormattedResponse()"
+                (click)="copyVisibleResponse()"
+                aria-label="Copy response body"
+              >
+                {{ copyState() === 'copied' ? 'Copied' : copyState() === 'error' ? 'Failed' : 'Copy' }}
+              </button>
+            </div>
             <app-virtual-response-body [body]="getFormattedResponse()" class="history-modal-body"></app-virtual-response-body>
           </div>
         }

@@ -5,6 +5,7 @@ import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseDa
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
 import { APP_BRIDGE } from '../../services/app-bridge.contract';
+import { formatResponseBody } from '../../utils/response-body-format';
 
 import {
   formatBytesForResponsePanel,
@@ -62,6 +63,7 @@ export class ResponsePanelComponent implements OnDestroy {
   assertionsCollapsed = signal<Record<string, boolean>>({});
   private copyTimers = new Map<string, any>();
   private saveTimers = new Map<string, any>();
+  private formattedBodyCache = new WeakMap<ResponsePreview, { source: string; formatted: string }>();
 
   // Tooltip state
   tooltipText = signal<string | null>(null);
@@ -271,6 +273,17 @@ export class ResponsePanelComponent implements OnDestroy {
     return this.copyStates()[entryId] ?? 'idle';
   }
 
+  getFormattedResponseBody(response: ResponsePreview): string {
+    const cached = this.formattedBodyCache.get(response);
+    if (cached?.source === response.body) {
+      return cached.formatted;
+    }
+
+    const formatted = formatResponseBody(response.body || '');
+    this.formattedBodyCache.set(response, { source: response.body, formatted });
+    return formatted;
+  }
+
   async copyResponseBody(entryId: string, body?: string | null) {
     if (!body) {
       return;
@@ -280,7 +293,7 @@ export class ResponsePanelComponent implements OnDestroy {
       return;
     }
     try {
-      await navigator.clipboard.writeText(body);
+      await navigator.clipboard.writeText(formatResponseBody(body));
       this.setCopyState(entryId, 'copied');
     } catch (error) {
       console.error('Copy failed', error);

@@ -1,9 +1,10 @@
-import { Component, input, output, effect, HostListener } from '@angular/core';
+import { Component, input, output, effect, HostListener, computed, signal, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { FocusTrapDirective } from '../../directives/focus-trap.directive';
 import { IconComponent } from '../icon/icon.component';
 import type { HistoryItem, LoadTestMetrics } from '../../models/http.models';
+import { formatResponseBody } from '../../utils/response-body-format';
 
 @Component({
   selector: 'app-history-detail-modal',
@@ -12,15 +13,22 @@ import type { HistoryItem, LoadTestMetrics } from '../../models/http.models';
   templateUrl: './history-detail-modal.component.html',
   styleUrls: ['./history-detail-modal.component.scss']
 })
-export class HistoryDetailModalComponent {
+export class HistoryDetailModalComponent implements OnDestroy {
   isOpen = input<boolean>(false);
   item = input<HistoryItem | null>(null);
 
   onClose = output<void>();
 
   activeTab: 'body' | 'headers' | 'summary' | 'raw' = 'body';
+  readonly copyState = signal<'idle' | 'copied' | 'error'>('idle');
+  readonly formattedResponse = computed(() => formatResponseBody(this.item()?.responseData?.body ?? ''));
+  readonly rawJson = computed(() => {
+    const metrics = this.item()?.responseData?.loadTestMetrics;
+    return metrics ? JSON.stringify(metrics, null, 2) : this.formattedResponse();
+  });
 
   private lastItemKey: string | null = null;
+  private copyTimer: ReturnType<typeof setTimeout> | null = null;
 
   @HostListener('document:keydown.escape')
   handleEscape(): void {
@@ -40,6 +48,7 @@ export class HistoryDetailModalComponent {
 
       // When switching to a load test history item, default to Summary.
       if (key !== this.lastItemKey) {
+        this.setCopyState('idle');
         if (it.responseData?.loadTestMetrics) {
           this.activeTab = 'summary';
         } else {
@@ -49,6 +58,12 @@ export class HistoryDetailModalComponent {
 
       this.lastItemKey = key;
     });
+  }
+
+  ngOnDestroy(): void {
+    if (this.copyTimer) {
+      clearTimeout(this.copyTimer);
+    }
   }
 
   isLoadTest(): boolean {
@@ -75,27 +90,42 @@ export class HistoryDetailModalComponent {
   }
 
   getFormattedResponse(): string {
-    const currentItem = this.item();
-    if (!currentItem || !currentItem.responseData) return '';
-
-    const body = currentItem.responseData.body;
-    try {
-      const json = JSON.parse(body);
-      return JSON.stringify(json, null, 2);
-    } catch {
-      return body;
-    }
+    return this.formattedResponse();
   }
 
   getRawJson(): string {
-    const it = this.item();
-    if (!it) return '';
-    const metrics = this.getLoadTestMetrics();
-    if (metrics) {
-      return JSON.stringify(metrics, null, 2);
+    return this.rawJson();
+  }
+
+  async copyVisibleResponse(): Promise<void> {
+    const text = this.activeTab === 'raw' ? this.rawJson() : this.formattedResponse();
+    if (!text) return;
+
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      this.setCopyState('error');
+      return;
     }
-    // Fallback: show response body (pretty-printed if JSON)
-    return this.getFormattedResponse();
+
+    try {
+      await navigator.clipboard.writeText(text);
+      this.setCopyState('copied');
+    } catch {
+      this.setCopyState('error');
+    }
+  }
+
+  private setCopyState(state: 'idle' | 'copied' | 'error'): void {
+    this.copyState.set(state);
+    if (this.copyTimer) {
+      clearTimeout(this.copyTimer);
+      this.copyTimer = null;
+    }
+    if (state !== 'idle') {
+      this.copyTimer = setTimeout(() => {
+        this.copyState.set('idle');
+        this.copyTimer = null;
+      }, 1500);
+    }
   }
 
 }
