@@ -1,7 +1,7 @@
 import { Component, ChangeDetectionStrategy, OnDestroy, effect, inject, signal, computed, untracked, HostListener, output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
-import { AssertionResult, ChainEntryPreview, Request, RequestPreview, ResponseData, ResponsePreview } from '../../models/http.models';
+import { AssertionResult, ChainEntryPreview } from '../../models/http.models';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
 import { APP_BRIDGE } from '../../services/app-bridge.contract';
@@ -38,14 +38,16 @@ export class ResponsePanelComponent implements OnDestroy {
   readonly responseData = computed(() => {
     const activeFile = this.ws.currentFileView();
     const idx = activeFile?.activeRequestIndex;
-    if (idx === undefined || idx === null) return null;
-    return activeFile.responseData[idx] ?? null;
+    if (idx !== undefined && idx !== null && activeFile.responseData[idx]) {
+      return activeFile.responseData[idx];
+    }
+    return this.ws.history()[0]?.responseData ?? null;
   });
 
   readonly request = computed(() => {
     const activeFile = this.ws.currentFileView();
     const idx = activeFile?.activeRequestIndex;
-    if (idx === undefined || idx === null) return null;
+    if (idx === undefined || idx === null || !activeFile.responseData[idx]) return null;
     return activeFile.requests[idx] ?? null;
   });
 
@@ -63,7 +65,6 @@ export class ResponsePanelComponent implements OnDestroy {
   assertionsCollapsed = signal<Record<string, boolean>>({});
   private copyTimers = new Map<string, any>();
   private saveTimers = new Map<string, any>();
-  private formattedBodyCache = new WeakMap<ResponsePreview, { source: string; formatted: string }>();
 
   // Tooltip state
   tooltipText = signal<string | null>(null);
@@ -271,17 +272,6 @@ export class ResponsePanelComponent implements OnDestroy {
 
   getCopyState(entryId: string): 'idle' | 'copied' | 'error' {
     return this.copyStates()[entryId] ?? 'idle';
-  }
-
-  getFormattedResponseBody(response: ResponsePreview): string {
-    const cached = this.formattedBodyCache.get(response);
-    if (cached?.source === response.body) {
-      return cached.formatted;
-    }
-
-    const formatted = formatResponseBody(response.body || '');
-    this.formattedBodyCache.set(response, { source: response.body, formatted });
-    return formatted;
   }
 
   async copyResponseBody(entryId: string, body?: string | null) {

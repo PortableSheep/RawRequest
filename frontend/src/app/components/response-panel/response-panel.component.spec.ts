@@ -91,6 +91,7 @@ function createMockWs(fileData: any = {}) {
 
   return {
     currentFileView: fileSignal as WritableSignal<any>,
+    history: signal<any[]>([]),
     getCurrentFile: vi.fn(() => fileSignal()),
     setActiveRequestIndex: vi.fn((index: number | null) => {
       fileSignal.update(val => ({ ...val, activeRequestIndex: index }));
@@ -380,12 +381,6 @@ describe('ResponsePanelComponent', () => {
       expect(component.getCopyState('entry-1')).toBe('copied');
     });
 
-    it('should render the same formatted body that it copies', () => {
-      const response = makeEntry().response!;
-
-      expect(component.getFormattedResponseBody(response)).toBe('{\n  "ok": true\n}');
-    });
-
     it('should not copy when body is empty or null', async () => {
       await component.copyResponseBody('entry-1', null);
       expect(writeTextSpy).not.toHaveBeenCalled();
@@ -444,6 +439,55 @@ describe('ResponsePanelComponent', () => {
 
       expect(copyBtn.getAttribute('data-state')).toBe('copied');
       expect(copyBtn.textContent).toContain('Copied');
+    });
+  });
+
+  describe('response display source', () => {
+    it('leaves JSON unformatted for the syntax-highlighting viewer', () => {
+      const rd = makeResponseData({
+        body: '{"nested":{"value":true}}',
+        chainItems: undefined,
+      });
+      setup({
+        requests: [{ method: 'GET', url: 'https://example.com', headers: {} }],
+        responseData: { 0: rd },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.mock-body')?.textContent).toBe('{"nested":{"value":true}}');
+    });
+
+    it('shows the most recent history response when no in-memory response is available', () => {
+      setup();
+      const historyResponse = makeResponseData({
+        body: '{"from":"history"}',
+        requestPreview: {
+          name: 'Latest request',
+          method: 'GET',
+          url: 'https://example.com/latest',
+          headers: {},
+        },
+        chainItems: undefined,
+      });
+      mockWs.currentFileView.set({
+        requests: [{ method: 'GET', url: 'https://example.com/latest', headers: {} }],
+        responseData: {},
+        activeRequestIndex: null,
+      });
+      mockWs.history.set([{
+        timestamp: new Date(),
+        method: 'GET',
+        url: 'https://example.com/latest',
+        status: 200,
+        statusText: 'OK',
+        responseTime: 42,
+        responseData: historyResponse,
+      }]);
+      fixture.detectChanges();
+
+      expect(component.responseData()).toBe(historyResponse);
+      expect(component.getChainItems()[0].label).toBe('Latest request');
+      expect(fixture.nativeElement.textContent).not.toContain('Awaiting response');
     });
   });
 

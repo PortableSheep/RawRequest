@@ -393,7 +393,7 @@
                                                     </button>
                                                 </div>
                                             } @else {
-                                                <app-virtual-response-body [body]="getFormattedResponseBody(entry.response!)"></app-virtual-response-body>
+                                                <app-virtual-response-body [body]="entry.response!.body || ''"></app-virtual-response-body>
                                             }
                                         </div>
                                     } @else {

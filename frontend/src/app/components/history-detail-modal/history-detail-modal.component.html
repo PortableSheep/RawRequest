@@ -294,7 +294,7 @@
                 {{ copyState() === 'copied' ? 'Copied' : copyState() === 'error' ? 'Failed' : 'Copy' }}
               </button>
             </div>
-            <app-virtual-response-body [body]="getFormattedResponse()" class="history-modal-body"></app-virtual-response-body>
+            <app-virtual-response-body [body]="item()!.responseData.body" class="history-modal-body"></app-virtual-response-body>
           </div>
         }
 
