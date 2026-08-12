@@ -373,11 +373,17 @@ describe('ResponsePanelComponent', () => {
       expect(component.getCopyState('entry-1')).toBe('idle');
     });
 
-    it('should copy body to clipboard and set state to copied', async () => {
+    it('should copy the formatted body to clipboard and set state to copied', async () => {
       await component.copyResponseBody('entry-1', '{"ok":true}');
 
-      expect(writeTextSpy).toHaveBeenCalledWith('{"ok":true}');
+      expect(writeTextSpy).toHaveBeenCalledWith('{\n  "ok": true\n}');
       expect(component.getCopyState('entry-1')).toBe('copied');
+    });
+
+    it('should render the same formatted body that it copies', () => {
+      const response = makeEntry().response!;
+
+      expect(component.getFormattedResponseBody(response)).toBe('{\n  "ok": true\n}');
     });
 
     it('should not copy when body is empty or null', async () => {
