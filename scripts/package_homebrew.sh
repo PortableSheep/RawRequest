@@ -45,6 +45,16 @@ if [[ ! -x "$BUILD_DIR/RawRequest" ]]; then
   chmod +x "$BUILD_DIR/RawRequest"
 fi
 cp "$BUILD_DIR/RawRequest" "$TARGET_DIR/rawrequest"
+
+# Re-sign the standalone CLI with a distinct ad-hoc identifier so it is
+# not conflated with the GUI bundle by macOS LaunchServices when running
+# as `rawrequest mcp` / `rawrequest service`. The release workflow may
+# layer a Developer ID signature on top of this; the --identifier sticks.
+# Mirrors internal/migrations/m0002_cli_distinct_identifier_darwin.go.
+if command -v codesign >/dev/null 2>&1; then
+  echo "Ad-hoc resigning standalone CLI with identifier dev.rawrequest.cli..."
+  codesign --force --sign - --identifier dev.rawrequest.cli "$TARGET_DIR/rawrequest"
+fi
 cat > "$TARGET_DIR/rawrequest-service" << 'EOF'
 #!/usr/bin/env bash
 set -euo pipefail

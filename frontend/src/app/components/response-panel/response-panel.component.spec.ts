@@ -5,6 +5,7 @@ import { ChainEntryPreview, ResponseData, Request, AssertionResult, FileTab } fr
 import { VirtualResponseBodyComponent } from '../virtual-response-body/virtual-response-body.component';
 import { WorkspaceStateService } from '../../services/workspace-state.service';
 import { RequestExecutionService } from '../../services/request-execution.service';
+import { APP_BRIDGE, AppBridgeContract } from '../../services/app-bridge.contract';
 
 // Lightweight stub so we don't pull in the real virtual-response-body tree.
 @Component({
@@ -53,14 +54,48 @@ function makeResponseData(overrides: Partial<ResponseData> = {}): ResponseData {
 // Mock services (using signals for reactive tracking)
 // ---------------------------------------------------------------------------
 
-const emptyFile = { requests: [] as any[], responseData: {} as Record<number, ResponseData> };
+const emptyFile = { requests: [] as any[], responseData: {} as Record<number, ResponseData>, activeRequestIndex: null as number | null };
 
 function createMockWs(fileData: any = {}) {
   const fileValue = { ...emptyFile, ...fileData };
+  if (fileValue.activeRequestIndex === undefined || fileValue.activeRequestIndex === null) {
+    const keys = Object.keys(fileValue.responseData || {});
+    fileValue.activeRequestIndex = keys.length > 0 ? Number(keys[0]) : null;
+  }
   const fileSignal = signal(fileValue);
+
+  const originalSet = fileSignal.set.bind(fileSignal);
+  const customSet = (val: any) => {
+    if (val && val.activeRequestIndex === undefined) {
+      const keys = Object.keys(val.responseData || {});
+      const index = keys.length > 0 ? Number(keys[0]) : null;
+      val = { ...val, activeRequestIndex: index };
+    }
+    originalSet(val);
+  };
+  fileSignal.set = customSet;
+
+  const originalUpdate = fileSignal.update.bind(fileSignal);
+  const customUpdate = (updateFn: (value: any) => any) => {
+    fileSignal.update(val => {
+      let updated = updateFn(val);
+      if (updated && updated.activeRequestIndex === undefined) {
+        const keys = Object.keys(updated.responseData || {});
+        const index = keys.length > 0 ? Number(keys[0]) : null;
+        updated = { ...updated, activeRequestIndex: index };
+      }
+      return updated;
+    });
+  };
+  fileSignal.update = customUpdate;
+
   return {
     currentFileView: fileSignal as WritableSignal<any>,
+    history: signal<any[]>([]),
     getCurrentFile: vi.fn(() => fileSignal()),
+    setActiveRequestIndex: vi.fn((index: number | null) => {
+      fileSignal.update(val => ({ ...val, activeRequestIndex: index }));
+    }),
   };
 }
 
@@ -74,6 +109,13 @@ function createMockReqExec(overrides: any = {}) {
   };
 }
 
+function createMockAppBridge(overrides: Partial<AppBridgeContract> = {}): AppBridgeContract {
+  return {
+    saveBase64ToFile: vi.fn().mockResolvedValue('/tmp/saved-file'),
+    ...overrides,
+  } as AppBridgeContract;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -83,10 +125,12 @@ describe('ResponsePanelComponent', () => {
   let component: ResponsePanelComponent;
   let mockWs: ReturnType<typeof createMockWs>;
   let mockReqExec: ReturnType<typeof createMockReqExec>;
+  let mockAppBridge: AppBridgeContract;
 
-  function setup(fileData: any = {}, reqExecOverrides: any = {}) {
+  function setup(fileData: any = {}, reqExecOverrides: any = {}, appBridgeOverrides: Partial<AppBridgeContract> = {}) {
     mockWs = createMockWs(fileData);
     mockReqExec = createMockReqExec(reqExecOverrides);
+    mockAppBridge = createMockAppBridge(appBridgeOverrides);
 
     TestBed.configureTestingModule({
       imports: [ResponsePanelComponent],
@@ -97,6 +141,7 @@ describe('ResponsePanelComponent', () => {
       })
       .overrideProvider(WorkspaceStateService, { useValue: mockWs })
       .overrideProvider(RequestExecutionService, { useValue: mockReqExec })
+      .overrideProvider(APP_BRIDGE, { useValue: mockAppBridge })
       .compileComponents();
 
     fixture = TestBed.createComponent(ResponsePanelComponent);
@@ -189,6 +234,28 @@ describe('ResponsePanelComponent', () => {
       fixture.detectChanges();
 
       expect(component.expandedEntryId()).toBeNull();
+    });
+
+    it('should expose the header as a keyboard-operable disclosure control', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+
+      expect(header.getAttribute('role')).toBe('button');
+      expect(header.getAttribute('tabindex')).toBe('0');
+      expect(header.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('should toggle the entry on Enter and Space keydown', () => {
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBeNull();
+
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
     });
   });
 
@@ -307,10 +374,10 @@ describe('ResponsePanelComponent', () => {
       expect(component.getCopyState('entry-1')).toBe('idle');
     });
 
-    it('should copy body to clipboard and set state to copied', async () => {
+    it('should copy the formatted body to clipboard and set state to copied', async () => {
       await component.copyResponseBody('entry-1', '{"ok":true}');
 
-      expect(writeTextSpy).toHaveBeenCalledWith('{"ok":true}');
+      expect(writeTextSpy).toHaveBeenCalledWith('{\n  "ok": true\n}');
       expect(component.getCopyState('entry-1')).toBe('copied');
     });
 
@@ -372,6 +439,147 @@ describe('ResponsePanelComponent', () => {
 
       expect(copyBtn.getAttribute('data-state')).toBe('copied');
       expect(copyBtn.textContent).toContain('Copied');
+    });
+  });
+
+  describe('response display source', () => {
+    it('leaves JSON unformatted for the syntax-highlighting viewer', () => {
+      const rd = makeResponseData({
+        body: '{"nested":{"value":true}}',
+        chainItems: undefined,
+      });
+      setup({
+        requests: [{ method: 'GET', url: 'https://example.com', headers: {} }],
+        responseData: { 0: rd },
+      });
+      fixture.detectChanges();
+
+      expect(fixture.nativeElement.querySelector('.mock-body')?.textContent).toBe('{"nested":{"value":true}}');
+    });
+
+    it('shows the most recent history response when no in-memory response is available', () => {
+      setup();
+      const historyResponse = makeResponseData({
+        body: '{"from":"history"}',
+        requestPreview: {
+          name: 'Latest request',
+          method: 'GET',
+          url: 'https://example.com/latest',
+          headers: {},
+        },
+        chainItems: undefined,
+      });
+      mockWs.currentFileView.set({
+        requests: [{ method: 'GET', url: 'https://example.com/latest', headers: {} }],
+        responseData: {},
+        activeRequestIndex: null,
+      });
+      mockWs.history.set([{
+        timestamp: new Date(),
+        method: 'GET',
+        url: 'https://example.com/latest',
+        status: 200,
+        statusText: 'OK',
+        responseTime: 42,
+        responseData: historyResponse,
+      }]);
+      fixture.detectChanges();
+
+      expect(component.responseData()).toBe(historyResponse);
+      expect(component.getChainItems()[0].label).toBe('Latest request');
+      expect(fixture.nativeElement.textContent).not.toContain('Awaiting response');
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Save binary response (routes through APP_BRIDGE)
+  // -----------------------------------------------------------------------
+
+  describe('save binary response', () => {
+    function makeBinaryEntry(overrides: Partial<ChainEntryPreview> = {}): ChainEntryPreview {
+      return makeEntry({
+        response: {
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'image/png' },
+          body: 'base64-image-data',
+          responseTime: 10,
+          isBinary: true,
+          contentType: 'image/png',
+        } as any,
+        ...overrides,
+      });
+    }
+
+    it('should be idle by default', () => {
+      setup();
+      expect(component.getSaveState('entry-1')).toBe('idle');
+    });
+
+    it('should do nothing when the response is not binary', async () => {
+      setup();
+      const entry = makeEntry();
+      await component.saveBinaryResponse(entry);
+      expect(mockAppBridge.saveBase64ToFile).not.toHaveBeenCalled();
+      expect(component.getSaveState(entry.id)).toBe('idle');
+    });
+
+    it('should do nothing when the binary response has no body', async () => {
+      setup();
+      const entry = makeBinaryEntry({ response: { status: 200, statusText: 'OK', headers: {}, body: '', responseTime: 10, isBinary: true } as any });
+      await component.saveBinaryResponse(entry);
+      expect(mockAppBridge.saveBase64ToFile).not.toHaveBeenCalled();
+    });
+
+    it('should call appBridge.saveBase64ToFile with body, content-type and request url', async () => {
+      setup();
+      const entry = makeBinaryEntry({ request: { method: 'GET', url: 'https://example.com/img.png', headers: {} } });
+
+      await component.saveBinaryResponse(entry);
+
+      expect(mockAppBridge.saveBase64ToFile).toHaveBeenCalledWith(
+        'base64-image-data',
+        'image/png',
+        'https://example.com/img.png'
+      );
+      expect(component.getSaveState(entry.id)).toBe('saved');
+    });
+
+    it('should set state to error when the save rejects with an unrelated error', async () => {
+      setup(undefined, undefined, {
+        saveBase64ToFile: vi.fn().mockRejectedValue(new Error('disk full')),
+      });
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+
+      expect(component.getSaveState(entry.id)).toBe('error');
+    });
+
+    it('should reset state to idle (not error) when the user cancels the save dialog', async () => {
+      setup(undefined, undefined, {
+        saveBase64ToFile: vi.fn().mockRejectedValue(new Error('save cancelled')),
+      });
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+
+      expect(component.getSaveState(entry.id)).toBe('idle');
+    });
+
+    it('should reset save state to idle after timeout', async () => {
+      setup();
+      vi.useFakeTimers();
+      const entry = makeBinaryEntry();
+
+      await component.saveBinaryResponse(entry);
+      expect(component.getSaveState(entry.id)).toBe('saved');
+
+      vi.advanceTimersByTime(2000);
+      expect(component.getSaveState(entry.id)).toBe('idle');
+
+      vi.useRealTimers();
     });
   });
 
@@ -574,6 +782,60 @@ describe('ResponsePanelComponent', () => {
       replayBtn.click();
 
       expect(spy).toHaveBeenCalledWith(entry);
+    });
+
+    // Regression: Enter/Space on the nested Replay button used to bubble up
+    // to the disclosure header before the click handler's stopPropagation
+    // could run, toggling the entry open/closed as an unwanted side effect.
+    it('should not toggle the disclosure header when Enter is pressed on the nested Replay button', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const replayBtn = el.querySelector('.response-entry__replay') as HTMLElement;
+      replayBtn.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBe('entry-1');
+    });
+
+    it('should not toggle the disclosure header when Space is pressed on the nested Replay button', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const replayBtn = el.querySelector('.response-entry__replay') as HTMLElement;
+      replayBtn.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBe('entry-1');
+    });
+
+    it('should still toggle the header via keyboard when the header itself is the event target', () => {
+      const rd = makeResponseData();
+      setup(
+        { requests: [{}], responseData: { 0: rd } },
+        { lastIdx: 0 },
+      );
+      fixture.detectChanges();
+      expect(component.expandedEntryId()).toBe('entry-1');
+
+      const el: HTMLElement = fixture.nativeElement;
+      const header = el.querySelector('.response-entry__header') as HTMLElement;
+      header.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      fixture.detectChanges();
+
+      expect(component.expandedEntryId()).toBeNull();
     });
   });
 

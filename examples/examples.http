@@ -318,14 +318,40 @@ GET https://httpbun.com/status/503
 GET https://httpbun.com/delay/1
 
 ###############################################################################
-# 8. SECRETS USAGE
+# 8. SECRETS USAGE & ENTERPRISE VAULTS
 ###############################################################################
-# Use {{secret:keyName}} to reference encrypted secrets
+# Use {{secret:keyName}} to reference credentials securely.
+# RawRequest resolves secrets dynamically in three ways:
+#
+# 1) Scheme-based Auto-detection:
+#    Provide explicit URI schemes directly inside the secret reference to query
+#    external enterprise secrets managers on-the-fly (no configuration needed):
+#    - 1Password:     {{secret:op://vault/item/field}}
+#    - Doppler:       {{secret:doppler://PROJECT/CONFIG/SECRET}}
+#    - AWS Secrets:   {{secret:aws://secret-name/key}}
+#    - Vault:         {{secret:vault://path/to/secret/key}}
+#    - Custom CLI:    {{secret:custom://secret-key}} (uses your custom CLI command template)
+#
+# 2) Configured Enterprise Provider:
+#    Set your active Secrets Provider in the Secrets Modal Settings to
+#    automatically scope standard keys. For example, if Doppler is configured as the active
+#    provider, then {{secret:API_SECRET}} will auto-query Doppler.
+#
+# 3) Local Enclave Vault (Fallback):
+#    If no external provider is configured or matching scheme is found, it will look up
+#    keyring/file-based secrets managed right inside the Secrets Modal in the UI.
 
-### Request using secrets
+### Request using explicit enterprise schemes
+# @name enterpriseSecretDemo
+# GET https://httpbun.com/get
+# Authorization: Bearer {{secret:op://private/my-api-key/credential}}
+# X-Doppler-Secret: {{secret:doppler://my-project/my-config/SOME_API_TOKEN}}
+# X-AWS-Secret: {{secret:aws://prod-api-keys/stripe_key}}
+
+### Request using standard keys (scopes via local or active enterprise provider)
 @name secretDemo
 GET https://httpbun.com/get
-# To try secrets:
+# To try local secrets:
 # 1) Open the Secrets modal
 # 2) Add secrets for the active environment:
 #    - api_token

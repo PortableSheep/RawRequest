@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, HostListener, inject } from '@angular/core';
+import { Component, ChangeDetectionStrategy, HostListener, inject, computed } from '@angular/core';
 
 import { FormsModule } from '@angular/forms';
 import { ThemeService } from '../../services/theme.service';
@@ -7,11 +7,14 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { FileSaveService } from '../../services/file-save.service';
 import { ToastService } from '../../services/toast.service';
 import { StartupService } from '../../services/startup.service';
+import { MockServerService } from '../../services/mock-server.service';
+import { DiagnosticLoggerService } from '../../services/diagnostic-logger.service';
 import { shortcutHint, getVisibleShortcuts, formatKeyCombo } from '../../logic/app/shortcut-catalog';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-header',
-  imports: [FormsModule],
+  imports: [FormsModule, IconComponent],
   templateUrl: './header.component.html',
   styleUrls: ['./header.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,6 +26,10 @@ export class HeaderComponent {
   private readonly fileSave = inject(FileSaveService);
   private readonly toast = inject(ToastService);
   readonly startup = inject(StartupService);
+  private readonly mockServer = inject(MockServerService);
+  private readonly diagnostics = inject(DiagnosticLoggerService);
+
+  readonly mockServerRunning = computed(() => this.mockServer.status().running);
 
   readonly shortcutHint = shortcutHint;
 
@@ -198,9 +205,28 @@ export class HeaderComponent {
     this.closeMoreMenu();
   }
 
+  handleOpenMockDemoClick(): void {
+    void this.openMockDemoFile();
+    this.closeMoreMenu();
+  }
+
   handleDonateClick(): void {
     this.panels.showDonationModal.set(true);
     this.closeMoreMenu();
+  }
+
+  async handleExportDiagnosticsClick(): Promise<void> {
+    this.closeMoreMenu();
+    try {
+      const path = await this.diagnostics.exportLogs();
+      if (path) {
+        this.toast.success(`Diagnostic logs exported successfully to: ${path}`);
+      }
+    } catch (err: any) {
+      if (err !== "no path selected" && err?.message !== "no path selected" && err?.message !== "SaveFileDialog cancelled") {
+        this.toast.error(`Failed to export logs: ${err?.message || err}`);
+      }
+    }
   }
 
   handleImportPostmanClick(): void {
@@ -215,6 +241,16 @@ export class HeaderComponent {
 
   handleToggleThemeClick(): void {
     this.toggleTheme();
+    this.closeMoreMenu();
+  }
+
+  handleMockServerClick(): void {
+    this.panels.consoleActiveTab.set('mock');
+    this.panels.consoleOpen.set(true);
+  }
+
+  handleMockServerClickFromMenu(): void {
+    this.handleMockServerClick();
     this.closeMoreMenu();
   }
 
@@ -427,6 +463,15 @@ export class HeaderComponent {
     } catch (error) {
       console.error("Failed to open examples file:", error);
       this.toast.error("Failed to open examples file.");
+    }
+  }
+
+  async openMockDemoFile(): Promise<void> {
+    try {
+      await this.ws.openMockDemoFile();
+    } catch (error) {
+      console.error("Failed to open mock demo file:", error);
+      this.toast.error("Failed to open mock demo file.");
     }
   }
 

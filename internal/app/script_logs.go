@@ -1,32 +1,17 @@
 package app
 
-import (
-	"strings"
-	"time"
-
-	rb "rawrequest/internal/ringbuffer"
-)
+// appendScriptLog, RecordScriptLog, GetScriptLogs, and ClearScriptLogs are
+// the internal/Wails-bound façade for script log recording. They delegate
+// storage and buffering to the concurrency-safe
+// internal/scriptlogstore.Store owned by App (a.scriptLogs); that package
+// has no dependency on Wails, so publishing the resulting entry as an event
+// remains App's responsibility here.
 
 func (a *App) appendScriptLog(level, source, message string) {
-	message = strings.TrimSpace(message)
-	if message == "" {
+	entry, ok := a.scriptLogs.Append(level, source, message)
+	if !ok {
 		return
 	}
-	if source == "" {
-		source = "script"
-	}
-	entry := ScriptLogEntry{
-		Timestamp: time.Now().UTC().Format(time.RFC3339Nano),
-		Level:     strings.ToLower(level),
-		Source:    source,
-		Message:   message,
-	}
-	a.scriptLogMutex.Lock()
-	if a.scriptLogs == nil {
-		a.scriptLogs = rb.New[ScriptLogEntry](maxScriptLogs)
-	}
-	a.scriptLogs.Append(entry)
-	a.scriptLogMutex.Unlock()
 	a.emitEvent(scriptLogEventName, entry)
 }
 
@@ -35,18 +20,9 @@ func (a *App) RecordScriptLog(level, source, message string) {
 }
 
 func (a *App) GetScriptLogs() []ScriptLogEntry {
-	a.scriptLogMutex.Lock()
-	defer a.scriptLogMutex.Unlock()
-	if a.scriptLogs == nil {
-		return nil
-	}
 	return a.scriptLogs.Items()
 }
 
 func (a *App) ClearScriptLogs() {
-	a.scriptLogMutex.Lock()
-	if a.scriptLogs != nil {
-		a.scriptLogs.Clear()
-	}
-	a.scriptLogMutex.Unlock()
+	a.scriptLogs.Clear()
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -184,22 +185,57 @@ func (a *App) getWindowStatePath() (string, error) {
 	return filepath.Join(configDir, "window-state.json"), nil
 }
 
+func (a *App) trackWindowState(ctx context.Context) {
+	ticker := time.NewTicker(2 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if a.ctx == nil {
+				continue
+			}
+			x, y := runtime.WindowGetPosition(a.ctx)
+			width, height := runtime.WindowGetSize(a.ctx)
+			maximized := runtime.WindowIsMaximised(a.ctx)
+
+			a.windowStateMu.Lock()
+			a.cachedWindowState = WindowState{
+				X:         x,
+				Y:         y,
+				Width:     width,
+				Height:    height,
+				Maximized: maximized,
+			}
+			a.windowStateMu.Unlock()
+		}
+	}
+}
+
 func (a *App) SaveWindowState() error {
 	statePath, err := a.getWindowStatePath()
 	if err != nil {
 		return err
 	}
 
-	x, y := runtime.WindowGetPosition(a.ctx)
-	width, height := runtime.WindowGetSize(a.ctx)
-	maximized := runtime.WindowIsMaximised(a.ctx)
+	a.windowStateMu.Lock()
+	state := a.cachedWindowState
+	a.windowStateMu.Unlock()
 
-	state := WindowState{
-		X:         x,
-		Y:         y,
-		Width:     width,
-		Height:    height,
-		Maximized: maximized,
+	// Fallback if loop has not run yet or a.ctx is valid
+	if state.Width == 0 && state.Height == 0 && a.ctx != nil {
+		x, y := runtime.WindowGetPosition(a.ctx)
+		width, height := runtime.WindowGetSize(a.ctx)
+		maximized := runtime.WindowIsMaximised(a.ctx)
+		state = WindowState{
+			X:         x,
+			Y:         y,
+			Width:     width,
+			Height:    height,
+			Maximized: maximized,
+		}
 	}
 
 	data, err := json.MarshalIndent(state, "", "  ")
@@ -265,7 +301,120 @@ func (a *App) SaveFileContents(filePath string, content string) (string, error) 
 	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 		return "", err
 	}
+
+	a.updateWatchedFileTime(filePath)
+
 	return filePath, nil
+}
+
+func (a *App) WatchFiles(filePaths []string) {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	newWatched := make(map[string]watchedFileState)
+	for _, fp := range filePaths {
+		if fp == "" {
+			continue
+		}
+		// Carry over any prior content hash so an existing watch entry isn't
+		// reset (which could cause a redundant "external modification" event
+		// on the next tick).
+		prev, hadPrev := a.watchedFiles[fp]
+		state := watchedFileState{}
+		if info, err := os.Stat(fp); err == nil {
+			state.modTime = info.ModTime()
+		}
+		if hadPrev {
+			state.contentHash = prev.contentHash
+		}
+		newWatched[fp] = state
+	}
+	a.watchedFiles = newWatched
+}
+
+func (a *App) updateWatchedFileTime(filePath string) {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	if a.watchedFiles == nil {
+		return
+	}
+	if state, exists := a.watchedFiles[filePath]; exists {
+		if info, err := os.Stat(filePath); err == nil {
+			state.modTime = info.ModTime()
+			// Recompute the content hash too so a freshly-saved file does not
+			// register as "externally modified" on the next watcher tick.
+			if data, err := os.ReadFile(filePath); err == nil {
+				state.contentHash = hashFileContent(data)
+			}
+			a.watchedFiles[filePath] = state
+		}
+	}
+}
+
+func (a *App) startFileWatcher(ctx context.Context) {
+	ticker := time.NewTicker(1500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.checkWatchedFiles()
+		}
+	}
+}
+
+func (a *App) checkWatchedFiles() {
+	a.watchedFilesMu.Lock()
+	defer a.watchedFilesMu.Unlock()
+
+	if a.watchedFiles == nil {
+		return
+	}
+
+	for fp, state := range a.watchedFiles {
+		info, err := os.Stat(fp)
+		if err != nil {
+			continue
+		}
+
+		modTime := info.ModTime()
+		if state.modTime.IsZero() {
+			state.modTime = modTime
+			a.watchedFiles[fp] = state
+			continue
+		}
+
+		if !modTime.After(state.modTime) {
+			continue
+		}
+
+		// mtime advanced, but the bytes may not have actually changed (e.g.
+		// `touch`, Time Machine local snapshot, our own SaveFile + a slight
+		// filesystem mtime-granularity drift). Hash the content to make sure
+		// before notifying the frontend, which would otherwise replace the
+		// editor doc and reset the user's scroll position.
+		data, err := os.ReadFile(fp)
+		if err != nil {
+			continue
+		}
+
+		newHash := hashFileContent(data)
+		state.modTime = modTime
+		if state.contentHash == newHash {
+			a.watchedFiles[fp] = state
+			continue
+		}
+		state.contentHash = newHash
+		a.watchedFiles[fp] = state
+
+		a.emitEvent("file-externally-modified", map[string]string{
+			"filePath": fp,
+			"content":  string(data),
+		})
+	}
 }
 
 func (a *App) SaveResponseFile(httpFilePath string, responseJson string) (string, error) {

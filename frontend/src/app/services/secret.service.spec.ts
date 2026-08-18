@@ -32,6 +32,10 @@ function createMockBackend(): MockBackendClient {
     verifyMasterPassword: vi.fn(),
     resetVault: vi.fn(),
     exportSecrets: vi.fn(),
+    getEnterpriseConfig: vi.fn(),
+    saveEnterpriseConfig: vi.fn(),
+    testEnterpriseSecret: vi.fn(),
+    openEnterpriseConfig: vi.fn(),
   };
 }
 
@@ -236,6 +240,17 @@ describe('SecretService', () => {
       expect(service.allSecrets()).toEqual({});
       expect(backend.resetVault).toHaveBeenCalled();
       expect(backend.getVaultInfo).toHaveBeenCalled();
+    });
+  });
+
+  describe('replaceSecrets', () => {
+    it('replaces external provider URI placeholders', async () => {
+      backend.getSecretValue.mockResolvedValue('external-token');
+
+      const result = await service.replaceSecrets('Authorization: Bearer {{secret:op://team/api/token}}', 'default');
+
+      expect(result).toBe('Authorization: Bearer external-token');
+      expect(backend.getSecretValue).toHaveBeenCalledWith('default', 'op://team/api/token');
     });
   });
 

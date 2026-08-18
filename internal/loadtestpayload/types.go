@@ -31,6 +31,13 @@ type ActiveRunProgressPayload struct {
 	Cancelled         bool   `json:"cancelled,omitempty"`
 	Aborted           bool   `json:"aborted,omitempty"`
 	AbortReason       string `json:"abortReason,omitempty"`
+	P50Ms             int64  `json:"p50,omitempty"`
+	P90Ms             int64  `json:"p90,omitempty"`
+	P95Ms             int64  `json:"p95,omitempty"`
+	P99Ms             int64  `json:"p99,omitempty"`
+	AvgMs             int64  `json:"avg,omitempty"`
+	MinMs             int64  `json:"min,omitempty"`
+	MaxMs             int64  `json:"max,omitempty"`
 }
 
 type DonePayload struct {

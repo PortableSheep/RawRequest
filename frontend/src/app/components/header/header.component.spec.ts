@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectionStrategy, signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HeaderComponent } from './header.component';
 import { ThemeService } from '../../services/theme.service';
@@ -7,6 +7,7 @@ import { PanelVisibilityService } from '../../services/panel-visibility.service'
 import { FileSaveService } from '../../services/file-save.service';
 import { ToastService } from '../../services/toast.service';
 import { StartupService } from '../../services/startup.service';
+import { MockServerService } from '../../services/mock-server.service';
 import { FileTab } from '../../models/http.models';
 
 // jsdom doesn't provide DragEvent; create a minimal stand-in.
@@ -44,6 +45,8 @@ describe('HeaderComponent', () => {
   let mockFileSave: any;
   let mockToast: any;
   let mockStartup: any;
+  let mockConsoleActiveTab: ReturnType<typeof signal<string>>;
+  let mockConsoleOpen: ReturnType<typeof signal<boolean>>;
 
   beforeEach(async () => {
     const themeMock = {
@@ -67,14 +70,19 @@ describe('HeaderComponent', () => {
       addFileFromContent: vi.fn(),
       importCollection: vi.fn().mockResolvedValue(0),
       openExamplesFile: vi.fn().mockResolvedValue(undefined),
+      openMockDemoFile: vi.fn().mockResolvedValue(undefined),
       revealInFinder: vi.fn().mockResolvedValue(undefined),
     };
+    mockConsoleActiveTab = signal('logs');
+    mockConsoleOpen = signal(false);
     mockPanels = {
       openSecretsModal: vi.fn(),
       showDonationModal: { set: vi.fn() },
       toggleHistory: vi.fn(),
       toggleOutlinePanel: vi.fn(),
       toggleCommandPalette: vi.fn(),
+      consoleActiveTab: mockConsoleActiveTab,
+      consoleOpen: mockConsoleOpen,
     };
     mockFileSave = {
       saveCurrentFile: vi.fn().mockResolvedValue(undefined),
@@ -88,6 +96,10 @@ describe('HeaderComponent', () => {
     mockStartup = {
       updateService: { appVersion: vi.fn().mockReturnValue('') },
     };
+    const mockMockServer = {
+      status: signal({ running: false, port: 8080, dbPath: '' }),
+      logs: signal([]),
+    };
 
     await TestBed.configureTestingModule({
       imports: [HeaderComponent],
@@ -98,6 +110,7 @@ describe('HeaderComponent', () => {
         { provide: FileSaveService, useValue: mockFileSave },
         { provide: ToastService, useValue: mockToast },
         { provide: StartupService, useValue: mockStartup },
+        { provide: MockServerService, useValue: mockMockServer },
       ],
     })
     .overrideComponent(HeaderComponent, {
@@ -441,6 +454,18 @@ describe('HeaderComponent', () => {
     expect(component.moreMenu.show).toBe(false);
   });
 
+  it('should call ws.openMockDemoFile from more menu', () => {
+    component.moreMenu = { show: true, x: 0, y: 0 };
+    fixture.detectChanges();
+
+    const items = fixture.nativeElement.querySelectorAll('.rr-menu--more .rr-menu__item') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(items).find((el) => el.textContent?.includes('Open Mock API Demo'))!;
+    btn.click();
+
+    expect(mockWs.openMockDemoFile).toHaveBeenCalled();
+    expect(component.moreMenu.show).toBe(false);
+  });
+
   it('should call panels.showDonationModal.set from more menu', () => {
     component.moreMenu = { show: true, x: 0, y: 0 };
     fixture.detectChanges();
@@ -498,6 +523,45 @@ describe('HeaderComponent', () => {
     btn.click();
 
     expect(mockPanels.openSecretsModal).toHaveBeenCalled();
+  });
+
+  // ── Responsive header strategy ──────────────────────────────────────
+
+  it('marks the Secrets and Mock Server topbar buttons as collapsible for narrow widths', () => {
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.rr-topbar__right .rr-btn') as NodeListOf<HTMLButtonElement>;
+    const secretsBtn = Array.from(buttons).find((el) => el.textContent?.includes('Secrets'))!;
+    const mockServerBtn = Array.from(buttons).find((el) => el.textContent?.includes('Mock Server'))!;
+
+    expect(secretsBtn.classList.contains('header-collapsible-action')).toBe(true);
+    expect(mockServerBtn.classList.contains('header-collapsible-action')).toBe(true);
+  });
+
+  it('should call handleMockServerClick from mock server button in topbar', () => {
+    fixture.detectChanges();
+
+    const buttons = fixture.nativeElement.querySelectorAll('.rr-topbar__right .rr-btn') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(buttons).find((el) => el.textContent?.includes('Mock Server'))!;
+    btn.click();
+
+    expect(mockConsoleActiveTab()).toBe('mock');
+    expect(mockConsoleOpen()).toBe(true);
+  });
+
+  it('offers a Mock Server entry in the More menu so the action stays reachable once the topbar button collapses', () => {
+    component.moreMenu = { show: true, x: 0, y: 0 };
+    fixture.detectChanges();
+
+    const items = fixture.nativeElement.querySelectorAll('.rr-menu--more .rr-menu__item') as NodeListOf<HTMLButtonElement>;
+    const btn = Array.from(items).find((el) => el.textContent?.includes('Mock Server'))!;
+    expect(btn).toBeTruthy();
+
+    btn.click();
+
+    expect(mockConsoleActiveTab()).toBe('mock');
+    expect(mockConsoleOpen()).toBe(true);
+    expect(component.moreMenu.show).toBe(false);
   });
 
   it('should call panels.toggleHistory from more menu', () => {

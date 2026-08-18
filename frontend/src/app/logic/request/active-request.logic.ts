@@ -7,6 +7,7 @@ export type ActiveRequestInfo = {
   id?: string;
   label: string;
   requestIndex: number;
+  request: Request;
   canCancel: boolean;
   type: 'single' | 'chain' | 'load';
   startedAt: number;
@@ -51,6 +52,7 @@ export function buildActiveRequestInfo(
     id: buildRequestToken(fileId, requestIndex, nowMs),
     label: buildRequestLabel(request),
     requestIndex,
+    request: { ...request },
     canCancel: true,
     type: deriveActiveRequestType(request),
     startedAt: nowMs

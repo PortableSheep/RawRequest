@@ -16,6 +16,22 @@ export namespace app {
 	        this.isFirstRun = source["isFirstRun"];
 	    }
 	}
+	export class MockServerStatus {
+	    running: boolean;
+	    port: number;
+	    dbPath: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MockServerStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.running = source["running"];
+	        this.port = source["port"];
+	        this.dbPath = source["dbPath"];
+	    }
+	}
 	export class ReleaseInfo {
 	    version: string;
 	    name: string;
@@ -151,6 +167,101 @@ export namespace importers {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Files = this.convertValues(source["Files"], ImportedFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+
+}
+
+export namespace secretvaultlogic {
+	
+	export class AWSConfig {
+	    _comment?: string;
+	    region: string;
+	    profile: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AWSConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this._comment = source["_comment"];
+	        this.region = source["region"];
+	        this.profile = source["profile"];
+	    }
+	}
+	export class DopplerConfig {
+	    _comment?: string;
+	    project: string;
+	    config: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new DopplerConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this._comment = source["_comment"];
+	        this.project = source["project"];
+	        this.config = source["config"];
+	    }
+	}
+	export class VaultConfig {
+	    _comment?: string;
+	    address: string;
+	    token: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new VaultConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this._comment = source["_comment"];
+	        this.address = source["address"];
+	        this.token = source["token"];
+	    }
+	}
+	export class EnterpriseConfig {
+	    _comment?: string;
+	    provider: string;
+	    _customCommandComment?: string;
+	    customCommand: string;
+	    aws: AWSConfig;
+	    doppler: DopplerConfig;
+	    vault: VaultConfig;
+	
+	    static createFrom(source: any = {}) {
+	        return new EnterpriseConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this._comment = source["_comment"];
+	        this.provider = source["provider"];
+	        this._customCommandComment = source["_customCommandComment"];
+	        this.customCommand = source["customCommand"];
+	        this.aws = this.convertValues(source["aws"], AWSConfig);
+	        this.doppler = this.convertValues(source["doppler"], DopplerConfig);
+	        this.vault = this.convertValues(source["vault"], VaultConfig);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

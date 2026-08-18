@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"rawrequest/internal/secretvaultlogic"
+
 	"github.com/gen2brain/beeep"
 )
 
@@ -98,6 +100,46 @@ func (a *App) SendNotification(title, message string) error {
 	}
 	return beeep.Notify(title, message, "")
 }
+
+func (a *App) GetEnterpriseConfig() (*secretvaultlogic.EnterpriseConfig, error) {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return nil, err
+	}
+	return vault.GetEnterpriseConfig()
+}
+
+func (a *App) SaveEnterpriseConfig(cfg *secretvaultlogic.EnterpriseConfig) error {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return err
+	}
+	return vault.SaveEnterpriseConfig(cfg)
+}
+
+func (a *App) TestEnterpriseSecret(key string) (string, error) {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return "", err
+	}
+	return vault.TestEnterpriseSecret(key)
+}
+
+func (a *App) OpenEnterpriseConfig() error {
+	vault, err := a.getSecretVault()
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(vault.dir, "secrets-config.json")
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		cfg := secretvaultlogic.DefaultConfig()
+		if err := secretvaultlogic.SaveConfig(vault.dir, cfg); err != nil {
+			return err
+		}
+	}
+	return a.RevealInFinder(configPath)
+}
+
 
 func (a *App) getSecretVault() (*SecretVault, error) {
 	a.secretVaultOnce.Do(func() {

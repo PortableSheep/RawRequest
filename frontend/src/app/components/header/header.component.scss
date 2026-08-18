@@ -49,7 +49,7 @@
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--rr-text-muted-color);
+  color: var(--rr-text-muted);
 }
 
 .rr-shortcuts__row {
@@ -62,7 +62,7 @@
 
 .rr-shortcuts__label {
   font-size: 13px;
-  color: var(--rr-text-color);
+  color: var(--rr-text);
 }
 
 .rr-shortcuts__kbd {
@@ -70,8 +70,48 @@
   font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
-  background: var(--rr-bg-color);
+  background: var(--rr-surface-3);
   border: 1px solid var(--rr-border-color);
-  color: var(--rr-text-muted-color);
+  color: var(--rr-text-muted);
   white-space: nowrap;
+}
+
+.status-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #71717a; // Gray
+  display: inline-block;
+  transition: background 150ms ease, box-shadow 150ms ease;
+
+  &--online {
+    background: #10b981; // Green
+    box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+    animation: status-pulse 2s infinite;
+  }
+}
+
+@keyframes status-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(16, 185, 129, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+// Responsive header strategy: below this width the topbar is too dense for
+// every ambient action to fit alongside the tab strip, the env select, and
+// the save/new/open/shortcuts/kebab cluster. Rather than letting buttons
+// wrap or squeeze (or dropping functionality), the least-essential actions
+// collapse into the existing "More actions" overflow menu, which already
+// carries duplicate entries for Secrets and Mock Server for exactly this
+// case.
+@media (max-width: 900px) {
+  .header-collapsible-action {
+    display: none;
+  }
 }

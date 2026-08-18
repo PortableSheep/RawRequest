@@ -22,21 +22,21 @@ go generate ./...
 
 Go code is formatted with `gofmt` (standard Go formatting).
 
-### Frontend (Angular + Jest)
+### Frontend (Angular + Vitest)
 ```bash
 cd frontend
 
 # Install dependencies
 npm ci
 
-# Run all tests
-npm test -- --runInBand
+# Run all tests (vitest run)
+npm test
 
 # Run tests for a specific file
-npm test -- request.component.spec.ts
+npx vitest run request.component.spec.ts
 
-# Run tests in watch mode
-npm test:watch
+# Run tests in watch mode (vitest)
+npm run test:watch
 
 # Build frontend
 npm run build
@@ -53,9 +53,18 @@ wails build
 
 ## Architecture
 
+See [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md) for the canonical, more
+detailed architecture reference (entry points, generated code, build
+requirements). Summary below.
+
 ### Backend Structure
 
-**Entry Point**: `app.go` defines the `App` struct which is the main Wails application bound to the frontend. Key responsibilities:
+**Entry Points**: `main.go` (repo root) is the actual process entry point —
+it dispatches CLI/MCP/service commands via `internal/cli` or falls through to
+`wails.Run(...)` for GUI mode, and embeds `frontend/dist` + `examples/` via
+`//go:embed`. `internal/app/app.go` defines the `App` struct, which is the
+Wails-bound application object containing most backend business logic. Key
+responsibilities:
 - Variable and environment management (`variables`, `environments`, `currentEnv`)
 - Request execution orchestration
 - Secret vault integration (`SecretVault`)
@@ -91,12 +100,12 @@ wails build
 **Framework**: Angular 21 with standalone components (no modules)
 
 **Key Patterns**:
-- **Logic separation**: Unit-testable, deterministic logic lives in `*.logic.ts` files with Jest specs
+- **Logic separation**: Unit-testable, deterministic logic lives in `*.logic.ts` files with Vitest specs
 - **Components**: UI components in `*.component.ts` files, orchestrate logic and interact with Wails bindings
 - **Service-style logic**: Logic files in `frontend/src/app/logic/` organized by feature (app, active-run, history, layout, request)
 
 **Wails Integration**: 
-- Frontend calls Go via `@wailsjs/go/main/App` bindings (auto-generated)
+- Frontend calls Go via `@wailsjs/go/app/App` bindings (auto-generated)
 - Go emits events to frontend via `runtime.EventsEmit(ctx, eventName, data)`
 - Example: Script logs emitted as `"script-log"` events, received by frontend
 
@@ -132,10 +141,11 @@ Variables set via `setVar()` do NOT need to be pre-declared with `@varName =` di
 
 ### Frontend Code Organization
 - **Small, testable components**: Always aim for creating smaller components that are fully testable. Extract distinct responsibilities into dedicated services or sub-components rather than building monolithic components. A component over ~200 lines likely has multiple concerns that should be separated.
-- **Testable logic**: Extract to `*.logic.ts` with pure functions, test with Jest
+- **Testable logic**: Extract to `*.logic.ts` with pure functions, test with Vitest
 - **Component tests**: Focus on user interaction, not business logic
 - **Service extraction**: When a component manages state or orchestrates complex behavior (layout, keyboard shortcuts, panel visibility, request execution), extract that logic into an `@Injectable` service with its own tests
-- **Wails bindings**: Import from `@wailsjs/go/main/App`, never commit changes to `wailsjs/` (auto-generated)
+- **Wails bindings**: Import from `@wailsjs/go/app/App`, never commit changes to `wailsjs/` (auto-generated)
+- **Feature folders**: Cohesive, feature-owned components/logic/services live under `frontend/src/app/features/<feature>/` (e.g. `features/editor/`), migrated incrementally from the legacy flat `components/` layout. A feature exposes its public surface via `index.ts` (e.g. `EditorComponent`); code outside the feature should import from that barrel rather than reaching into internal files. Genuinely shared UI/core services (e.g. `services/`, `utils/`, `logic/`, `models/`) stay outside any feature folder.
 
 ### Secret Management
 - Secrets stored encrypted in OS keyring (macOS Keychain, Windows Credential Manager, Linux Secret Service)
@@ -151,10 +161,6 @@ Variables set via `setVar()` do NOT need to be pre-declared with `@varName =` di
 ### Load Testing
 - Triggered via `@load` directive with config:
   ```
-  @load
-  duration: 60s
-  users: 100
-  rampUp: 10s
-  targetRPS: 500
+  @load duration=60s users=100 rampUp=10s rps=500
   ```
 - Results include percentile breakdowns, error rates, timing histograms

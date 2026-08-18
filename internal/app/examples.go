@@ -28,3 +28,11 @@ func (a *App) GetExamplesFile() (*ExamplesForFirstRunResponse, error) {
 	}
 	return &ExamplesForFirstRunResponse{Content: string(content), FilePath: "examples.http", IsFirstRun: false}, nil
 }
+
+func (a *App) GetMockDemoFile() (*ExamplesForFirstRunResponse, error) {
+	content, err := fs.ReadFile(a.examplesFS, "examples/mock_demo.http")
+	if err != nil {
+		return nil, err
+	}
+	return &ExamplesForFirstRunResponse{Content: string(content), FilePath: "mock_demo.http", IsFirstRun: false}, nil
+}

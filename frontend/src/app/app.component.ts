@@ -11,8 +11,7 @@ import {
 } from "@angular/core";
 import { CommonModule } from "@angular/common";
 import { FormsModule } from "@angular/forms";
-import { EditorComponent } from "./components/editor/editor.component";
-import { RequestManagerComponent } from "./components/request-manager/request-manager.component";
+import { EditorComponent } from "./features/editor";
 import {
   HeaderComponent,
   ResponsePanelComponent,
@@ -32,9 +31,6 @@ import { ToastContainerComponent } from "./components/toast-container/toast-cont
 import { VersionManagerComponent } from "./components/version-manager/version-manager.component";
 import {
   FileTab,
-  ResponseData,
-  HistoryItem,
-  ActiveRunProgress,
   ChainEntryPreview,
 } from "./models/http.models";
 import { SecretService } from "./services/secret.service";
@@ -55,6 +51,7 @@ import { RequestExecutionService } from "./services/request-execution.service";
 import { WorkspaceStateService } from "./services/workspace-state.service";
 import { FileSaveService } from "./services/file-save.service";
 import { StartupService } from "./services/startup.service";
+import { DiagnosticLoggerService } from "./services/diagnostic-logger.service";
 
 @Component({
   selector: "app-root",
@@ -63,7 +60,6 @@ import { StartupService } from "./services/startup.service";
     CommonModule,
     FormsModule,
     EditorComponent,
-    RequestManagerComponent,
     HeaderComponent,
     ResponsePanelComponent,
     HistorySidebarComponent,
@@ -99,22 +95,21 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly fileSave = inject(FileSaveService);
   readonly startup = inject(StartupService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly diagnostics = inject(DiagnosticLoggerService);
 
   readonly shortcutHint = shortcutHint;
 
   @ViewChild("mainSplit") mainSplitEl?: ElementRef<HTMLElement>;
-  @ViewChild(RequestManagerComponent) requestManager!: RequestManagerComponent;
   @ViewChild("editorComponent") editorComponent!: EditorComponent;
   @ViewChild("snippetModal") snippetModal!: ScriptSnippetModalComponent;
 
   // Delegated signal accessors for template bindings
-  get filesSignal() { return this.ws.files; }
-  get currentFileIndexSignal() { return this.ws.currentFileIndex; }
   get currentFileView() { return this.ws.currentFileView; }
   get currentEnv() { return this.ws.currentEnv; }
   get currentFileRequestNames() { return this.ws.currentFileRequestNames; }
   get isRequestRunningSignal() { return this.reqExec.isRequestRunningSignal; }
   get pendingRequestIndexSignal() { return this.reqExec.pendingRequestIndexSignal; }
+  get lastExecutedRequestIndexSignal() { return this.reqExec.lastExecutedRequestIndexSignal; }
 
   // Imperative accessors for template/logic
   get isRequestRunning() { return this.reqExec.isRequestRunning; }
@@ -136,9 +131,28 @@ export class AppComponent implements OnInit, OnDestroy {
     this.splitPane.refreshSplitLayoutState();
     this.registerKeyboardShortcuts();
     void this.startup.bootstrap(this.destroy$, (idx) => this.onRequestExecute(idx));
+
+    // Telemetry: initial boot log
+    this.diagnostics.info("RawRequest App Booting / Initializing");
+
+    // Global drag and drop block to prevent WKWebView reload navigation
+    document.addEventListener("dragover", (e) => e.preventDefault(), false);
+    document.addEventListener("drop", (e) => e.preventDefault(), false);
+
+    // Global unhandled error capturing
+    window.onerror = (message, source, lineno, colno, error) => {
+      const errorDetails = `Message: ${message} | Source: ${source}:${lineno}:${colno}`;
+      this.diagnostics.log('FATAL', `Unhandled JS Runtime Error: ${errorDetails} | ${error ? error.stack || error : ''}`);
+      return false; // Let browser keep its standard console logs as well
+    };
+
+    window.onunhandledrejection = (event) => {
+      this.diagnostics.log('FATAL', `Unhandled Promise Rejection: ${event.reason?.stack || event.reason}`);
+    };
   }
 
   ngOnDestroy() {
+    this.diagnostics.info("RawRequest App Destroyed / Shutting Down");
     this.keyboardShortcuts.unregisterMany(this.SHORTCUT_IDS);
     this.destroy$.next();
     this.destroy$.complete();
@@ -178,19 +192,6 @@ export class AppComponent implements OnInit, OnDestroy {
 
   // --- Workspace state delegation ---
 
-  onFilesChange(files: FileTab[]) {
-    this.ws.onFilesChange(files);
-  }
-
-  onCurrentFileIndexChange(index: number) {
-    this.ws.onCurrentFileIndexChange(index);
-  }
-
-  onCurrentEnvChange(env: string) {
-    this.ws.onCurrentEnvChange(env);
-  }
-
-  // Debounced editor content change
   onEditorContentChange(content: string) {
     if (this.parseDebounceTimer) {
       clearTimeout(this.parseDebounceTimer);
@@ -205,7 +206,6 @@ export class AppComponent implements OnInit, OnDestroy {
   // --- Request execution ---
 
   onRequestExecute(requestIndex: number) {
-    this.reqExec.setDelegate(this.requestManager);
     this.reqExec.onRequestExecute(
       requestIndex,
       this.ws.files(),
@@ -216,7 +216,6 @@ export class AppComponent implements OnInit, OnDestroy {
   }
 
   onReplayRequest(entry: ChainEntryPreview) {
-    this.reqExec.setDelegate(this.requestManager);
     this.reqExec.onReplayRequest(
       entry,
       this.ws.files(),
@@ -224,18 +223,6 @@ export class AppComponent implements OnInit, OnDestroy {
       this.ws.currentEnv(),
       this.cdr,
     );
-  }
-
-  onRequestExecuted(result: { requestIndex: number; response: ResponseData }) {
-    this.reqExec.onRequestExecuted(result);
-  }
-
-  onRequestProgress(progress: ActiveRunProgress) {
-    this.reqExec.onRequestProgress(progress);
-  }
-
-  onHistoryUpdated(event: { fileId: string; history: HistoryItem[] }) {
-    this.ws.onHistoryUpdated(event);
   }
 
   // --- UI handlers ---
@@ -321,6 +308,7 @@ export class AppComponent implements OnInit, OnDestroy {
   private readonly shortcutActions: Record<string, () => void> = {
     'app:save': () => void this.saveCurrentFile(),
     'app:saveAs': () => void this.saveCurrentFileAs(),
+    'app:open': () => void this.ws.openFilesFromDisk(),
     'app:toggleHistory': () => this.panels.toggleHistory(),
     'app:toggleOutline': () => this.panels.toggleOutlinePanel(),
     'app:toggleCommandPalette': () => this.panels.toggleCommandPalette(),
@@ -329,12 +317,14 @@ export class AppComponent implements OnInit, OnDestroy {
 
   private registerKeyboardShortcuts(): void {
     this.keyboardShortcuts.registerMany(
-      SHORTCUT_CATALOG.map(entry => ({
-        id: entry.id,
-        combo: entry.combo,
-        priority: entry.priority,
-        action: this.shortcutActions[entry.id] ?? (() => {}),
-      })),
+      SHORTCUT_CATALOG
+        .filter(entry => !!this.shortcutActions[entry.id])
+        .map(entry => ({
+          id: entry.id,
+          combo: entry.combo,
+          priority: entry.priority,
+          action: this.shortcutActions[entry.id]!,
+        })),
     );
   }
 

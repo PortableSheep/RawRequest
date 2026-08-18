@@ -1,4 +1,4 @@
-import { Injectable, ChangeDetectorRef, signal, inject } from '@angular/core';
+import { Injectable, ChangeDetectorRef, signal, inject, effect, untracked } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import type {
   FileTab,
@@ -12,6 +12,8 @@ import { SecretService } from './secret.service';
 import { ToastService } from './toast.service';
 import { LoadTestVisualizationService } from './load-test-visualization.service';
 import { PanelVisibilityService } from './panel-visibility.service';
+import { WorkspaceStateService } from './workspace-state.service';
+import { RequestManagerService } from './request-manager.service';
 import {
   buildActiveRequestMeta,
   buildActiveRequestPreview,
@@ -30,14 +32,8 @@ import { consumeQueuedRequest } from '../logic/request/request-queue.logic';
 import {
   getCombinedVariablesForFile,
   getActiveEnvNameForFile,
-} from '../components/request-manager/env-vars';
+} from './request-manager/env-vars';
 import { hydrateText } from './http/hydration';
-
-/** Delegate that the host component provides so the service can trigger execution. */
-export interface RequestExecutionDelegate {
-  executeRequestByIndex(requestIndex: number, requestId?: string): Promise<void> | undefined;
-  cancelActiveRequest(): Promise<void>;
-}
 
 @Injectable({ providedIn: 'root' })
 export class RequestExecutionService {
@@ -46,6 +42,29 @@ export class RequestExecutionService {
   private readonly toast = inject(ToastService);
   readonly loadTestViz = inject(LoadTestVisualizationService);
   private readonly panels = inject(PanelVisibilityService);
+  private readonly ws = inject(WorkspaceStateService);
+  private readonly requestManager = inject(RequestManagerService);
+
+  constructor() {
+    effect(() => {
+      const activeFile = this.ws.currentFileView();
+      const tabActiveIdx = activeFile?.activeRequestIndex ?? null;
+      untracked(() => {
+        this.lastExecutedRequestIndex = tabActiveIdx;
+        this.lastExecutedRequestIndexSignal.set(tabActiveIdx);
+      });
+    });
+
+    // Stay in sync with request execution as it completes, replacing the
+    // former ViewChild + setDelegate wiring (which required AppComponent to
+    // re-register RequestManagerComponent on every execute/replay call).
+    this.requestManager.requestExecuted.subscribe((result) => {
+      this.onRequestExecuted(result);
+    });
+    this.requestManager.requestProgress.subscribe((progress) => {
+      this.onRequestProgress(progress);
+    });
+  }
 
   // --- Signals (reactive state exposed to templates) ---
   readonly isRequestRunningSignal = signal<boolean>(false);
@@ -62,8 +81,6 @@ export class RequestExecutionService {
   isCancellingActiveRequest = false;
   downloadProgress: { downloaded: number; total: number } | null = null;
 
-  private delegate: RequestExecutionDelegate | null = null;
-
   /** Wire up the download-progress subscription. Call once during app init. */
   subscribeToDownloadProgress(destroy$: Subject<void>): void {
     this.httpService.downloadProgress$
@@ -77,11 +94,6 @@ export class RequestExecutionService {
           this.downloadProgressSignal.set(this.downloadProgress);
         }
       });
-  }
-
-  /** Register the component that actually runs requests (RequestManagerComponent). */
-  setDelegate(delegate: RequestExecutionDelegate): void {
-    this.delegate = delegate;
   }
 
   // --- Request execution lifecycle ---
@@ -102,13 +114,11 @@ export class RequestExecutionService {
     if (!activeFile || !activeFile.requests?.[requestIndex]) {
       return;
     }
-    if (!this.delegate) {
-      return;
-    }
 
     // Clear the response panel so stale results don't linger.
     this.lastExecutedRequestIndex = null;
     this.lastExecutedRequestIndexSignal.set(null);
+    this.ws.setActiveRequestIndex(null);
 
     this.isRequestRunning = true;
     this.isRequestRunningSignal.set(true);
@@ -151,7 +161,12 @@ export class RequestExecutionService {
       cdr,
     );
 
-    const execution = this.delegate.executeRequestByIndex(
+    if (request.loadTest) {
+      this.loadTestViz.loadTestMetrics = null;
+      this.panels.showLoadTestResults.set(true);
+    }
+
+    const execution = this.requestManager.executeRequestByIndex(
       requestIndex,
       this.activeRequestInfo.id,
     );
@@ -211,6 +226,7 @@ export class RequestExecutionService {
   onRequestExecuted(result: { requestIndex: number; response: ResponseData }): void {
     this.lastExecutedRequestIndex = result.requestIndex;
     this.lastExecutedRequestIndexSignal.set(result.requestIndex);
+    this.ws.setActiveRequestIndex(result.requestIndex);
     this.resetPendingRequestState();
 
     if ((result.response as any).loadTestMetrics) {
@@ -226,12 +242,7 @@ export class RequestExecutionService {
     if (progress.requestId !== this.activeRequestInfo.id) {
       return;
     }
-    this.loadTestViz.activeRunProgress = progress;
-    if (progress.type === 'load') {
-      const sample =
-        typeof progress.activeUsers === 'number' ? progress.activeUsers : 0;
-      this.loadTestViz.pushLoadUsersSample(sample);
-    }
+    this.loadTestViz.updateProgress(progress);
   }
 
   // --- Active request helpers ---
@@ -240,24 +251,18 @@ export class RequestExecutionService {
     if (!this.activeRequestInfo) {
       return null;
     }
-    return currentFile.requests?.[this.activeRequestInfo.requestIndex] || null;
+    return this.activeRequestInfo.request;
   }
 
   getActiveRequestPreview(currentFile: FileTab): string {
     const request = this.getActiveRequestDetails(currentFile);
-    const processedUrl = this.activeRequestInfo
-      ? (currentFile.responseData?.[this.activeRequestInfo.requestIndex]
-          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
-      : undefined;
+    const processedUrl = this.activeRequestInfo?.processedUrl;
     return buildActiveRequestPreview(request, processedUrl);
   }
 
   getActiveRequestMeta(currentFile: FileTab): string {
     const request = this.getActiveRequestDetails(currentFile);
-    const processedUrl = this.activeRequestInfo
-      ? (currentFile.responseData?.[this.activeRequestInfo.requestIndex]
-          ?.processedUrl ?? this.activeRequestInfo.processedUrl)
-      : undefined;
+    const processedUrl = this.activeRequestInfo?.processedUrl;
     return buildActiveRequestMeta({
       activeRequestInfo: this.activeRequestInfo,
       isRequestRunning: this.isRequestRunning,
@@ -279,7 +284,7 @@ export class RequestExecutionService {
     const decision = decideCancelActiveRequest({
       activeRequestId: this.activeRequestInfo?.id,
       isCancelling: this.isCancellingActiveRequest,
-      hasRequestManager: Boolean(this.delegate),
+      hasRequestManager: true,
     });
     if (!decision.shouldCancel) {
       return;
@@ -287,7 +292,7 @@ export class RequestExecutionService {
 
     this.isCancellingActiveRequest = decision.isCancellingAfterStart;
     try {
-      await this.delegate!.cancelActiveRequest();
+      await this.requestManager.cancelActiveRequest();
       this.toast.info('Request cancelled');
     } catch (error) {
       console.error('Failed to cancel request', error);

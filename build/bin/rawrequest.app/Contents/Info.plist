@@ -8,7 +8,7 @@
         <key>CFBundleExecutable</key>
         <string>RawRequest</string>
         <key>CFBundleIdentifier</key>
-        <string>com.wails.RawRequest</string>
+        <string>dev.rawrequest.app</string>
         <key>CFBundleVersion</key>
         <string>1.0.0</string>
         <key>CFBundleGetInfoString</key>
@@ -25,10 +25,5 @@
         <string>Copyright © 2024 RawRequest</string>
         
         
-        <key>NSAppTransportSecurity</key>
-        <dict>
-            <key>NSAllowsLocalNetworking</key>
-            <true/>
-        </dict>
     </dict>
 </plist>

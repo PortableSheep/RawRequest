@@ -1,12 +1,13 @@
 import { TestBed } from '@angular/core/testing';
 import { ChangeDetectorRef } from '@angular/core';
 import { Subject } from 'rxjs';
-import { RequestExecutionService, RequestExecutionDelegate } from './request-execution.service';
+import { RequestExecutionService } from './request-execution.service';
 import { HttpService } from './http.service';
 import { SecretService } from './secret.service';
 import { ToastService } from './toast.service';
 import { LoadTestVisualizationService } from './load-test-visualization.service';
 import { PanelVisibilityService } from './panel-visibility.service';
+import { RequestManagerService } from './request-manager.service';
 import type { FileTab, ResponseData, ActiveRunProgress, ChainEntryPreview } from '../models/http.models';
 
 function makeFileTab(overrides: Partial<FileTab> = {}): FileTab {
@@ -35,10 +36,17 @@ function makeRequest(overrides: any = {}) {
   };
 }
 
-function makeDelegate(): { [K in keyof RequestExecutionDelegate]: vi.Mock } {
+function makeRequestManager(): {
+  executeRequestByIndex: vi.Mock;
+  cancelActiveRequest: vi.Mock;
+  requestExecuted: Subject<{ requestIndex: number; response: ResponseData }>;
+  requestProgress: Subject<ActiveRunProgress>;
+} {
   return {
     executeRequestByIndex: vi.fn(),
     cancelActiveRequest: vi.fn(),
+    requestExecuted: new Subject(),
+    requestProgress: new Subject(),
   };
 }
 
@@ -62,9 +70,29 @@ describe('RequestExecutionService', () => {
   };
   let panels: PanelVisibilityService;
   let httpService: { downloadProgress$: Subject<any> };
+  let requestManager: ReturnType<typeof makeRequestManager>;
 
   beforeEach(() => {
     const downloadProgress$ = new Subject<any>();
+    requestManager = makeRequestManager();
+
+    const mockLoadTestViz = {
+      initializeLoadRun: vi.fn(),
+      startActiveRunTick: vi.fn(),
+      stopActiveRunTick: vi.fn(),
+      applyResetPatch: vi.fn(),
+      pushLoadUsersSample: vi.fn(),
+      notifyRegisteredViews: vi.fn(),
+      updateProgress: vi.fn().mockImplementation((p) => {
+        mockLoadTestViz.activeRunProgress = p;
+        if (p.type === 'load') {
+          mockLoadTestViz.pushLoadUsersSample(p.activeUsers ?? 0);
+        }
+      }),
+      activeRunNowMs: Date.now(),
+      activeRunProgress: null,
+      loadTestMetrics: null,
+    };
 
     TestBed.configureTestingModule({
       providers: [
@@ -83,17 +111,11 @@ describe('RequestExecutionService', () => {
         },
         {
           provide: LoadTestVisualizationService,
-          useValue: {
-            initializeLoadRun: vi.fn(),
-            startActiveRunTick: vi.fn(),
-            stopActiveRunTick: vi.fn(),
-            applyResetPatch: vi.fn(),
-            pushLoadUsersSample: vi.fn(),
-            notifyRegisteredViews: vi.fn(),
-            activeRunNowMs: Date.now(),
-            activeRunProgress: null,
-            loadTestMetrics: null,
-          },
+          useValue: mockLoadTestViz,
+        },
+        {
+          provide: RequestManagerService,
+          useValue: requestManager,
         },
         PanelVisibilityService,
       ],
@@ -142,35 +164,20 @@ describe('RequestExecutionService', () => {
   describe('onRequestExecute', () => {
     it('should queue request when one is already running', () => {
       service.isRequestRunning = true;
-      const delegate = makeDelegate();
-      service.setDelegate(delegate);
 
       service.onRequestExecute(1, [makeFileTab()], 0, '', makeCdr());
 
-      expect(delegate.executeRequestByIndex).not.toHaveBeenCalled();
+      expect(requestManager.executeRequestByIndex).not.toHaveBeenCalled();
     });
 
     it('should not execute when file has no requests', () => {
-      const delegate = makeDelegate();
-      service.setDelegate(delegate);
-
       service.onRequestExecute(0, [makeFileTab()], 0, '', makeCdr());
 
-      expect(delegate.executeRequestByIndex).not.toHaveBeenCalled();
-    });
-
-    it('should not execute without a delegate', () => {
-      const file = makeFileTab({ requests: [makeRequest()] });
-      // No delegate set
-      service.onRequestExecute(0, [file], 0, '', makeCdr());
-
-      expect(service.isRequestRunning).toBe(false);
+      expect(requestManager.executeRequestByIndex).not.toHaveBeenCalled();
     });
 
     it('should set running state and delegate execution', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
 
       const file = makeFileTab({ requests: [makeRequest()] });
       service.onRequestExecute(0, [file], 0, '', makeCdr());
@@ -181,13 +188,11 @@ describe('RequestExecutionService', () => {
       expect(service.pendingRequestIndexSignal()).toBe(0);
       expect(service.activeRequestInfo).toBeTruthy();
       expect(service.isCancellingActiveRequest).toBe(false);
-      expect(delegate.executeRequestByIndex).toHaveBeenCalledWith(0, expect.any(String));
+      expect(requestManager.executeRequestByIndex).toHaveBeenCalledWith(0, expect.any(String));
     });
 
     it('should clear last executed request index', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
       service.lastExecutedRequestIndex = 2;
       service.lastExecutedRequestIndexSignal.set(2);
 
@@ -199,9 +204,7 @@ describe('RequestExecutionService', () => {
     });
 
     it('should clear download progress on new request', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
       service.downloadProgressSignal.set({ downloaded: 100, total: 200 });
 
       const file = makeFileTab({ requests: [makeRequest()] });
@@ -211,9 +214,7 @@ describe('RequestExecutionService', () => {
     });
 
     it('should initialize load test visualization', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
 
       const file = makeFileTab({ requests: [makeRequest()] });
       service.onRequestExecute(0, [file], 0, '', makeCdr());
@@ -261,6 +262,7 @@ describe('RequestExecutionService', () => {
         id: 'xyz',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -277,6 +279,7 @@ describe('RequestExecutionService', () => {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'load',
         startedAt: Date.now(),
@@ -296,9 +299,7 @@ describe('RequestExecutionService', () => {
 
   describe('onReplayRequest', () => {
     it('should replay primary entry by last executed index', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
       service.lastExecutedRequestIndexSignal.set(0);
 
       const file = makeFileTab({ requests: [makeRequest()] });
@@ -309,13 +310,11 @@ describe('RequestExecutionService', () => {
 
       service.onReplayRequest(entry, [file], 0, '', makeCdr());
 
-      expect(delegate.executeRequestByIndex).toHaveBeenCalled();
+      expect(requestManager.executeRequestByIndex).toHaveBeenCalled();
     });
 
     it('should find request by name for non-primary entry', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
 
       const file = makeFileTab({
         requests: [makeRequest({ name: 'login' }), makeRequest({ name: 'getData' })],
@@ -327,13 +326,10 @@ describe('RequestExecutionService', () => {
 
       service.onReplayRequest(entry, [file], 0, '', makeCdr());
 
-      expect(delegate.executeRequestByIndex).toHaveBeenCalled();
+      expect(requestManager.executeRequestByIndex).toHaveBeenCalled();
     });
 
     it('should toast when request not found', () => {
-      const delegate = makeDelegate();
-      service.setDelegate(delegate);
-
       const file = makeFileTab({ requests: [makeRequest({ name: 'login' })] });
       const entry: ChainEntryPreview = {
         isPrimary: false,
@@ -343,7 +339,7 @@ describe('RequestExecutionService', () => {
       service.onReplayRequest(entry, [file], 0, '', makeCdr());
 
       expect(toast.info).toHaveBeenCalledWith('Request not found in editor; cannot replay.');
-      expect(delegate.executeRequestByIndex).not.toHaveBeenCalled();
+      expect(requestManager.executeRequestByIndex).not.toHaveBeenCalled();
     });
   });
 
@@ -353,41 +349,39 @@ describe('RequestExecutionService', () => {
       expect(service.getActiveRequestDetails(file)).toBeNull();
     });
 
-    it('should return request at active index', () => {
+    it('should return the request snapshot captured when execution started', () => {
       const req = makeRequest({ name: 'test' });
+      const capturedRequest = makeRequest({ name: 'test', url: 'https://original.example' });
       service.activeRequestInfo = {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: capturedRequest,
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
       };
 
       const file = makeFileTab({ requests: [req] });
-      expect(service.getActiveRequestDetails(file)).toEqual(req);
+      expect(service.getActiveRequestDetails(file)).toBe(capturedRequest);
     });
   });
 
   describe('cancelActiveRequest', () => {
     it('should not cancel when no active request', async () => {
-      const delegate = makeDelegate();
-      service.setDelegate(delegate);
-
       await service.cancelActiveRequest();
 
-      expect(delegate.cancelActiveRequest).not.toHaveBeenCalled();
+      expect(requestManager.cancelActiveRequest).not.toHaveBeenCalled();
     });
 
     it('should cancel and toast on success', async () => {
-      const delegate = makeDelegate();
-      delegate.cancelActiveRequest.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.cancelActiveRequest.mockResolvedValue(undefined);
 
       service.activeRequestInfo = {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -396,19 +390,18 @@ describe('RequestExecutionService', () => {
       await service.cancelActiveRequest();
 
       expect(service.isCancellingActiveRequest).toBe(true);
-      expect(delegate.cancelActiveRequest).toHaveBeenCalled();
+      expect(requestManager.cancelActiveRequest).toHaveBeenCalled();
       expect(toast.info).toHaveBeenCalledWith('Request cancelled');
     });
 
     it('should toast error on cancel failure', async () => {
-      const delegate = makeDelegate();
-      delegate.cancelActiveRequest.mockRejectedValue(new Error('fail'));
-      service.setDelegate(delegate);
+      requestManager.cancelActiveRequest.mockRejectedValue(new Error('fail'));
 
       service.activeRequestInfo = {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -421,13 +414,11 @@ describe('RequestExecutionService', () => {
     });
 
     it('should not cancel when already cancelling', async () => {
-      const delegate = makeDelegate();
-      service.setDelegate(delegate);
-
       service.activeRequestInfo = {
         id: 'abc',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -436,7 +427,7 @@ describe('RequestExecutionService', () => {
 
       await service.cancelActiveRequest();
 
-      expect(delegate.cancelActiveRequest).not.toHaveBeenCalled();
+      expect(requestManager.cancelActiveRequest).not.toHaveBeenCalled();
     });
   });
 
@@ -447,6 +438,7 @@ describe('RequestExecutionService', () => {
         id: 'req-1',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -473,6 +465,7 @@ describe('RequestExecutionService', () => {
         id: 'req-1',
         label: 'test',
         requestIndex: 0,
+        request: makeRequest(),
         canCancel: true,
         type: 'single',
         startedAt: Date.now(),
@@ -494,11 +487,47 @@ describe('RequestExecutionService', () => {
     });
   });
 
+  describe('requestManager event wiring', () => {
+    it('should react to requestManager.requestExecuted without manual delegate registration', () => {
+      service.isRequestRunning = true;
+      service.isRequestRunningSignal.set(true);
+      service.pendingRequestIndex = 0;
+      service.pendingRequestIndexSignal.set(0);
+
+      requestManager.requestExecuted.next({
+        requestIndex: 3,
+        response: { status: 200 } as unknown as ResponseData,
+      });
+
+      expect(service.lastExecutedRequestIndex).toBe(3);
+      expect(service.lastExecutedRequestIndexSignal()).toBe(3);
+      expect(service.isRequestRunning).toBe(false);
+    });
+
+    it('should react to requestManager.requestProgress without manual delegate registration', () => {
+      service.activeRequestInfo = {
+        id: 'abc',
+        label: 'test',
+        requestIndex: 0,
+        request: makeRequest(),
+        canCancel: true,
+        type: 'load',
+        startedAt: Date.now(),
+      };
+
+      requestManager.requestProgress.next({
+        requestId: 'abc',
+        type: 'load',
+        activeUsers: 7,
+      } as any);
+
+      expect(loadTestViz.pushLoadUsersSample).toHaveBeenCalledWith(7);
+    });
+  });
+
   describe('queuedExecutionRequested', () => {
     it('should emit queued request index after execution completes', () => {
-      const delegate = makeDelegate();
-      delegate.executeRequestByIndex.mockResolvedValue(undefined);
-      service.setDelegate(delegate);
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
 
       // Start a request
       const file = makeFileTab({

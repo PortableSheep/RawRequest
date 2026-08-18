@@ -12,9 +12,9 @@ interface HighlightResponse {
   type: 'highlight-result';
 }
 
-const LARGE_THRESHOLD = 5000;
-const HUGE_THRESHOLD = 50000;
-const MAX_PARSE_SIZE = 2_000_000;
+const LARGE_THRESHOLD = 2000;
+const HUGE_THRESHOLD = 10000;
+const MAX_PARSE_SIZE = 500_000; // 500 KB
 
 self.onmessage = (event: MessageEvent<HighlightRequest>) => {
   const { id, content, type } = event.data;

@@ -179,6 +179,27 @@ func (sv *SecretVault) RemoveSecret(env, key string) (map[string][]string, error
 }
 
 func (sv *SecretVault) GetSecret(env, key string) (string, error) {
+	// 1. Enterprise scheme auto-detection
+	if strings.HasPrefix(key, "op://") || strings.HasPrefix(key, "doppler://") || strings.HasPrefix(key, "aws://") || strings.HasPrefix(key, "vault://") || strings.HasPrefix(key, "custom://") {
+		cfg, err := secretvaultlogic.LoadConfig(sv.dir)
+		if err == nil {
+			val, err := secretvaultlogic.ResolveSecret(key, cfg)
+			if err == nil {
+				return val, nil
+			}
+		}
+	}
+
+	// 2. Default enterprise provider check
+	cfg, err := secretvaultlogic.LoadConfig(sv.dir)
+	if err == nil && cfg.Provider != "local" {
+		val, err := secretvaultlogic.ResolveSecret(key, cfg)
+		if err == nil {
+			return val, nil
+		}
+	}
+
+	// 3. Fallback to local vault
 	env = secretvaultlogic.NormalizeEnv(env)
 	cleanedKey, err := secretvaultlogic.NormalizeKey(key)
 	if err != nil {
@@ -200,6 +221,28 @@ func (sv *SecretVault) GetSecret(env, key string) (string, error) {
 	}
 	return "", fmt.Errorf("secret %s not found in %s", cleanedKey, env)
 }
+
+func (sv *SecretVault) GetEnterpriseConfig() (*secretvaultlogic.EnterpriseConfig, error) {
+	return secretvaultlogic.LoadConfig(sv.dir)
+}
+
+func (sv *SecretVault) SaveEnterpriseConfig(cfg *secretvaultlogic.EnterpriseConfig) error {
+	cfg.Comment = "RawRequest Enterprise Secrets Configuration. Active provider can be: local, 1password, doppler, aws, vault, custom."
+	cfg.CustomCommandComment = "Custom CLI command template. Uses {{key}} token, e.g. 'gcloud secrets versions access latest --secret=\"{{key}}\"'"
+	cfg.AWS.Comment = "AWS Secrets Manager settings. Profile and Region overrides."
+	cfg.Doppler.Comment = "Doppler settings. Default fallback Project and Config."
+	cfg.Vault.Comment = "HashiCorp Vault settings. VAULT_ADDR and VAULT_TOKEN overrides."
+	return secretvaultlogic.SaveConfig(sv.dir, cfg)
+}
+
+func (sv *SecretVault) TestEnterpriseSecret(key string) (string, error) {
+	cfg, err := secretvaultlogic.LoadConfig(sv.dir)
+	if err != nil {
+		return "", err
+	}
+	return secretvaultlogic.ResolveSecret(key, cfg)
+}
+
 
 func (sv *SecretVault) loadSecretsLocked() (map[string]map[string]string, error) {
 	data, err := os.ReadFile(sv.dataPath)

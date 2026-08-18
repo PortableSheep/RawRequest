@@ -1,12 +1,14 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { PanelVisibilityService } from '../../services/panel-visibility.service';
 import { UpdateService, ReleaseInfo } from '../../services/update.service';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
+import { IconComponent } from '../icon/icon.component';
 
 @Component({
   selector: 'app-version-manager',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FocusTrapDirective, IconComponent],
   templateUrl: './version-manager.component.html',
   styleUrls: ['./version-manager.component.scss'],
 })
@@ -18,6 +20,16 @@ export class VersionManagerComponent implements OnInit {
 
   ngOnInit(): void {
     void this.updateService.listReleases();
+  }
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.panels.showVersionManager()) return;
+    if (this.confirmVersion) {
+      this.cancelInstall();
+      return;
+    }
+    this.close();
   }
 
   close(): void {

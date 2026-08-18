@@ -18,18 +18,6 @@
 
     <main class="rr-app__main">
         <div class="rr-shell">
-            <app-request-manager
-                    [files]="filesSignal()"
-                    [currentFileIndex]="currentFileIndexSignal()"
-                    [currentEnv]="currentEnv()"
-                    (filesChange)="onFilesChange($event)"
-                    (currentFileIndexChange)="onCurrentFileIndexChange($event)"
-                    (currentEnvChange)="onCurrentEnvChange($event)"
-                    (requestExecuted)="onRequestExecuted($event)"
-                    (requestProgress)="onRequestProgress($event)"
-                    (historyUpdated)="onHistoryUpdated($event)">
-            </app-request-manager>
-
             <div
                 #mainSplit
                 class="rr-split"
@@ -63,6 +51,7 @@
                     <app-editor
                         #editorComponent
                         class="rr-panel__body"
+                        [fileId]="currentFileView().id"
                         [content]="currentFileView().content"
                         [requests]="currentFileView().requests"
                         [variables]="currentFileView().variables"
@@ -71,6 +60,7 @@
                         [secrets]="allSecrets"
                         [requestNames]="currentFileRequestNames()"
                         [executingRequestIndex]="pendingRequestIndexSignal()"
+                        [lastExecutedRequestIndex]="lastExecutedRequestIndexSignal()"
                         [isBusy]="isRequestRunningSignal()"
                         (contentChange)="onEditorContentChange($event)"
                         (requestExecute)="onRequestExecute($event)">

@@ -3,11 +3,13 @@ import { Component, HostListener, input, output } from "@angular/core";
 import { BrowserOpenURL } from "../../../../wailsjs/runtime/runtime";
 
 import { FormsModule } from "@angular/forms";
+import { FocusTrapDirective } from "../../directives/focus-trap.directive";
+import { IconComponent } from "../icon/icon.component";
 
 @Component({
   selector: "app-donation-modal",
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, FocusTrapDirective, IconComponent],
   templateUrl: "./donation-modal.component.html",
   styleUrls: ["./donation-modal.component.scss"],
 })

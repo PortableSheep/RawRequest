@@ -78,6 +78,28 @@ func TestExecuteRequest_TimeoutError(t *testing.T) {
 	}
 }
 
+func TestExecuteRequest_UsesPerRequestTimeoutWhenPresent(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		time.Sleep(300 * time.Millisecond)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	runner := NewRunner(&Options{
+		Variables: make(map[string]string),
+		Timeout:   10,
+	}, "test-version")
+	result := runner.ExecuteRequest(Request{
+		Method:  http.MethodGet,
+		URL:     srv.URL,
+		Timeout: 100,
+	})
+
+	if !strings.HasPrefix(result.Error, "Request failed: ") {
+		t.Fatalf("error = %q", result.Error)
+	}
+}
+
 func TestExecuteRequest_PreScriptSetsVariable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-Token") != "from-script" {
@@ -186,6 +208,59 @@ func TestExecuteRequest_NoScriptsFlag(t *testing.T) {
 	}
 	if len(result.ScriptLogs) != 0 {
 		t.Errorf("expected no script logs with noScripts=true, got %d", len(result.ScriptLogs))
+	}
+}
+
+func TestResolveForTest_ExternalSecretURI(t *testing.T) {
+	runner := NewRunner(&Options{
+		Variables: make(map[string]string),
+	}, "test")
+	runner.SetSecretResolver(secretResolverFunc(func(env, key string) (string, error) {
+		if env != "default" || key != "custom://api-token" {
+			t.Fatalf("unexpected secret lookup env=%q key=%q", env, key)
+		}
+		return "external-api-token", nil
+	}))
+
+	got := runner.ResolveForTest("Authorization: Bearer {{secret:custom://api-token}}")
+	if got != "Authorization: Bearer external-api-token" {
+		t.Fatalf("ResolveForTest() = %q", got)
+	}
+}
+
+type secretResolverFunc func(env, key string) (string, error)
+
+func (f secretResolverFunc) GetSecret(env, key string) (string, error) {
+	return f(env, key)
+}
+
+// TestResolveForTest_VariablesTakePrecedenceOverEnvVars is a characterization
+// test locking in the runner's documented resolution order: global/session
+// variables win over a same-named environment-profile variable set via
+// SetEnvVars. MCP's handler now delegates to SetEnvVars specifically so it
+// shares this precedence instead of reimplementing its own (previously
+// divergent) merge order.
+func TestResolveForTest_VariablesTakePrecedenceOverEnvVars(t *testing.T) {
+	runner := NewRunner(&Options{
+		Variables: map[string]string{"apiKey": "fileValue"},
+	}, "test")
+	runner.SetEnvVars(map[string]string{"apiKey": "envValue", "onlyInEnv": "envOnly"})
+
+	if got := runner.ResolveForTest("key={{apiKey}}"); got != "key=fileValue" {
+		t.Fatalf("expected file/global variable to win, got %q", got)
+	}
+	if got := runner.ResolveForTest("other={{onlyInEnv}}"); got != "other=envOnly" {
+		t.Fatalf("expected env-only variable to resolve, got %q", got)
+	}
+}
+
+func TestResolveForTest_SystemEnvVar(t *testing.T) {
+	t.Setenv("RAWREQUEST_RUNNER_TEST_VAR", "from-os-env")
+	runner := NewRunner(&Options{Variables: make(map[string]string)}, "test")
+
+	got := runner.ResolveForTest("v={{env.RAWREQUEST_RUNNER_TEST_VAR}}")
+	if got != "v=from-os-env" {
+		t.Fatalf("expected system env var to resolve, got %q", got)
 	}
 }
 

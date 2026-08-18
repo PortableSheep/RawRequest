@@ -38,13 +38,13 @@ func (a *App) EnsureServiceRunning(baseURL string) error {
 		return fmt.Errorf("failed to start service process: %w", err)
 	}
 
-	a.managedServiceMu.Lock()
-	a.managedServicePID = cmd.Process.Pid
-	a.managedServiceMu.Unlock()
+	servicePID := cmd.Process.Pid
+	a.managedService.Set(servicePID)
 
-	go func() {
+	go func(pid int) {
 		_ = cmd.Wait()
-	}()
+		a.managedService.ClearIfMatch(pid)
+	}(servicePID)
 
 	if waitForServiceHealth(normalizedBaseURL, 8*time.Second) {
 		return nil
@@ -54,22 +54,12 @@ func (a *App) EnsureServiceRunning(baseURL string) error {
 	return fmt.Errorf("service startup failed at %s", normalizedBaseURL)
 }
 
+// stopManagedService stops the currently owned service process, if any. It
+// delegates ownership bookkeeping and best-effort process termination to
+// a.managedService (internal/procowner), which App uses as its
+// stopManagedSvcFn shutdown hook.
 func (a *App) stopManagedService() error {
-	a.managedServiceMu.Lock()
-	pid := a.managedServicePID
-	a.managedServicePID = 0
-	a.managedServiceMu.Unlock()
-
-	if pid <= 0 {
-		return nil
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return nil
-	}
-	_ = proc.Kill()
-	return nil
+	return a.managedService.Stop()
 }
 
 func normalizeServiceEndpoint(raw string) (baseURL string, addr string, err error) {

@@ -1,12 +1,13 @@
-import { Component, EventEmitter, Output, signal } from '@angular/core';
+import { Component, EventEmitter, Output, signal, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ScriptSnippetService, ScriptSnippet } from '../../services/script-snippet.service';
+import { FocusTrapDirective } from '../../directives/focus-trap.directive';
 
 @Component({
   selector: 'app-script-snippet-modal',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, FocusTrapDirective],
   templateUrl: './script-snippet-modal.component.html',
   styleUrl: './script-snippet-modal.component.scss'
 })
@@ -21,6 +22,12 @@ export class ScriptSnippetModalComponent {
   previewTab = signal<'pre' | 'post'>('pre');
 
   constructor(public snippetService: ScriptSnippetService) {}
+
+  @HostListener('document:keydown.escape')
+  handleEscape(): void {
+    if (!this.isOpen()) return;
+    this.close();
+  }
 
   open() {
     this.isOpen.set(true);
