@@ -242,6 +242,34 @@ describe('SecretsModalComponent', () => {
       expect(mockToast.success).toHaveBeenCalled();
     });
 
+    it('should prompt before overwriting a secret in the same environment', async () => {
+      component.newKey = 'api_key';
+      component.newValue = 'replacement';
+      component.targetEnv = 'dev';
+
+      await component.handleSave();
+
+      expect(component.secretToOverwrite).toEqual({
+        env: 'dev',
+        key: 'api_key',
+        value: 'replacement',
+      });
+      expect(mockSecretService.saveSecret).not.toHaveBeenCalled();
+    });
+
+    it('should save a secret after overwrite is confirmed', async () => {
+      component.secretToOverwrite = {
+        env: 'dev',
+        key: 'api_key',
+        value: 'replacement',
+      };
+
+      await component.confirmOverwrite();
+
+      expect(mockSecretService.saveSecret).toHaveBeenCalledWith('dev', 'api_key', 'replacement');
+      expect(component.secretToOverwrite).toBeNull();
+    });
+
     it('should clear form after save', async () => {
       component.newKey = 'key';
       component.newValue = 'val';
@@ -281,6 +309,7 @@ describe('SecretsModalComponent', () => {
       component.confirmDeleteSecret('dev', 'api_key');
       expect(component.showDeleteConfirm).toBe(true);
       expect(component.secretToDelete).toEqual({ env: 'dev', key: 'api_key' });
+      expect(mockSecretService.confirmDeleteSecret).toHaveBeenCalledWith('dev', 'api_key');
     });
 
     it('should call secretService.deleteConfirmedSecret on confirm', async () => {

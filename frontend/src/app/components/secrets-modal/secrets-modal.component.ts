@@ -70,6 +70,7 @@ export class SecretsModalComponent {
   // Delete confirmation state
   showDeleteConfirm = false;
   secretToDelete: { env: string; key: string } | null = null;
+  secretToOverwrite: { env: string; key: string; value: string } | null = null;
 
   private wasOpen = false;
 
@@ -92,6 +93,7 @@ export class SecretsModalComponent {
         this.showForgotPasswordConfirm = false;
         this.showDeleteConfirm = false;
         this.secretToDelete = null;
+        this.secretToOverwrite = null;
         
         // Reset enterprise state on open
         this.activeTab = 'secrets';
@@ -209,6 +211,10 @@ export class SecretsModalComponent {
       this.cancelDelete();
       return;
     }
+    if (this.secretToOverwrite) {
+      this.cancelOverwrite();
+      return;
+    }
     if (this.showMasterPasswordPrompt) {
       if (this.showForgotPasswordConfirm) {
         this.showForgotPasswordConfirm = false;
@@ -259,11 +265,35 @@ export class SecretsModalComponent {
   async handleSave() {
     if (!this.newKey || !this.newValue) return;
     const normalizedEnv = normalizeEnvName(this.targetEnv);
+    const normalizedKey = this.newKey.trim();
+    if (this.allSecrets()[normalizedEnv]?.includes(normalizedKey)) {
+      this.secretToOverwrite = {
+        env: normalizedEnv,
+        key: normalizedKey,
+        value: this.newValue,
+      };
+      return;
+    }
+    await this.saveSecret(normalizedEnv, normalizedKey, this.newValue);
+  }
+
+  async confirmOverwrite(): Promise<void> {
+    if (!this.secretToOverwrite) return;
+    const { env, key, value } = this.secretToOverwrite;
+    await this.saveSecret(env, key, value);
+  }
+
+  cancelOverwrite(): void {
+    this.secretToOverwrite = null;
+  }
+
+  private async saveSecret(env: string, key: string, value: string): Promise<void> {
     try {
-      await this.secretService.saveSecret(normalizedEnv, this.newKey, this.newValue);
-      this.toast.success(buildSecretSavedToast({ key: this.newKey, env: normalizedEnv }));
+      await this.secretService.saveSecret(env, key, value);
+      this.toast.success(buildSecretSavedToast({ key, env }));
       this.newKey = '';
       this.newValue = '';
+      this.secretToOverwrite = null;
     } catch (error) {
       console.error('Failed to save secret', error);
       this.toast.error('Failed to save secret');
@@ -274,6 +304,7 @@ export class SecretsModalComponent {
 
   confirmDeleteSecret(env: string, key: string): void {
     this.secretToDelete = { env, key };
+    this.secretService.confirmDeleteSecret(env, key);
     this.showDeleteConfirm = true;
   }
 
