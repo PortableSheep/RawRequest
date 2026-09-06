@@ -1,6 +1,6 @@
 module rawrequest
 
-go 1.25.5
+go 1.26.0
 
 require (
 	github.com/dop251/goja v0.0.0-20251201205617-2bb4c724c0f9
@@ -8,7 +8,7 @@ require (
 	github.com/mark3labs/mcp-go v0.58.0
 	github.com/wailsapp/wails/v2 v2.14.0
 	github.com/zalando/go-keyring v0.2.8
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/sys v0.47.0
 	modernc.org/sqlite v1.51.0
 )
