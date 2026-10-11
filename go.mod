@@ -8,9 +8,9 @@ require (
 	github.com/mark3labs/mcp-go v1.1.1
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/zalando/go-keyring v0.2.8
-	modernc.org/sqlite v1.59.0
 	golang.org/x/crypto v0.57.0
-	golang.org/x/sys v0.48.0
+	golang.org/x/sys v0.49.0
+	modernc.org/sqlite v1.59.0
 )
 
 require (
