@@ -142,7 +142,7 @@ export class RequestExecutionService {
     const envName = getActiveEnvNameForFile(activeFile, currentEnv);
     const capturedId = this.activeRequestInfo.id;
     hydrateText(request.url, variables, envName, (text, env) =>
-      this.secretService.replaceSecrets(text, env),
+      this.secretService.replaceSecrets(text, env, activeFile.filePath ?? null),
     )
       .then((resolved) => {
         if (this.activeRequestInfo?.id === capturedId) {

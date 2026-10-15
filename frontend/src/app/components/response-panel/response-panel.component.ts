@@ -63,6 +63,7 @@ export class ResponsePanelComponent implements OnDestroy {
   saveStates = signal<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   requestCollapsed = signal<Record<string, boolean>>({});
   assertionsCollapsed = signal<Record<string, boolean>>({});
+  private lastResponseRef: unknown = undefined;
   private copyTimers = new Map<string, any>();
   private saveTimers = new Map<string, any>();
 
@@ -162,7 +163,12 @@ export class ResponsePanelComponent implements OnDestroy {
       if (tabsChanged || Object.keys(currentTabs).length !== Object.keys(normalizedTabs).length) {
         this.entryTabs.set(normalizedTabs);
       }
-      const preferred = getPreferredExpandedEntryId(entries, current);
+      // A new response (e.g. a fresh chain run) always focuses the last entry in the chain,
+      // rather than whichever position happened to be expanded for the previous run.
+      const response = this.responseData();
+      const isNewResponse = response !== this.lastResponseRef;
+      this.lastResponseRef = response;
+      const preferred = getPreferredExpandedEntryId(entries, current, isNewResponse);
       if (preferred !== current) {
         this.expandedEntryId.set(preferred);
       }

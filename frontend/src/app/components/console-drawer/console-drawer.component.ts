@@ -64,6 +64,12 @@ export class ConsoleDrawerComponent implements OnInit, OnDestroy {
   private hasView = false;
   private pendingOpenAnimation = false;
 
+  // Auto-scroll state
+  private static readonly STICK_THRESHOLD_PX = 24;
+  private stickToBottom = true;
+  private lastScrollTab: string | null = null;
+  private lastScrollVisible = false;
+
   // Resize state
   panelHeight = signal<number>(380); // Default 380px
   isResizing = signal<boolean>(false);
@@ -84,6 +90,23 @@ export class ConsoleDrawerComponent implements OnInit, OnDestroy {
         return;
       }
       this.syncAnimatedState(isOpen);
+    });
+
+    effect(() => {
+      // Auto-scroll log viewports to the newest entry, unless the user has scrolled up to read history.
+      void this.scriptConsole.logs();
+      void this.mockLogs();
+      const tab = this.activeTab();
+      const visible = this.isDrawerVisible();
+      if (tab !== this.lastScrollTab || visible !== this.lastScrollVisible) {
+        this.stickToBottom = true;
+        this.lastScrollTab = tab;
+        this.lastScrollVisible = visible;
+      }
+      if (!visible || !this.stickToBottom) {
+        return;
+      }
+      this.scheduleScrollToBottom();
     });
 
     effect(() => {
@@ -131,6 +154,25 @@ export class ConsoleDrawerComponent implements OnInit, OnDestroy {
 
   handleClear() {
     this.scriptConsole.clear();
+  }
+
+  onLogScroll(event: Event) {
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const distanceFromBottom = target.scrollHeight - target.scrollTop - target.clientHeight;
+    this.stickToBottom = distanceFromBottom <= ConsoleDrawerComponent.STICK_THRESHOLD_PX;
+  }
+
+  private scheduleScrollToBottom() {
+    if (typeof requestAnimationFrame === 'undefined') return;
+    requestAnimationFrame(() => {
+      const host = this.el.nativeElement as HTMLElement | undefined;
+      const scrollers = host?.querySelectorAll?.('.console-panel__scroll') ?? [];
+      scrollers.forEach((node: Element) => {
+        const scroller = node as HTMLElement;
+        scroller.scrollTop = scroller.scrollHeight;
+      });
+    });
   }
 
   private syncAnimatedState(open: boolean, immediate = false): void {

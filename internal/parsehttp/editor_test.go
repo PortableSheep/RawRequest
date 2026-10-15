@@ -247,3 +247,19 @@ func TestSaveVariableInFile(t *testing.T) {
 		t.Errorf("expected variables block before request block: portIdx=%d, pingIdx=%d", portIdx, pingIdx)
 	}
 }
+
+func TestFormatRequestSeparatorHasLabel(t *testing.T) {
+	cases := []struct {
+		req  RequestData
+		want string
+	}{
+		{RequestData{Name: "login", Method: "POST", URL: "/login"}, "### login\n"},
+		{RequestData{Method: "GET", URL: "/me"}, "### GET /me\n"},
+	}
+	for _, c := range cases {
+		out := FormatRequest(c.req, nil)
+		if !strings.HasPrefix(out, c.want) {
+			t.Fatalf("expected prefix %q, got %q", c.want, out)
+		}
+	}
+}

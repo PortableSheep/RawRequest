@@ -9,8 +9,10 @@ import { FocusTrapDirective } from '../../directives/focus-trap.directive';
 import { IconComponent } from '../icon/icon.component';
 import {
   SecretRow, SortColumn, SortDirection,
-  buildSecretRows, sortSecretRows, filterSecretRows, countSecretUsage, toggleSort
+  buildSecretRows, sortSecretRows, filterSecretRows, countSecretUsage, toggleSort,
+  describeSecretBucket,
 } from './secrets-modal.logic';
+import { fileBaseName, fileScopedEnv } from '../../services/secret-scope.logic';
 import {
   normalizeEnvName,
   buildSecretSavedToast,
@@ -37,9 +39,17 @@ export class SecretsModalComponent {
   readonly allSecrets = this.secretService.allSecrets;
   readonly vaultInfo = this.secretService.vaultInfo;
   readonly fileContent = computed(() => this.ws.currentFileView().content);
+  readonly currentFilePath = computed(() => this.ws.currentFileView().filePath || '');
+  readonly currentFileName = computed(() => {
+    const path = this.currentFilePath();
+    return path ? fileBaseName(path) : '';
+  });
+  readonly orphanedFiles = computed<string[]>(() => this.vaultInfo()?.orphanedFiles ?? []);
 
   // Internal form state
   targetEnv = '';
+  /** 'global' = shared by every file; 'file' = only the active tab's file. */
+  targetScope: 'global' | 'file' = 'global';
   newKey = '';
   newValue = '';
   showValue = false;
@@ -79,6 +89,7 @@ export class SecretsModalComponent {
       const open = this.isOpen();
       if (open && !this.wasOpen) {
         this.targetEnv = '';
+        this.targetScope = 'global';
         this.resetConfirmText = '';
         this.showResetConfirm = false;
         this.filterQuery = '';
@@ -246,9 +257,40 @@ export class SecretsModalComponent {
 
   getDisplayRows(): SecretRow[] {
     const usageCounts = countSecretUsage(this.fileContent());
-    const rows = buildSecretRows(this.allSecrets(), usageCounts);
+    const rows = buildSecretRows(this.allSecrets(), usageCounts, this.orphanedFiles());
     const filtered = filterSecretRows(rows, this.filterQuery);
     return sortSecretRows(filtered, this.sortColumn, this.sortDirection);
+  }
+
+  describeBucket(bucket: string): string {
+    return describeSecretBucket(bucket);
+  }
+
+  fileName(path: string): string {
+    return fileBaseName(path);
+  }
+
+  /** Vault bucket the add form will write to. */
+  resolveTargetBucket(): string {
+    const env = normalizeEnvName(this.targetEnv);
+    if (this.targetScope === 'file' && this.currentFilePath()) {
+      return fileScopedEnv(this.currentFilePath(), env);
+    }
+    return env;
+  }
+
+  async cleanupOrphanedSecrets(): Promise<void> {
+    const orphans = buildSecretRows(this.allSecrets(), {}, this.orphanedFiles()).filter((r) => r.isOrphan);
+    if (!orphans.length) return;
+    try {
+      for (const row of orphans) {
+        await this.secretService.removeSecret(row.env, row.key);
+      }
+      this.toast.info(`Removed ${orphans.length} orphaned secret${orphans.length === 1 ? '' : 's'}`);
+    } catch (error) {
+      console.error('Failed to clean up orphaned secrets', error);
+      this.toast.error('Failed to clean up orphaned secrets');
+    }
   }
 
   onSortClick(column: SortColumn) {
@@ -264,7 +306,7 @@ export class SecretsModalComponent {
 
   async handleSave() {
     if (!this.newKey || !this.newValue) return;
-    const normalizedEnv = normalizeEnvName(this.targetEnv);
+    const normalizedEnv = this.resolveTargetBucket();
     const normalizedKey = this.newKey.trim();
     if (this.allSecrets()[normalizedEnv]?.includes(normalizedKey)) {
       this.secretToOverwrite = {
@@ -290,7 +332,7 @@ export class SecretsModalComponent {
   private async saveSecret(env: string, key: string, value: string): Promise<void> {
     try {
       await this.secretService.saveSecret(env, key, value);
-      this.toast.success(buildSecretSavedToast({ key, env }));
+      this.toast.success(buildSecretSavedToast({ key, env: describeSecretBucket(env) }));
       this.newKey = '';
       this.newValue = '';
       this.secretToOverwrite = null;
@@ -413,8 +455,10 @@ export class SecretsModalComponent {
 
   async loadSecretValue(env: string, key: string): Promise<void> {
     try {
-      const value = await this.secretService.getSecretValue(env, key);
-      this.revealedValues[`${env}:${key}`] = value;
+      // Exact bucket lookup: the table shows each stored value, not the
+      // value that would win after scope/env fallback.
+      const result = await this.secretService.getSecretValueExact(env, key);
+      this.revealedValues[`${env}:${key}`] = result.found ? result.value : '(error)';
     } catch (error) {
       console.error('Failed to get secret value', error);
       this.revealedValues[`${env}:${key}`] = '(error)';

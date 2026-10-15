@@ -72,6 +72,29 @@ describe('parser/parse-http-file', () => {
     expect(parsed.requests[0].group).toBe('Admin');
   });
 
+  it('parses MCP-written blocks with labeled separators and ### @group', () => {
+    const parsed = parseHttpFile([
+      '### login',
+      '@name login',
+      '### @group Auth',
+      'POST https://x/login',
+      'Content-Type: application/json',
+      '',
+      '{"a":1}',
+      '',
+      '### me',
+      '@name me',
+      '@depends login',
+      'GET https://x/me',
+      '',
+    ].join('\n'));
+
+    expect(parsed.requests.map((r) => r.name)).toEqual(['login', 'me']);
+    expect(parsed.requests[0].method).toBe('POST');
+    expect(parsed.requests[0].group).toBe('Auth');
+    expect(parsed.requests[1].method).toBe('GET');
+  });
+
   it('does not treat a second method line as a new request without a separator', () => {
     const parsed = parseHttpFile([
       'GET https://example.com/one',

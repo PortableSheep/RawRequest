@@ -228,6 +228,14 @@ directives.
   Credential Manager, Linux Secret Service).
 * Referenced in requests as `{{secret:keyName}}`.
 * Managed via the UI or `SecretVault` Go code (`internal/secretvaultlogic`).
+* Secrets can be **Global** (shared by every file) or **scoped to a single
+  `.http` file**, so two files can each define `client_secret` with different
+  values. File-scoped secrets live in the vault under a synthetic environment
+  bucket `@file:<env>:<absPath>` (see `secretvaultlogic/scope.go` and the
+  frontend mirror `services/secret-scope.logic.ts`). Lookup order is
+  file+env → file+default → env → default, in the GUI, CLI, and MCP runner.
+  File-scoped secrets whose file was deleted/renamed are reported as
+  `orphanedFiles` in vault info and can be cleaned up from the Secrets modal.
 
 ### Request Chaining
 

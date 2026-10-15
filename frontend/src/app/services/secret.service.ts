@@ -1,6 +1,7 @@
 import { Inject, Injectable, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import { BACKEND_CLIENT, BackendClientContract } from './backend-client.contract';
+import { isFileScopedEnv, secretLookupChain } from './secret-scope.logic';
 
 export type SecretIndex = Partial<Record<string, string[]>>;
 
@@ -22,6 +23,8 @@ export class SecretService {
    *  a relaunch to see the UI refresh. */
   readonly allSecrets = signal<SecretIndex>({});
   readonly vaultInfo = signal<VaultInfo | null>(null);
+  /** Absolute path of the active tab's .http file; used for file-scoped secrets. */
+  readonly activeFilePath = signal<string | null>(null);
   secretToDelete: { env: string; key: string } | null = null;
   private masterPasswordCheckDone = false;
   private masterPasswordWarningCallback: (() => void) | null = null;
@@ -65,18 +68,32 @@ export class SecretService {
     return this.lastSnapshot;
   }
 
-  async getSecretValue(env: string, key: string): Promise<string> {
+  /**
+   * Resolve a secret honoring file scope: file+env, file+default, env, default.
+   * `filePath` defaults to the active tab's file (see activeFilePath).
+   */
+  async getSecretValue(env: string, key: string, filePath?: string | null): Promise<string> {
     const normalizedEnv = this.normalizeEnv(env);
+    const scopeFile = filePath === undefined ? this.activeFilePath() : filePath;
 
-    const primary = await this.getSecretValueExact(normalizedEnv, key);
-    if (primary.found) {
-      return primary.value;
+    const chain = secretLookupChain(scopeFile, normalizedEnv);
+    if (chain.some(isFileScopedEnv) && !Object.keys(this.lastSnapshot).length) {
+      try {
+        await this.list();
+      } catch {
+        // fall through; non-file scopes still resolve directly
+      }
     }
 
-    if (normalizedEnv !== 'default') {
-      const fallback = await this.getSecretValueExact('default', key);
-      if (fallback.found) {
-        return fallback.value;
+    for (const bucket of chain) {
+      // Skip file-scoped buckets the index says don't hold this key, so we
+      // don't hit the backend (and log warnings) for every request.
+      if (isFileScopedEnv(bucket) && !this.indexHas(bucket, key)) {
+        continue;
+      }
+      const result = await this.getSecretValueExact(bucket, key);
+      if (result.found) {
+        return result.value;
       }
     }
 
@@ -84,7 +101,12 @@ export class SecretService {
     return '';
   }
 
-  private async getSecretValueExact(env: string, key: string): Promise<{ value: string; found: boolean }> {
+  private indexHas(bucket: string, key: string): boolean {
+    const keys = this.lastSnapshot[bucket];
+    return Array.isArray(keys) && keys.includes(key);
+  }
+
+  async getSecretValueExact(env: string, key: string): Promise<{ value: string; found: boolean }> {
     const cacheKey = this.buildCacheKey(env, key);
     if (this.cache.has(cacheKey)) {
       return { value: this.cache.get(cacheKey)!, found: true };
@@ -113,7 +135,7 @@ export class SecretService {
     }
   }
 
-  async replaceSecrets(input: string, env: string): Promise<string> {
+  async replaceSecrets(input: string, env: string, filePath?: string | null): Promise<string> {
     if (!input || !input.includes('{{secret:')) {
       return input;
     }
@@ -128,7 +150,7 @@ export class SecretService {
       if (replacements.has(token)) {
         continue;
       }
-      const value = await this.getSecretValue(env, token);
+      const value = await this.getSecretValue(env, token, filePath);
       replacements.set(token, value);
     }
 

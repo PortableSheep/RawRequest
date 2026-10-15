@@ -83,8 +83,8 @@ export function parseHttpFile(content: string, deps: ParseHttpFileDeps = {}): Pa
       }
       return;
     }
-    if (meta.startsWith('group:')) {
-      const group = meta.substring(6).trim();
+    if (meta.startsWith('group:') || meta.startsWith('@group ')) {
+      const group = meta.substring(meta.startsWith('@group ') ? 7 : 6).trim();
       if (applyTo === pendingMetadata) {
         (pendingMetadata as any).group = group;
       } else {

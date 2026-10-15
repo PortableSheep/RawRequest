@@ -40,12 +40,13 @@ export function getChainItemsForResponsePanel(
 
 export function getPreferredExpandedEntryId(
   entries: ChainEntryPreview[],
-  currentExpandedId: string | null
+  currentExpandedId: string | null,
+  resetToLast = false
 ): string | null {
   if (!entries.length) {
     return null;
   }
-  if (currentExpandedId && entries.some(entry => entry.id === currentExpandedId)) {
+  if (!resetToLast && currentExpandedId && entries.some(entry => entry.id === currentExpandedId)) {
     return currentExpandedId;
   }
   return entries[entries.length - 1]?.id ?? null;

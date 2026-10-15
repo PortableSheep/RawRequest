@@ -17,6 +17,7 @@ import (
 	"rawrequest/internal/mockserver"
 	se "rawrequest/internal/scriptexec"
 	sr "rawrequest/internal/scriptruntime"
+	"rawrequest/internal/secretvaultlogic"
 	tpl "rawrequest/internal/templating"
 )
 
@@ -43,6 +44,7 @@ type Runner struct {
 	timeout        time.Duration
 	version        string
 	secretResolver SecretResolver
+	secretFile     string
 	environment    string
 	logCallback    func(level, source, message string)
 }
@@ -64,6 +66,7 @@ func NewRunner(opts *Options, version string) *Runner {
 		timeout:     time.Duration(opts.Timeout) * time.Second,
 		version:     version,
 		environment: opts.Environment,
+		secretFile:  opts.File,
 	}
 }
 
@@ -553,8 +556,8 @@ func (r *Runner) resolveVariablesWithStore(input string, responseStore map[strin
 
 // lookupSecret adapts the runner's secretResolver + active environment into
 // the shared templating.SecretLookup signature used by tpl.ResolveSecrets.
-// It preserves the original fallback semantics: try the active environment
-// first, then fall back to "default" if not found there.
+// Lookup order: secrets scoped to the running .http file (active env, then
+// file default), then the active environment, then "default".
 func (r *Runner) lookupSecret(key string) (string, bool) {
 	if r.secretResolver == nil {
 		return "", false
@@ -563,9 +566,15 @@ func (r *Runner) lookupSecret(key string) (string, bool) {
 	if env == "" {
 		env = "default"
 	}
-	val, err := r.secretResolver.GetSecret(env, key)
-	if err != nil && env != "default" {
-		val, err = r.secretResolver.GetSecret("default", key)
+	var (
+		val string
+		err error
+	)
+	for _, bucket := range secretvaultlogic.SecretLookupChain(r.secretFile, env) {
+		val, err = r.secretResolver.GetSecret(bucket, key)
+		if err == nil {
+			break
+		}
 	}
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: secret '%s' not found: %s\n", key, err)

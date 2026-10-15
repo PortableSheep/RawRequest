@@ -358,6 +358,7 @@ func (h *handlers) handleRunRequest(_ context.Context, req mcp.CallToolRequest) 
 
 	// Build runner with session variables + file variables
 	opts := &cli.Options{
+		File:        file,
 		Variables:   make(map[string]string),
 		Environment: env,
 		Timeout:     30,

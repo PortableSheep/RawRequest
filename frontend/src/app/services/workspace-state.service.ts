@@ -6,6 +6,7 @@ import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
 import { APP_BRIDGE } from './app-bridge.contract';
 import { EventTransportService } from './event-transport.service';
+import { SecretService } from './secret.service';
 import {
   deriveAppStateFromWorkspaceUpdate,
 } from '../logic/app/workspace-update.logic';
@@ -24,8 +25,14 @@ export class WorkspaceStateService {
   private readonly historyStore = inject(HistoryStoreService);
   private readonly appBridge = inject(APP_BRIDGE);
   private readonly events = inject(EventTransportService);
+  private readonly secretService = inject(SecretService);
 
   constructor() {
+    effect(() => {
+      const path = this.currentFileView().filePath;
+      this.secretService.activeFilePath.set(path && path.length ? path : null);
+    });
+
     effect(() => {
       const paths = this.files()
         .map((f) => f.filePath)

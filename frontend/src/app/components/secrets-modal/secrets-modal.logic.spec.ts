@@ -4,8 +4,41 @@ import {
   filterSecretRows,
   countSecretUsage,
   toggleSort,
+  describeSecretBucket,
   SecretRow
 } from './secrets-modal.logic';
+
+describe('secrets-modal.logic file scope', () => {
+  const scoped = {
+    'default': ['client_secret'],
+    'dev': ['token'],
+    '@file:dev:/repo/a.http': ['client_secret', 'token'],
+    '@file:default:/gone/b.http': ['client_secret'],
+  };
+
+  it('marks file-scoped rows with path, env and override', () => {
+    const rows = buildSecretRows(scoped, {}, ['/gone/b.http']);
+    const a = rows.filter((r) => r.filePath === '/repo/a.http');
+    expect(a.map((r) => r.displayEnv)).toEqual(['dev', 'dev']);
+    expect(a.every((r) => r.isOverride)).toBe(true);
+    expect(a.every((r) => !r.isOrphan)).toBe(true);
+    const orphan = rows.find((r) => r.filePath === '/gone/b.http');
+    expect(orphan?.isOrphan).toBe(true);
+    expect(rows.find((r) => r.env === 'default')?.filePath).toBeUndefined();
+  });
+
+  it('describes buckets for display', () => {
+    expect(describeSecretBucket('default')).toBe('Global');
+    expect(describeSecretBucket('dev')).toBe('dev');
+    expect(describeSecretBucket('@file:dev:/repo/a.http')).toBe('dev · a.http');
+    expect(describeSecretBucket('@file:default:/repo/a.http')).toBe('Global · a.http');
+  });
+
+  it('filters by file path', () => {
+    const rows = buildSecretRows(scoped, {});
+    expect(filterSecretRows(rows, 'a.http')).toHaveLength(2);
+  });
+});
 
 describe('secrets-modal.logic', () => {
   const sampleSecrets = {

@@ -146,6 +146,10 @@ describe('response-panel.logic', () => {
       expect(getPreferredExpandedEntryId(entries, null)).toBe('c');
       expect(getPreferredExpandedEntryId(entries, 'missing')).toBe('c');
     });
+
+    it('always selects last entry when resetToLast is true (new run)', () => {
+      expect(getPreferredExpandedEntryId(entries, 'b', true)).toBe('c');
+    });
   });
 
   describe('formatBytesForResponsePanel', () => {

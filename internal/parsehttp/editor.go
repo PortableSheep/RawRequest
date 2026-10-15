@@ -128,7 +128,16 @@ func extractComments(lines []string) []string {
 // FormatRequest formats a RequestData struct into a clean .http block string.
 func FormatRequest(req RequestData, comments []string) string {
 	var sb strings.Builder
-	sb.WriteString("###\n")
+	// The separator must carry a label: the editor/frontend parser only treats
+	// "### <label>" as a request boundary (a bare "###" is read as a comment).
+	label := strings.TrimSpace(req.Name)
+	if label == "" {
+		label = strings.TrimSpace(req.Method + " " + req.URL)
+	}
+	if label == "" {
+		label = "Request"
+	}
+	sb.WriteString("### " + label + "\n")
 	
 	// Prepend developer comments
 	for _, comment := range comments {

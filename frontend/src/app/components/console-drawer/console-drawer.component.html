@@ -115,7 +115,7 @@
                 stroke-linejoin="round"
               >
                 <path stroke="none" d="M0 0h24v24H0z" />
-                <path d="M6 15l6 -6l6 6" />
+                <path d="M6 9l6 6l6 -6" />
               </svg>
               <span>Hide console</span>
             </button>
@@ -140,7 +140,7 @@
               [class.select-none]="isResizing()"
             >
               @if (scriptConsole.logs().length) {
-                <div class="console-panel__scroll" aria-live="polite">
+                <div class="console-panel__scroll" aria-live="polite" (scroll)="onLogScroll($event)">
                   @for (log of scriptConsole.logs(); track trackLogEntry($index, log)) {
                     <article
                       class="log-entry"
@@ -231,7 +231,7 @@
                 [class.select-none]="isResizing()"
               >
                 @if (mockLogs().length) {
-                  <div class="console-panel__scroll" aria-live="polite">
+                  <div class="console-panel__scroll" aria-live="polite" (scroll)="onLogScroll($event)">
                     @for (log of mockLogs(); track trackMockLogEntry($index, log)) {
                       <article
                         class="log-entry"

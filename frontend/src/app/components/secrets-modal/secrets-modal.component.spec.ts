@@ -23,7 +23,7 @@ function createMockSecretService(secrets: any = {}) {
     confirmDeleteSecret: vi.fn(),
     exportVault: vi.fn().mockResolvedValue('{}'),
     resetVaultAndClear: vi.fn().mockResolvedValue(undefined),
-    getSecretValue: vi.fn().mockResolvedValue('revealed_value'),
+    getSecretValueExact: vi.fn().mockResolvedValue({ value: 'revealed_value', found: true }),
     setMasterPasswordAndRefresh: vi.fn().mockResolvedValue(undefined),
     verifyMasterPassword: vi.fn().mockResolvedValue(true),
     getEnterpriseConfig: vi.fn().mockResolvedValue(null),
@@ -451,9 +451,9 @@ describe('SecretsModalComponent', () => {
       await component.submitMasterPassword();
       await flushPromises();
       // Three secrets configured in beforeEach: default/api_key, default/db_password, dev/api_key
-      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('default', 'api_key');
-      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('default', 'db_password');
-      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('dev', 'api_key');
+      expect(mockSecretService.getSecretValueExact).toHaveBeenCalledWith('default', 'api_key');
+      expect(mockSecretService.getSecretValueExact).toHaveBeenCalledWith('default', 'db_password');
+      expect(mockSecretService.getSecretValueExact).toHaveBeenCalledWith('dev', 'api_key');
       expect(component.getRevealedValue('default', 'api_key')).toBe('revealed_value');
     });
 
@@ -578,12 +578,12 @@ describe('SecretsModalComponent', () => {
 
     it('should load secret value from service', async () => {
       await component.loadSecretValue('default', 'api_key');
-      expect(mockSecretService.getSecretValue).toHaveBeenCalledWith('default', 'api_key');
+      expect(mockSecretService.getSecretValueExact).toHaveBeenCalledWith('default', 'api_key');
       expect(component.getRevealedValue('default', 'api_key')).toBe('revealed_value');
     });
 
     it('should handle load error gracefully', async () => {
-      mockSecretService.getSecretValue.mockRejectedValueOnce(new Error('fail'));
+      mockSecretService.getSecretValueExact.mockRejectedValueOnce(new Error('fail'));
       vi.spyOn(console, 'error').mockImplementation();
       await component.loadSecretValue('default', 'api_key');
       expect(component.getRevealedValue('default', 'api_key')).toBe('(error)');

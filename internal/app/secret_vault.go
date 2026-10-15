@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 
@@ -33,6 +34,9 @@ type VaultInfo struct {
 	EnvCount          int    `json:"envCount"`
 	KeySource         string `json:"keySource"`
 	HasMasterPassword bool   `json:"hasMasterPassword"`
+	// OrphanedFiles lists file paths that have file-scoped secrets but no
+	// longer exist on disk (deleted/renamed), so the UI can offer cleanup.
+	OrphanedFiles []string `json:"orphanedFiles"`
 }
 
 type SecretVault struct {
@@ -91,11 +95,22 @@ func (sv *SecretVault) Info() (*VaultInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	envCount := len(secrets)
+	envCount := 0
 	secretCount := 0
-	for _, envSecrets := range secrets {
+	orphaned := []string{}
+	seenOrphans := map[string]bool{}
+	for bucket, envSecrets := range secrets {
 		secretCount += len(envSecrets)
+		if _, path, ok := secretvaultlogic.ParseFileScopedEnv(bucket); ok {
+			if _, statErr := os.Stat(path); errors.Is(statErr, os.ErrNotExist) && !seenOrphans[path] {
+				seenOrphans[path] = true
+				orphaned = append(orphaned, path)
+			}
+			continue
+		}
+		envCount++
 	}
+	sort.Strings(orphaned)
 	source := sv.keySource
 	if source == "" {
 		source = "unknown"
@@ -108,6 +123,7 @@ func (sv *SecretVault) Info() (*VaultInfo, error) {
 		EnvCount:          envCount,
 		KeySource:         source,
 		HasMasterPassword: sv.HasMasterPassword(),
+		OrphanedFiles:     orphaned,
 	}, nil
 }
 

@@ -1,30 +1,57 @@
 import { SecretIndex } from '../../services/secret.service';
+import { fileBaseName, parseFileScopedEnv } from '../../services/secret-scope.logic';
 
 export type SortColumn = 'key' | 'env' | 'usage';
 export type SortDirection = 'asc' | 'desc';
 
 export interface SecretRow {
+  /** Raw vault bucket (e.g. "default", "dev", "@file:dev:/abs/path.http"). */
   env: string;
   key: string;
   isOverride: boolean;
   usage: number;
+  /** Environment name with any file scope stripped. */
+  displayEnv: string;
+  /** Set when the secret is scoped to a single .http file. */
+  filePath?: string;
+  /** File-scoped secret whose file no longer exists. */
+  isOrphan: boolean;
+}
+
+/** Human-readable label for a vault bucket, e.g. "Global", "dev", "dev · api.http". */
+export function describeSecretBucket(bucket: string): string {
+  const scoped = parseFileScopedEnv(bucket);
+  const envLabel = (env: string) => (env === 'default' ? 'Global' : env);
+  if (scoped) {
+    return `${envLabel(scoped.env)} · ${fileBaseName(scoped.filePath)}`;
+  }
+  return envLabel(bucket);
 }
 
 export function buildSecretRows(
   allSecrets: SecretIndex,
-  usageCounts: Record<string, number>
+  usageCounts: Record<string, number>,
+  orphanedFiles: readonly string[] = [],
 ): SecretRow[] {
   const result: SecretRow[] = [];
   const globalKeys = new Set(allSecrets['default'] || []);
+  const orphans = new Set(orphanedFiles);
 
   for (const env of Object.keys(allSecrets)) {
     const keys = allSecrets[env] || [];
+    const scoped = parseFileScopedEnv(env);
     for (const key of keys) {
+      const shadowsUnscoped = scoped
+        ? globalKeys.has(key) || (allSecrets[scoped.env] || []).includes(key)
+        : env !== 'default' && globalKeys.has(key);
       result.push({
         env,
         key,
-        isOverride: env !== 'default' && globalKeys.has(key),
-        usage: usageCounts[key] || 0
+        isOverride: shadowsUnscoped,
+        usage: usageCounts[key] || 0,
+        displayEnv: scoped ? scoped.env : env,
+        filePath: scoped?.filePath,
+        isOrphan: !!scoped && orphans.has(scoped.filePath),
       });
     }
   }
@@ -44,10 +71,13 @@ export function sortSecretRows(
       case 'key':
         return a.key.localeCompare(b.key) * dir;
       case 'env': {
-        // 'default' always first within same direction
-        if (a.env === 'default' && b.env !== 'default') return -1;
-        if (b.env === 'default' && a.env !== 'default') return 1;
-        return a.env.localeCompare(b.env) * dir;
+        // 'default' always first within same direction; unscoped before file-scoped
+        if (a.displayEnv === 'default' && b.displayEnv !== 'default') return -1;
+        if (b.displayEnv === 'default' && a.displayEnv !== 'default') return 1;
+        const byEnv = a.displayEnv.localeCompare(b.displayEnv);
+        if (byEnv !== 0) return byEnv * dir;
+        if (!a.filePath !== !b.filePath) return a.filePath ? 1 : -1;
+        return (a.filePath ?? '').localeCompare(b.filePath ?? '') * dir;
       }
       case 'usage':
         return (a.usage - b.usage) * dir;
@@ -64,7 +94,8 @@ export function filterSecretRows(rows: SecretRow[], query: string): SecretRow[] 
   const lower = query.toLowerCase();
   return rows.filter(r =>
     r.key.toLowerCase().includes(lower) ||
-    r.env.toLowerCase().includes(lower)
+    r.displayEnv.toLowerCase().includes(lower) ||
+    (r.filePath ?? '').toLowerCase().includes(lower)
   );
 }
 
