@@ -52,24 +52,6 @@ export namespace app {
 	        this.isCurrent = source["isCurrent"];
 	    }
 	}
-	export class ScriptLogEntry {
-	    timestamp: string;
-	    level: string;
-	    source: string;
-	    message: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ScriptLogEntry(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.timestamp = source["timestamp"];
-	        this.level = source["level"];
-	        this.source = source["source"];
-	        this.message = source["message"];
-	    }
-	}
 	export class UpdateInfo {
 	    available: boolean;
 	    currentVersion: string;
@@ -102,6 +84,7 @@ export namespace app {
 	    envCount: number;
 	    keySource: string;
 	    hasMasterPassword: boolean;
+	    orphanedFiles: string[];
 	
 	    static createFrom(source: any = {}) {
 	        return new VaultInfo(source);
@@ -116,6 +99,7 @@ export namespace app {
 	        this.envCount = source["envCount"];
 	        this.keySource = source["keySource"];
 	        this.hasMasterPassword = source["hasMasterPassword"];
+	        this.orphanedFiles = source["orphanedFiles"];
 	    }
 	}
 	export class WindowState {
@@ -190,97 +174,25 @@ export namespace importers {
 
 }
 
-export namespace secretvaultlogic {
+export namespace scriptlogstore {
 	
-	export class AWSConfig {
-	    _comment?: string;
-	    region: string;
-	    profile: string;
+	export class Entry {
+	    timestamp: string;
+	    level: string;
+	    source: string;
+	    message: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new AWSConfig(source);
+	        return new Entry(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this._comment = source["_comment"];
-	        this.region = source["region"];
-	        this.profile = source["profile"];
+	        this.timestamp = source["timestamp"];
+	        this.level = source["level"];
+	        this.source = source["source"];
+	        this.message = source["message"];
 	    }
-	}
-	export class DopplerConfig {
-	    _comment?: string;
-	    project: string;
-	    config: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DopplerConfig(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this._comment = source["_comment"];
-	        this.project = source["project"];
-	        this.config = source["config"];
-	    }
-	}
-	export class VaultConfig {
-	    _comment?: string;
-	    address: string;
-	    token: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new VaultConfig(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this._comment = source["_comment"];
-	        this.address = source["address"];
-	        this.token = source["token"];
-	    }
-	}
-	export class EnterpriseConfig {
-	    _comment?: string;
-	    provider: string;
-	    _customCommandComment?: string;
-	    customCommand: string;
-	    aws: AWSConfig;
-	    doppler: DopplerConfig;
-	    vault: VaultConfig;
-	
-	    static createFrom(source: any = {}) {
-	        return new EnterpriseConfig(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this._comment = source["_comment"];
-	        this.provider = source["provider"];
-	        this._customCommandComment = source["_customCommandComment"];
-	        this.customCommand = source["customCommand"];
-	        this.aws = this.convertValues(source["aws"], AWSConfig);
-	        this.doppler = this.convertValues(source["doppler"], DopplerConfig);
-	        this.vault = this.convertValues(source["vault"], VaultConfig);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }

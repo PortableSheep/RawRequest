@@ -12,7 +12,6 @@ import (
 
 	"rawrequest/internal/cli"
 	hcl "rawrequest/internal/httpclientlogic"
-	"rawrequest/internal/secretvaultlogic"
 )
 
 const defaultServiceAddr = "127.0.0.1:7345"
@@ -97,10 +96,6 @@ func (s *httpService) registerRoutes(mux *http.ServeMux) {
 	post("/v1/verify-master-password", s.handleVerifyMasterPassword)
 	post("/v1/reset-vault", s.handleResetVault)
 	post("/v1/export-secrets", s.handleExportSecrets)
-	post("/v1/get-enterprise-config", s.handleGetEnterpriseConfig)
-	post("/v1/save-enterprise-config", s.handleSaveEnterpriseConfig)
-	post("/v1/test-enterprise-secret", s.handleTestEnterpriseSecret)
-	post("/v1/open-enterprise-config", s.handleOpenEnterpriseConfig)
 
 	// Environment management
 	post("/v1/get-environments", s.handleGetEnvironments)
@@ -596,44 +591,6 @@ func (s *httpService) handleExportSecrets(w http.ResponseWriter, r *http.Request
 	}
 	result, err := s.app.ExportSecrets()
 	writeJSONOrError(w, result, err, http.StatusInternalServerError)
-}
-
-func (s *httpService) handleGetEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
-		return
-	}
-	result, err := s.app.GetEnterpriseConfig()
-	writeJSONOrError(w, result, err, http.StatusInternalServerError)
-}
-
-func (s *httpService) handleSaveEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	payload, ok := decodeJSONBody[secretvaultlogic.EnterpriseConfig](w, r)
-	if !ok {
-		return
-	}
-	err := s.app.SaveEnterpriseConfig(&payload)
-	writeNoContentOrError(w, err, http.StatusInternalServerError)
-}
-
-type testEnterpriseSecretPayload struct {
-	Key string `json:"key"`
-}
-
-func (s *httpService) handleTestEnterpriseSecret(w http.ResponseWriter, r *http.Request) {
-	payload, ok := decodeJSONBody[testEnterpriseSecretPayload](w, r)
-	if !ok {
-		return
-	}
-	result, err := s.app.TestEnterpriseSecret(payload.Key)
-	writeJSONOrError(w, map[string]string{"result": result}, err, http.StatusInternalServerError)
-}
-
-func (s *httpService) handleOpenEnterpriseConfig(w http.ResponseWriter, r *http.Request) {
-	if _, ok := decodeJSONBody[struct{}](w, r); !ok {
-		return
-	}
-	err := s.app.OpenEnterpriseConfig()
-	writeNoContentOrError(w, err, http.StatusInternalServerError)
 }
 
 // --- Environment management handlers ---

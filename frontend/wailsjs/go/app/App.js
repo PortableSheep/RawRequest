@@ -38,10 +38,6 @@ export function GetAppVersion() {
   return window['go']['app']['App']['GetAppVersion']();
 }
 
-export function GetEnterpriseConfig() {
-  return window['go']['app']['App']['GetEnterpriseConfig']();
-}
-
 export function GetEnvVariables(arg1) {
   return window['go']['app']['App']['GetEnvVariables'](arg1);
 }
@@ -138,10 +134,6 @@ export function MigrateResponsesFromRunLocationToHttpFile(arg1, arg2) {
   return window['go']['app']['App']['MigrateResponsesFromRunLocationToHttpFile'](arg1, arg2);
 }
 
-export function OpenEnterpriseConfig() {
-  return window['go']['app']['App']['OpenEnterpriseConfig']();
-}
-
 export function OpenFileDialog() {
   return window['go']['app']['App']['OpenFileDialog']();
 }
@@ -198,14 +190,6 @@ export function SaveBinaryResponse(arg1, arg2, arg3) {
   return window['go']['app']['App']['SaveBinaryResponse'](arg1, arg2, arg3);
 }
 
-export function SaveBinaryResponseToPath(arg1, arg2) {
-  return window['go']['app']['App']['SaveBinaryResponseToPath'](arg1, arg2);
-}
-
-export function SaveEnterpriseConfig(arg1) {
-  return window['go']['app']['App']['SaveEnterpriseConfig'](arg1);
-}
-
 export function SaveFileContents(arg1, arg2) {
   return window['go']['app']['App']['SaveFileContents'](arg1, arg2);
 }
@@ -260,10 +244,6 @@ export function StartUpdateAndRestart(arg1) {
 
 export function StopMockServer() {
   return window['go']['app']['App']['StopMockServer']();
-}
-
-export function TestEnterpriseSecret(arg1) {
-  return window['go']['app']['App']['TestEnterpriseSecret'](arg1);
 }
 
 export function VerifyMasterPassword(arg1) {

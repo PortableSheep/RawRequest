@@ -32,10 +32,6 @@ function createMockBackend(): MockBackendClient {
     verifyMasterPassword: vi.fn(),
     resetVault: vi.fn(),
     exportSecrets: vi.fn(),
-    getEnterpriseConfig: vi.fn(),
-    saveEnterpriseConfig: vi.fn(),
-    testEnterpriseSecret: vi.fn(),
-    openEnterpriseConfig: vi.fn(),
   };
 }
 
