@@ -6,9 +6,13 @@
             (drop)="handleTabStripDrop($event)"
         >
             @for (file of ws.files(); track file.id; let i = $index) {
+                @let locked = ws.tabsLocked();
                 <li class="rr-tab"
-                    draggable="true"
+                    [attr.draggable]="locked ? 'false' : 'true'"
                     [class.rr-tab--active]="ws.currentFileIndex() === i"
+                    [class.rr-tab--locked]="locked && ws.currentFileIndex() !== i"
+                    [attr.aria-disabled]="locked && ws.currentFileIndex() !== i ? 'true' : null"
+                    [attr.title]="locked && ws.currentFileIndex() !== i ? 'Locked while a request is running' : null"
                     [class.rr-tab--dragging]="draggingIndex === i"
                     [class.rr-tab--dragover]="dragOverIndex === i"
                     (dragstart)="handleTabDragStart($event, i)"
@@ -31,6 +35,7 @@
                             type="button"
                             class="rr-icon-btn rr-icon-btn--danger"
                             draggable="false"
+                            [disabled]="locked"
                             (click)="$event.stopPropagation(); $event.preventDefault(); ws.closeTab(i)"
                             title="Close File"
                         >
@@ -134,7 +139,8 @@
             type="button"
             class="rr-btn btn-ambient"
             (click)="ws.addNewTab()"
-            title="New File"
+            [disabled]="ws.tabsLocked()"
+            [title]="ws.tabsLocked() ? 'Unavailable while a request is running' : 'New File'"
             aria-label="Create new file"
         >
             <svg xmlns="http://www.w3.org/2000/svg" class="rr-btn__icon rr-icon--primary" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" /><path d="M12 5l0 14" /><path d="M5 12l14 0" /></svg>
@@ -145,6 +151,7 @@
                 type="button"
                 class="rr-btn btn-ambient"
                 (click)="openFile()"
+                [disabled]="ws.tabsLocked()"
                 title="Open File"
                 aria-label="Open existing file"
         >

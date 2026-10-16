@@ -122,6 +122,7 @@ export class RequestExecutionService {
 
     this.isRequestRunning = true;
     this.isRequestRunningSignal.set(true);
+    this.ws.setTabsLocked(true);
     this.pendingRequestIndex = requestIndex;
     this.pendingRequestIndexSignal.set(requestIndex);
     this.downloadProgress = null;
@@ -315,6 +316,7 @@ export class RequestExecutionService {
     this.isCancellingActiveRequest = patch.isCancellingActiveRequest;
 
     this.isRequestRunningSignal.set(this.isRequestRunning);
+    this.ws.setTabsLocked(this.isRequestRunning);
     this.pendingRequestIndexSignal.set(this.pendingRequestIndex);
 
     // Notify OnPush overlay so it re-renders the cleared state.

@@ -1,3 +1,4 @@
+import { WorkspaceStateService } from './workspace-state.service';
 import { TestBed } from '@angular/core/testing';
 import { ChangeDetectorRef } from '@angular/core';
 import { Subject } from 'rxjs';
@@ -221,6 +222,19 @@ describe('RequestExecutionService', () => {
 
       expect(loadTestViz.initializeLoadRun).toHaveBeenCalled();
       expect(loadTestViz.startActiveRunTick).toHaveBeenCalled();
+    });
+  });
+
+  describe('tab lock', () => {
+    it('locks workspace tabs while running and unlocks when finished', () => {
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
+      const ws = TestBed.inject(WorkspaceStateService);
+
+      service.onRequestExecute(0, [makeFileTab({ requests: [makeRequest()] })], 0, '', makeCdr());
+      expect(ws.tabsLocked()).toBe(true);
+
+      service.onRequestExecuted({ requestIndex: 0, response: { status: 200 } as unknown as ResponseData });
+      expect(ws.tabsLocked()).toBe(false);
     });
   });
 

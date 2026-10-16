@@ -5,6 +5,7 @@ import { HttpService } from './http.service';
 import { HistoryStoreService } from './history-store.service';
 import { APP_BRIDGE, type AppBridgeContract } from './app-bridge.contract';
 import { EventTransportService } from './event-transport.service';
+import { ToastService } from './toast.service';
 import type { FileTab, HistoryItem } from '../models/http.models';
 
 function makeFileTab(overrides: Partial<FileTab> = {}): FileTab {
@@ -29,6 +30,7 @@ describe('WorkspaceStateService', () => {
   let historyStore: vi.Mocked<Partial<HistoryStoreService>>;
   let appBridge: vi.Mocked<Partial<AppBridgeContract>>;
   let events: vi.Mocked<Partial<EventTransportService>>;
+  let toast: { info: vi.Mock };
 
   beforeEach(() => {
     workspaceFacade = {
@@ -79,8 +81,11 @@ describe('WorkspaceStateService', () => {
       on: vi.fn().mockReturnValue(() => {}),
     };
 
+    toast = { info: vi.fn() };
+
     TestBed.configureTestingModule({
       providers: [
+        { provide: ToastService, useValue: toast },
         WorkspaceStateService,
         { provide: WorkspaceFacadeService, useValue: workspaceFacade },
         { provide: HttpService, useValue: httpService },
@@ -113,6 +118,56 @@ describe('WorkspaceStateService', () => {
 
     it('currentFileRequestNames returns empty when no files', () => {
       expect(service.currentFileRequestNames()).toEqual([]);
+    });
+  });
+
+  describe('tab lock during request runs', () => {
+    beforeEach(() => {
+      service.applyState({
+        files: [makeFileTab({ id: 'a' }), makeFileTab({ id: 'b' })],
+        currentFileIndex: 0,
+        currentEnv: 'dev',
+      });
+      service.setTabsLocked(true);
+    });
+
+    it('blocks switching to another tab and notifies the user', () => {
+      service.onCurrentFileIndexChange(1);
+      expect(service.currentFileIndex()).toBe(0);
+      expect(toast.info).toHaveBeenCalledTimes(1);
+    });
+
+    it('allows re-selecting the current tab without a toast', () => {
+      service.onCurrentFileIndexChange(0);
+      expect(toast.info).not.toHaveBeenCalled();
+    });
+
+    it('blocks closing, adding, and reordering tabs', async () => {
+      service.closeTab(1);
+      service.closeOtherTabs(0);
+      service.addNewTab();
+      service.addFileFromContent('x.http', 'GET http://x');
+      service.reorderTabs(0, 1);
+      expect(await service.openFilesFromDisk()).toBe(false);
+      expect(await service.importCollection('postman')).toBe(0);
+      await service.openExamplesFile();
+      await service.openMockDemoFile();
+
+      expect(workspaceFacade.closeTabDerived).not.toHaveBeenCalled();
+      expect(workspaceFacade.closeOtherTabsDerived).not.toHaveBeenCalled();
+      expect(workspaceFacade.addNewTabDerived).not.toHaveBeenCalled();
+      expect(workspaceFacade.addFileFromContentDerived).not.toHaveBeenCalled();
+      expect(workspaceFacade.reorderTabsDerived).not.toHaveBeenCalled();
+      expect(appBridge.getExamplesFile).not.toHaveBeenCalled();
+      expect(appBridge.getMockDemoFile).not.toHaveBeenCalled();
+      expect(service.files().map((f) => f.id)).toEqual(['a', 'b']);
+    });
+
+    it('allows tab switching again once unlocked', () => {
+      service.setTabsLocked(false);
+      service.onCurrentFileIndexChange(1);
+      expect(service.currentFileIndex()).toBe(1);
+      expect(toast.info).not.toHaveBeenCalled();
     });
   });
 

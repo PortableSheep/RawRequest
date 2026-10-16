@@ -7,6 +7,7 @@ import { HistoryStoreService } from './history-store.service';
 import { APP_BRIDGE } from './app-bridge.contract';
 import { EventTransportService } from './event-transport.service';
 import { SecretService } from './secret.service';
+import { ToastService } from './toast.service';
 import {
   deriveAppStateFromWorkspaceUpdate,
 } from '../logic/app/workspace-update.logic';
@@ -26,6 +27,7 @@ export class WorkspaceStateService {
   private readonly appBridge = inject(APP_BRIDGE);
   private readonly events = inject(EventTransportService);
   private readonly secretService = inject(SecretService);
+  private readonly toast = inject(ToastService);
 
   constructor() {
     effect(() => {
@@ -156,6 +158,24 @@ export class WorkspaceStateService {
     return (file.requests || []).map((r) => r.name || '');
   });
 
+  /**
+   * True while a request is running. Request execution resolves the target
+   * file by current tab index when it writes results back, so switching,
+   * opening, closing or reordering tabs mid-run would misroute the response.
+   */
+  readonly tabsLocked = signal(false);
+
+  setTabsLocked(locked: boolean): void {
+    this.tabsLocked.set(locked);
+  }
+
+  /** Returns true (and notifies the user) when tab changes are blocked. */
+  private rejectIfTabsLocked(): boolean {
+    if (!this.tabsLocked()) return false;
+    this.toast.info('Tabs are locked while a request is running. Press Esc to cancel.');
+    return true;
+  }
+
   // --- State mutations ---
 
   /** Apply a derived workspace state update (files, index, env). */
@@ -235,6 +255,7 @@ export class WorkspaceStateService {
 
   /** Handle current file index changing (tab switch). */
   onCurrentFileIndexChange(index: number): void {
+    if (index !== this.currentFileIndex() && this.rejectIfTabsLocked()) return;
     this.currentFileIndex.set(index);
 
     const synced = this.workspace.syncCurrentEnvWithFile(this.files(), index);
@@ -289,6 +310,7 @@ export class WorkspaceStateService {
 
   /** Close a tab. */
   closeTab(index: number): void {
+    if (this.rejectIfTabsLocked()) return;
     const next = this.workspace.closeTabDerived(
       this.LAST_SESSION_KEY, this.files(), this.currentFileIndex(), index,
     );
@@ -298,6 +320,7 @@ export class WorkspaceStateService {
 
   /** Close all tabs except the one at keepIndex. */
   closeOtherTabs(keepIndex: number): void {
+    if (this.rejectIfTabsLocked()) return;
     const next = this.workspace.closeOtherTabsDerived(
       this.LAST_SESSION_KEY, this.files(), keepIndex,
     );
@@ -307,6 +330,7 @@ export class WorkspaceStateService {
 
   /** Add a new empty tab. */
   addNewTab(): void {
+    if (this.rejectIfTabsLocked()) return;
     const next = this.workspace.addNewTabDerived(this.LAST_SESSION_KEY, this.files());
     this.applyState(next);
     this.history.set([]);
@@ -314,6 +338,7 @@ export class WorkspaceStateService {
 
   /** Add a file from raw content (used for first-run, import). */
   addFileFromContent(fileName: string, content: string, filePath?: string): void {
+    if (this.rejectIfTabsLocked()) return;
     const next = this.workspace.addFileFromContentDerived(
       this.LAST_SESSION_KEY, this.files(), fileName, content, filePath,
     );
@@ -326,6 +351,7 @@ export class WorkspaceStateService {
 
   /** Reorder tabs via drag-and-drop. */
   reorderTabs(fromIndex: number, toIndex: number): void {
+    if (this.rejectIfTabsLocked()) return;
     const next = this.workspace.reorderTabsDerived(
       this.LAST_SESSION_KEY, this.files(), this.currentFileIndex(), fromIndex, toIndex,
     );
@@ -334,6 +360,7 @@ export class WorkspaceStateService {
 
   /** Open file(s) from disk via native dialog. Returns true if files were opened. */
   async openFilesFromDisk(): Promise<boolean> {
+    if (this.rejectIfTabsLocked()) return false;
     const results = await this.workspace.openFilesFromDisk(
       this.LAST_SESSION_KEY, this.files(),
     );
@@ -350,6 +377,7 @@ export class WorkspaceStateService {
 
   /** Import a Postman or Bruno collection from disk. Returns count of imported files, or 0. */
   async importCollection(type: 'postman' | 'bruno'): Promise<number> {
+    if (this.rejectIfTabsLocked()) return 0;
     const result = await this.workspace.importCollectionFromDisk(
       this.LAST_SESSION_KEY, this.files(), type,
     );
@@ -363,6 +391,7 @@ export class WorkspaceStateService {
 
   /** Open/upsert the examples tab. */
   async openExamplesFile(): Promise<void> {
+    if (this.rejectIfTabsLocked()) return;
     const result = await this.appBridge.getExamplesFile();
     const content = result?.content || '';
     const name = result?.filePath || 'Examples.http';
@@ -381,6 +410,7 @@ export class WorkspaceStateService {
 
   /** Open/upsert the mock demo tab. */
   async openMockDemoFile(): Promise<void> {
+    if (this.rejectIfTabsLocked()) return;
     const result = await this.appBridge.getMockDemoFile();
     const content = result?.content || '';
     const name = result?.filePath || 'mock_demo.http';

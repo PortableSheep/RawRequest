@@ -32,7 +32,7 @@ describe("ActiveRequestOverlayComponent", () => {
     mockReqExec = {
       activeRequestInfo: defaultInfo,
       isCancellingActiveRequest: false,
-      getActiveRequestDetails: vi.fn().mockReturnValue(null),
+      getActiveRequestDetails: vi.fn(() => mockReqExec.activeRequestInfo?.request ?? null),
       getActiveRequestMeta: vi.fn().mockReturnValue(""),
       getActiveRequestPreview: vi.fn().mockReturnValue(""),
       cancelActiveRequest: vi.fn().mockResolvedValue(undefined),
@@ -116,6 +116,17 @@ describe("ActiveRequestOverlayComponent", () => {
     detectChanges();
     const pill = fixture.nativeElement.querySelector(".rr-pill--method");
     expect(pill?.textContent?.trim()).toBe("GET");
+  });
+
+  it("should show the request snapshot from the run, not the current tab", () => {
+    mockWs.getCurrentFile.mockReturnValue({
+      requests: [{ method: "DELETE", url: "https://other.example.com", headers: {}, name: "Other" }],
+      responseData: {},
+    });
+    detectChanges();
+    const pill = fixture.nativeElement.querySelector(".rr-pill--method");
+    expect(pill?.textContent?.trim()).toBe("GET");
+    expect(fixture.nativeElement.querySelector(".rr-active-card__name")?.textContent?.trim()).toBe("Test");
   });
 
   it("should show load test rows when type is load", () => {

@@ -61,6 +61,19 @@
   z-index: 1;
 }
 
+.rr-tab--locked,
+.rr-tab--locked:hover {
+  opacity: 0.45;
+  cursor: not-allowed;
+  background: var(--rr-surface-2);
+  border-color: var(--rr-border-color);
+  color: var(--rr-text-subtle);
+}
+
+.rr-tab--locked .rr-tab__link {
+  cursor: not-allowed;
+}
+
 .rr-tab--closing {
   animation: rr-tab-close 150ms ease forwards;
 }

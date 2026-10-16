@@ -57,6 +57,7 @@ describe('HeaderComponent', () => {
     mockWs = {
       files: vi.fn().mockReturnValue([]),
       currentFileIndex: vi.fn().mockReturnValue(0),
+      tabsLocked: vi.fn().mockReturnValue(false),
       currentFileEnvironments: vi.fn().mockReturnValue([]),
       currentEnv: vi.fn().mockReturnValue(''),
       currentFileRequestNames: vi.fn().mockReturnValue([]),

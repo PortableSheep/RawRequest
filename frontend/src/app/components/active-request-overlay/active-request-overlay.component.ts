@@ -57,10 +57,7 @@ export class ActiveRequestOverlayComponent implements OnInit, OnDestroy {
   get activeRunProgress() { return this.loadTestViz.activeRunProgress; }
 
   get activeRequest(): Request | null {
-    const info = this.reqExec.activeRequestInfo;
-    if (!info) return null;
-    const file = this.ws.getCurrentFile();
-    return file.requests[info.requestIndex] ?? null;
+    return this.reqExec.getActiveRequestDetails(this.ws.getCurrentFile());
   }
 
   get meta(): string {
