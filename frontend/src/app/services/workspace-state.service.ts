@@ -59,7 +59,16 @@ export class WorkspaceStateService {
     );
   }
 
+  /** External edits that arrived mid-run; applied once the run finishes. */
+  private readonly deferredExternalModifications = new Map<string, string>();
+
   private handleExternalFileModification(filePath: string, newContent: string): void {
+    if (this.tabsLocked()) {
+      // Reloading reparses the file and can shift request indices under an
+      // in-flight run, so wait until it completes.
+      this.deferredExternalModifications.set(filePath, newContent);
+      return;
+    }
     const files = this.files();
     const index = files.findIndex((f) => f.filePath === filePath);
     if (index === -1) return;
@@ -159,14 +168,21 @@ export class WorkspaceStateService {
   });
 
   /**
-   * True while a request is running. Request execution resolves the target
-   * file by current tab index when it writes results back, so switching,
-   * opening, closing or reordering tabs mid-run would misroute the response.
+   * True while a request is running. Blocks tab switches/opens/closes/
+   * reorders, environment changes and external-file reloads so the run's
+   * file, env and request indices stay stable until it completes.
    */
   readonly tabsLocked = signal(false);
 
   setTabsLocked(locked: boolean): void {
     this.tabsLocked.set(locked);
+    if (!locked && this.deferredExternalModifications.size) {
+      const pending = [...this.deferredExternalModifications];
+      this.deferredExternalModifications.clear();
+      for (const [filePath, content] of pending) {
+        this.handleExternalFileModification(filePath, content);
+      }
+    }
   }
 
   /** Returns true (and notifies the user) when tab changes are blocked. */
@@ -279,6 +295,7 @@ export class WorkspaceStateService {
 
   /** Handle environment change. */
   onCurrentEnvChange(env: string): void {
+    if (this.tabsLocked()) return;
     const file = this.files()[this.currentFileIndex()];
     if (file) {
       this.replaceFileAtIndex(this.currentFileIndex(), { ...file, selectedEnv: env });

@@ -1,3 +1,4 @@
+import { buildCancelledResponse } from './request-manager/request-manager.logic';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { RequestManagerService } from './request-manager.service';
@@ -620,6 +621,29 @@ describe('RequestManagerService', () => {
       expect(spy).toHaveBeenCalledTimes(1);
       const emitted = spy.mock.calls[0][0];
       expect(emitted.response.statusText).toBe('Load Test Error');
+    });
+
+    it('should report a cancelled load test as cancelled, not an error', async () => {
+      mockHttp.executeLoadTest.mockRejectedValue({ cancelled: true });
+
+      const spy = vi.fn();
+      service.requestExecuted.subscribe(spy);
+
+      await service.executeRequest(0);
+
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.calls[0][0].response.statusText).not.toBe('Load Test Error');
+      expect(spy.mock.calls[0][0].response).toEqual(expect.objectContaining(buildCancelledResponse()));
+    });
+
+    it('should emit completion only after history is recorded', async () => {
+      const order: string[] = [];
+      mockHttp.addToHistory.mockImplementation(async () => { order.push('history'); return []; });
+      service.requestExecuted.subscribe(() => order.push('executed'));
+
+      await service.executeRequest(0);
+
+      expect(order).toEqual(['history', 'executed']);
     });
   });
 

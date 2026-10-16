@@ -539,6 +539,64 @@ describe('RequestExecutionService', () => {
     });
   });
 
+  describe('run lifecycle gaps', () => {
+    it('toasts when a request is queued behind a running one', () => {
+      requestManager.executeRequestByIndex.mockReturnValue(new Promise(() => {}));
+      const file = makeFileTab({ requests: [makeRequest(), makeRequest({ name: 'second' })] });
+      service.onRequestExecute(0, [file], 0, '', makeCdr());
+      service.onRequestExecute(1, [file], 0, '', makeCdr());
+
+      expect(toast.info).toHaveBeenCalledWith(expect.stringContaining('queued'));
+    });
+
+    it('drops the queued request when the active run is cancelled', async () => {
+      requestManager.executeRequestByIndex.mockReturnValue(new Promise(() => {}));
+      requestManager.cancelActiveRequest.mockResolvedValue(undefined);
+      const file = makeFileTab({ requests: [makeRequest(), makeRequest({ name: 'second' })] });
+      service.onRequestExecute(0, [file], 0, '', makeCdr());
+      service.onRequestExecute(1, [file], 0, '', makeCdr());
+
+      const emitted = vi.fn();
+      service.queuedExecutionRequested.subscribe(emitted);
+
+      await service.cancelActiveRequest();
+      service.onRequestExecuted({ requestIndex: 0, response: { status: 0 } as unknown as ResponseData });
+
+      expect(emitted).not.toHaveBeenCalled();
+    });
+
+    it('unlocks the UI if the manager finishes without emitting a result', async () => {
+      requestManager.executeRequestByIndex.mockResolvedValue(undefined);
+      const ws = TestBed.inject(WorkspaceStateService);
+      service.onRequestExecute(0, [makeFileTab({ requests: [makeRequest()] })], 0, '', makeCdr());
+      expect(service.isRequestRunning).toBe(true);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(service.isRequestRunning).toBe(false);
+      expect(ws.tabsLocked()).toBe(false);
+    });
+
+    it('does not reset a newer run when an older execution promise resolves', async () => {
+      let resolveFirst!: () => void;
+      requestManager.executeRequestByIndex
+        .mockReturnValueOnce(new Promise<void>((r) => (resolveFirst = r)))
+        .mockReturnValueOnce(new Promise(() => {}));
+      const file = makeFileTab({ requests: [makeRequest(), makeRequest({ name: 'second' })] });
+
+      service.onRequestExecute(0, [file], 0, '', makeCdr());
+      service.onRequestExecuted({ requestIndex: 0, response: { status: 200 } as unknown as ResponseData });
+      service.onRequestExecute(1, [file], 0, '', makeCdr());
+
+      resolveFirst();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(service.isRequestRunning).toBe(true);
+    });
+  });
+
   describe('queuedExecutionRequested', () => {
     it('should emit queued request index after execution completes', () => {
       requestManager.executeRequestByIndex.mockResolvedValue(undefined);

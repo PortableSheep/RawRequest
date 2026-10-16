@@ -90,6 +90,8 @@
         <div class="rr-select-wrap">
             @if(ws.currentFileEnvironments().length > 0) {
                 <select class="rr-select"
+                    [disabled]="ws.tabsLocked()"
+                    [title]="ws.tabsLocked() ? 'Environment is locked while a request is running' : 'Environment'"
                     [ngModel]="ws.currentEnv()"
                     (ngModelChange)="ws.onCurrentEnvChange($event)"
                 >

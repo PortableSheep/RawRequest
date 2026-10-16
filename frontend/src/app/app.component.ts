@@ -285,6 +285,10 @@ export class AppComponent implements OnInit, OnDestroy {
     const { snippet, type } = event;
     const code = type === "pre" ? snippet.preScript : snippet.postScript;
     if (!code) return;
+    if (this.isRequestRunning) {
+      this.toast.info("Can't insert snippets while a request is running.");
+      return;
+    }
 
     const scriptBlock = type === "pre" ? `\n< {\n${code}\n}\n` : `\n> {\n${code}\n}\n`;
 

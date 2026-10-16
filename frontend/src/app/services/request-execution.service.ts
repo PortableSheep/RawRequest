@@ -29,6 +29,7 @@ import {
   decideCancelActiveRequest,
 } from '../logic/request/cancel-active-request.logic';
 import { consumeQueuedRequest } from '../logic/request/request-queue.logic';
+import { buildRequestLabel } from '../logic/app/app.component.logic';
 import {
   getCombinedVariablesForFile,
   getActiveEnvNameForFile,
@@ -107,6 +108,9 @@ export class RequestExecutionService {
   ): void {
     if (this.isRequestRunning) {
       this.queuedRequestIndex = requestIndex;
+      const queued = files[currentFileIndex]?.requests?.[requestIndex];
+      const name = queued ? buildRequestLabel(queued) : 'Request';
+      this.toast.info(`${name} queued — it will run when the current request finishes.`);
       return;
     }
 
@@ -171,10 +175,19 @@ export class RequestExecutionService {
       requestIndex,
       this.activeRequestInfo.id,
     );
-    execution?.catch((error) => {
-      console.error('Request execution failed', error);
-      this.resetPendingRequestState();
-    });
+    const runId = this.activeRequestInfo.id;
+    execution
+      ?.then(() => {
+        // Safety net: the manager can bail out without emitting a result
+        // (e.g. a run already in flight). Don't leave the UI locked.
+        if (this.isRequestRunning && this.activeRequestInfo?.id === runId) {
+          this.resetPendingRequestState();
+        }
+      })
+      .catch((error) => {
+        console.error('Request execution failed', error);
+        this.resetPendingRequestState();
+      });
   }
 
   onReplayRequest(
@@ -292,6 +305,8 @@ export class RequestExecutionService {
     }
 
     this.isCancellingActiveRequest = decision.isCancellingAfterStart;
+    // Cancelling means "stop", so don't start anything queued behind this run.
+    this.queuedRequestIndex = null;
     try {
       await this.requestManager.cancelActiveRequest();
       this.toast.info('Request cancelled');

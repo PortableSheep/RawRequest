@@ -163,6 +163,35 @@ describe('WorkspaceStateService', () => {
       expect(service.files().map((f) => f.id)).toEqual(['a', 'b']);
     });
 
+    it('blocks environment changes', () => {
+      service.onCurrentEnvChange('prod');
+      expect(service.currentEnv()).toBe('dev');
+    });
+
+    it('defers external file reloads until the run finishes', () => {
+      service.applyState({
+        files: [makeFileTab({ id: 'a', filePath: '/tmp/a.http', content: 'GET http://old' })],
+        currentFileIndex: 0,
+        currentEnv: 'dev',
+      });
+      (workspaceFacade.updateFileContent as vi.Mock).mockImplementation((files, idx, content) => {
+        const updated = [...files];
+        updated[idx] = { ...updated[idx], content };
+        return { files: updated, currentFileIndex: idx, currentEnv: 'dev' };
+      });
+      const callback = (events.on as vi.Mock).mock.calls.find(
+        (call) => call[0] === 'file-externally-modified',
+      )?.[1];
+
+      callback({ filePath: '/tmp/a.http', content: 'GET http://first' });
+      callback({ filePath: '/tmp/a.http', content: 'GET http://latest' });
+      expect(service.files()[0].content).toBe('GET http://old');
+
+      service.setTabsLocked(false);
+      expect(service.files()[0].content).toBe('GET http://latest');
+      expect(workspaceFacade.updateFileContent).toHaveBeenCalledTimes(1);
+    });
+
     it('allows tab switching again once unlocked', () => {
       service.setTabsLocked(false);
       service.onCurrentFileIndexChange(1);

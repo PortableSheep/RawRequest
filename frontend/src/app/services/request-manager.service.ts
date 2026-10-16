@@ -19,7 +19,7 @@ import { getActiveEnvNameForFile, getCombinedVariablesForFile } from './request-
 import { buildRequestChain } from './request-manager/request-chain';
 import { buildChainItems, ensureRequestPreview, toResponsePreview } from './request-manager/chain-items';
 import {
-  applyResponseDataForRequest,
+  applyResponseDataForFileId,
   buildCancelledResponse,
   buildFailureResponse,
   buildHistoryItem,
@@ -126,7 +126,7 @@ export class RequestManagerService {
       const chainItems = this.buildChainItems([request], [response.requestPreview], [response], 0);
       const responseWithChain = { ...response, chainItems };
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, responseWithChain);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, responseWithChain);
       this.ws.onFilesChange(updatedFiles);
 
       const historyItem: HistoryItem = buildHistoryItem({
@@ -154,7 +154,7 @@ export class RequestManagerService {
       const errorChain = this.buildChainItems([request], [errorResponse.requestPreview], [errorResponse], 0);
       const decoratedError = { ...errorResponse, chainItems: errorChain };
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedError);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, decoratedError);
       this.ws.onFilesChange(updatedFiles);
 
       const errorHistoryItem: HistoryItem = buildHistoryItem({
@@ -211,7 +211,7 @@ export class RequestManagerService {
       const chainItems = this.buildChainItems(chain, execution.requestPreviews, responses, primaryIndex);
       const decoratedLastResponse = { ...lastResponse, chainItems };
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, decoratedLastResponse);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, decoratedLastResponse);
       this.ws.onFilesChange(updatedFiles);
 
       const historyItem: HistoryItem = buildHistoryItem({
@@ -240,7 +240,7 @@ export class RequestManagerService {
         fallbackBody: 'Chain execution failed'
       });
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, errorResponse);
       this.ws.onFilesChange(updatedFiles);
 
       this.requestExecuted.next({ requestIndex, response: errorResponse });
@@ -297,16 +297,9 @@ export class RequestManagerService {
         name: request.name
       });
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, summaryResponse);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, summaryResponse);
       this.ws.onFilesChange(updatedFiles);
 
-      // Emit results for display in modal
-      this.requestExecuted.next({
-        requestIndex,
-        response: { ...summaryResponse, loadTestMetrics: metrics } as any
-      });
-
-      // Add to history
       const historyItem: HistoryItem = buildHistoryItem({
         now: new Date(),
         method: request.method + ' (Load Test)',
@@ -315,6 +308,13 @@ export class RequestManagerService {
       });
 
       await this.pushHistoryEntry(currentFile.id, historyItem, currentFile.filePath, { noHistory: request.noHistory });
+
+      // Emit last (after awaits) so a queued follow-up can't start while
+      // this run is still marked as executing.
+      this.requestExecuted.next({
+        requestIndex,
+        response: { ...summaryResponse, loadTestMetrics: metrics } as any
+      });
 
       // Send notification if app is in background
       this.notificationService.notifyLoadTestComplete(
@@ -325,13 +325,17 @@ export class RequestManagerService {
       );
 
     } catch (error: any) {
+      if (this.isCancellationError(error)) {
+        this.handleCancelledRequest(currentFile.id, request, requestIndex);
+        return;
+      }
       const errorResponse: ResponseData = buildFailureResponse({
         error,
         fallbackStatusText: 'Load Test Error',
         fallbackBody: 'Load test failed'
       });
 
-      const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, errorResponse);
+      const updatedFiles = applyResponseDataForFileId(this.files(), currentFile.id, requestIndex, errorResponse);
       this.ws.onFilesChange(updatedFiles);
 
       this.requestExecuted.next({ requestIndex, response: errorResponse });
@@ -365,7 +369,7 @@ export class RequestManagerService {
   private handleCancelledRequest(fileId: string, request: Request, requestIndex: number) {
     const cancelledResponse = buildCancelledResponse();
 
-    const updatedFiles = applyResponseDataForRequest(this.files(), this.currentFileIndex(), requestIndex, cancelledResponse);
+    const updatedFiles = applyResponseDataForFileId(this.files(), fileId, requestIndex, cancelledResponse);
     this.ws.onFilesChange(updatedFiles);
 
     this.requestExecuted.next({ requestIndex, response: cancelledResponse });

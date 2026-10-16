@@ -126,7 +126,8 @@
                                     <button
                                         type="button"
                                         class="rr-btn rr-btn--ghost response-entry__replay"
-                                        title="Replay this request"
+                                        [disabled]="isLoading()"
+                                        [title]="isLoading() ? 'A request is already running' : 'Replay this request'"
                                         (click)="onReplay(entry, $event)"
                                     >
                                         Replay

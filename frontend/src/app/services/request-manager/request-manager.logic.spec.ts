@@ -1,6 +1,6 @@
 import type { FileTab, LoadTestMetrics, ResponseData } from '../../models/http.models';
 import {
-  applyResponseDataForRequest,
+  applyResponseDataForFileId,
   buildCancelledResponse,
   buildFailureResponse,
   buildHistoryItem,
@@ -27,24 +27,30 @@ describe('request-manager.logic', () => {
     expect(buildRequestId('fileA', 7, 123)).toBe('fileA-7-123');
   });
 
-  it('applyResponseDataForRequest copies the files array and sets responseData', () => {
+  describe('applyResponseDataForFileId', () => {
     const resp: ResponseData = { status: 200, statusText: 'OK', headers: {}, body: 'x', responseTime: 1 };
-    const files: FileTab[] = [
-      {
-        id: 'f1',
-        name: 'f1',
-        content: '',
-        requests: [],
-        environments: {},
-        variables: {},
-        responseData: {},
-        groups: []
-      }
-    ];
+    const makeFile = (id: string): FileTab => ({
+      id, name: id, content: '', requests: [], environments: {}, variables: {}, responseData: {}, groups: []
+    });
 
-    const updated = applyResponseDataForRequest(files, 0, 2, resp);
-    expect(updated).not.toBe(files);
-    expect(updated[0].responseData[2]).toEqual(resp);
+    it('writes into the file matching the id, regardless of position', () => {
+      const files = [makeFile('a'), makeFile('b')];
+      const updated = applyResponseDataForFileId(files, 'b', 2, resp);
+      expect(updated).not.toBe(files);
+      expect(updated[1].responseData[2]).toEqual(resp);
+      expect(updated[0].responseData[2]).toBeUndefined();
+    });
+
+    it('does not mutate the original file objects', () => {
+      const files = [makeFile('a')];
+      applyResponseDataForFileId(files, 'a', 0, resp);
+      expect(files[0].responseData[0]).toBeUndefined();
+    });
+
+    it('is a no-op when the file was closed mid-run', () => {
+      const files = [makeFile('a')];
+      expect(applyResponseDataForFileId(files, 'gone', 0, resp)).toBe(files);
+    });
   });
 
   it('buildHistoryItem prefers processedUrl over fallbackUrl', () => {

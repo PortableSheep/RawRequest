@@ -12,14 +12,25 @@ export function buildRequestId(fileId: string, requestIndex: number, nowMs: numb
   return `${fileId}-${requestIndex}-${nowMs}`;
 }
 
-export function applyResponseDataForRequest(
+/**
+ * Writes a response into the file that owns the run (by id), not whichever
+ * tab is current, so results can't land in the wrong file. No-op if the file
+ * was closed mid-run.
+ */
+export function applyResponseDataForFileId(
   files: FileTab[],
-  fileIndex: number,
+  fileId: string,
   requestIndex: number,
   response: ResponseData
 ): FileTab[] {
+  const index = files.findIndex((f) => f.id === fileId);
+  if (index === -1) return files;
   const updatedFiles = [...files];
-  updatedFiles[fileIndex].responseData[requestIndex] = response;
+  const file = updatedFiles[index];
+  updatedFiles[index] = {
+    ...file,
+    responseData: { ...(file.responseData || {}), [requestIndex]: response },
+  };
   return updatedFiles;
 }
 

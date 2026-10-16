@@ -341,6 +341,7 @@ export class ConsoleDrawerComponent implements OnInit, OnDestroy {
   }
 
   insertMockTemplate() {
+    if (this.ws.tabsLocked()) return;
     const files = this.ws.files();
     const idx = this.ws.currentFileIndex();
     const file = files[idx];
