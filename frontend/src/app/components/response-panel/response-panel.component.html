@@ -1,5 +1,5 @@
-<div class="response-panel">
-    @let chainItems = getChainItems();
+@let chainItems = getChainItems();
+<div class="response-panel" [class.response-panel--refreshing]="isLoading() && chainItems.length > 0">
 
     <div class="response-panel__header">
         <div class="response-panel__header-left">
@@ -17,6 +17,12 @@
             </span>
         }
     </div>
+
+    @if (isLoading() && chainItems.length) {
+        <div class="response-panel__refresh-bar" role="progressbar" aria-label="Request running">
+            <div class="response-panel__refresh-bar-fill"></div>
+        </div>
+    }
 
     <div class="response-panel__body rr-no-scrollbar">
         @if (isLoading() && !chainItems.length) {

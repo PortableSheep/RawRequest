@@ -39,6 +39,7 @@
 }
 
 .rr-active-card__title {
+  flex: 1;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -51,12 +52,19 @@
   height: 10px;
   border-radius: 999px;
   background: var(--rr-accent);
+  flex-shrink: 0;
   animation: rr-pulse 1.1s ease-in-out infinite;
 }
 
 .rr-active-dot--cancelling {
   background: #facc15;
   animation-duration: 0.9s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rr-active-dot {
+    animation: none;
+  }
 }
 
 @keyframes rr-pulse {
@@ -71,8 +79,15 @@
   }
 }
 
+.rr-active-card__title > div {
+  min-width: 0;
+}
+
 .rr-active-card__label {
   margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 14px;
   font-weight: 700;
 }

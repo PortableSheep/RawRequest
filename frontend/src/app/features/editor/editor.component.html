@@ -9,6 +9,17 @@
 
 	<div #editor class="editor__surface rr-mono"></div>
 
+	@if (isBusy()) {
+		<div class="editor__busy-scrim" data-testid="editor-busy-scrim">
+			<div class="editor__busy-badge" role="status" aria-live="polite">
+				<span class="editor__busy-spinner" aria-hidden="true"></span>
+				<span>Request running — editor locked</span>
+				<kbd class="editor__busy-kbd">Esc</kbd>
+				<span class="editor__busy-hint">to cancel</span>
+			</div>
+		</div>
+	}
+
 	@if (editorContextMenu.show) {
 		<div class="rr-menu-backdrop" (click)="closeEditorContextMenu()" (contextmenu)="$event.preventDefault(); closeEditorContextMenu()"></div>
 		<div

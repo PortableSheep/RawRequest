@@ -626,6 +626,24 @@ describe('ResponsePanelComponent', () => {
       expect(el.textContent).toContain('Executing request');
       expect(el.querySelector('.response-panel__progress')).toBeNull();
     });
+
+    it('should mark previous results as stale while a new run is in flight', () => {
+      setup({ requests: [{}], responseData: { 0: makeResponseData() } }, { lastIdx: 0, isLoading: true });
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.response-panel--refreshing')).toBeTruthy();
+      expect(el.querySelector('.response-panel__refresh-bar')).toBeTruthy();
+    });
+
+    it('should not show the refresh bar when idle with results', () => {
+      setup({ requests: [{}], responseData: { 0: makeResponseData() } }, { lastIdx: 0 });
+      fixture.detectChanges();
+
+      const el: HTMLElement = fixture.nativeElement;
+      expect(el.querySelector('.response-panel--refreshing')).toBeNull();
+      expect(el.querySelector('.response-panel__refresh-bar')).toBeNull();
+    });
   });
 
   // -----------------------------------------------------------------------
