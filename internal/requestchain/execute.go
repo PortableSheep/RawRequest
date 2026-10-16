@@ -191,13 +191,7 @@ func Execute(ctx context.Context, requests []map[string]interface{}, deps Depend
 			}
 		}
 
-		result := resultRaw
-		if len(scriptCtx.Assertions) > 0 {
-			if b, err := json.Marshal(scriptCtx.Assertions); err == nil {
-				result += "\nAsserts: " + string(b)
-			}
-		}
-		results = append(results, result)
+		results = append(results, withAssertions(resultRaw, scriptCtx.Assertions))
 	}
 
 	return strings.Join(results, "\n\n")
@@ -212,4 +206,25 @@ func safeSnapshot(snapshot func() map[string]string) map[string]string {
 		return map[string]string{}
 	}
 	return vars
+}
+
+// withAssertions injects an "Asserts:" line ahead of "Body:". Response
+// parsers treat everything after "Body:" as the body, so appending it at the
+// end would both lose the assertions and corrupt the body.
+func withAssertions(result string, assertions []sr.AssertionResult) string {
+	if len(assertions) == 0 {
+		return result
+	}
+	b, err := json.Marshal(assertions)
+	if err != nil {
+		return result
+	}
+	line := "Asserts: " + string(b)
+	if strings.HasPrefix(result, "Body: ") {
+		return line + "\n" + result
+	}
+	if idx := strings.Index(result, "\nBody: "); idx >= 0 {
+		return result[:idx] + "\n" + line + result[idx:]
+	}
+	return result + "\n" + line
 }

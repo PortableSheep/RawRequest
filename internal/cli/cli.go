@@ -344,7 +344,7 @@ Output Formats:
           request last.
   body    Response body only
   full    Human-readable format with status and body
-  quiet   No output, exit code only (0=success, 1=failure)
+  quiet   No output, exit code only (0=success, 1=failure or failed assert)
 
 Examples:
   # Run a specific named request

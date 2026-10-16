@@ -27,17 +27,6 @@ type Dependencies struct {
 	Sleep             func(time.Duration)
 }
 
-type assertionFailure struct {
-	message string
-}
-
-func (a assertionFailure) Error() string {
-	if a.message == "" {
-		return "Assertion failed"
-	}
-	return a.message
-}
-
 func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps Dependencies) {
 	if strings.TrimSpace(cleanScript) == "" {
 		return
@@ -131,27 +120,32 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 		return goja.Undefined()
 	})
 
-	_ = vm.Set("assert", func(call goja.FunctionCall) goja.Value {
-		if len(call.Arguments) == 0 {
-			return goja.Undefined()
+	recordAssertion := func(passed bool, message string) {
+		ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: passed, Message: message, Stage: stage})
+		if passed {
+			log("info", "✓ "+message)
+		} else {
+			log("error", "✗ "+message)
 		}
-		passed := call.Arguments[0].ToBoolean()
+	}
+
+	// assert records a result and keeps going, so one failure doesn't hide
+	// the outcome of later assertions or skip subsequent setVar calls.
+	_ = vm.Set("assert", func(call goja.FunctionCall) goja.Value {
+		passed := len(call.Arguments) > 0 && call.Arguments[0].ToBoolean()
 		message := ""
 		if len(call.Arguments) > 1 {
 			message = call.Arguments[1].String()
 		}
-		if passed {
-			if message == "" {
-				message = "Assertion passed"
-			}
-			ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: true, Message: message, Stage: stage})
-			return goja.Undefined()
-		}
 		if message == "" {
-			message = "Assertion failed"
+			if passed {
+				message = "Assertion passed"
+			} else {
+				message = "Assertion failed"
+			}
 		}
-		ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: false, Message: message, Stage: stage})
-		panic(assertionFailure{message: message})
+		recordAssertion(passed, message)
+		return vm.ToValue(passed)
 	})
 
 	_ = vm.Set("delay", func(call goja.FunctionCall) goja.Value {
@@ -183,12 +177,16 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 	})
 	_ = vm.Set("console", console)
 
+	// A script that crashes can't vouch for the response, so surface it as a
+	// failed assertion in addition to the console error.
+	recordScriptError := func(detail string) {
+		log("error", detail)
+		ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: false, Message: "Script error: " + detail, Stage: stage})
+	}
+
 	defer func() {
 		if r := recover(); r != nil {
-			if _, ok := r.(assertionFailure); ok {
-				return
-			}
-			log("error", fmt.Sprintf("panic: %v", r))
+			recordScriptError(fmt.Sprintf("panic: %v", r))
 		}
 	}()
 
@@ -204,7 +202,7 @@ func Execute(cleanScript string, ctx *sr.ExecutionContext, stage string, deps De
 	)
 
 	if _, err := vm.RunString(wrappedScript); err != nil {
-		log("error", fmt.Sprintf("runtime error: %v", err))
+		recordScriptError(fmt.Sprintf("runtime error: %v", err))
 	}
 }
 

@@ -9,16 +9,19 @@ export type ScriptRunnerDeps = {
   setVariable: (key: string, value: string) => Promise<void>;
 };
 
-class AssertionError extends Error {
-  readonly isAssertionError = true;
-}
-
 export async function runScript(script: string, context: any, stage: ScriptStage, deps: ScriptRunnerDeps): Promise<AssertionResult[]> {
   if (!script || !script.trim()) {
     return [];
   }
 
   const assertions: AssertionResult[] = [];
+  const source = buildScriptSource(stage, context?.request as Request | undefined);
+  const recordAssertion = (passed: boolean, message: string) => {
+    const entry: AssertionResult = { passed, message, stage };
+    assertions.push(entry);
+    context?.assertions?.push(entry);
+    deps.recordConsole(passed ? 'info' : 'error', source, `${passed ? '✓' : '✗'} ${message}`);
+  };
 
   try {
     const clean = deps.cleanScript(script).trim();
@@ -29,7 +32,6 @@ export async function runScript(script: string, context: any, stage: ScriptStage
     const scriptContext = context || {};
     scriptContext.variables = scriptContext.variables || {};
     scriptContext.assertions = scriptContext.assertions || [];
-    const source = buildScriptSource(stage, scriptContext.request as Request | undefined);
 
     const emitLog = (level: 'info' | 'warn' | 'error' | 'debug', args: any[]) => {
       const message = buildConsoleMessage(args);
@@ -79,22 +81,13 @@ export async function runScript(script: string, context: any, stage: ScriptStage
       });
     };
 
-    const recordAssertion = (passed: boolean, message: string) => {
-      const entry: AssertionResult = { passed, message, stage };
-      assertions.push(entry);
-      scriptContext.assertions.push(entry);
-    };
-
+    // assert records and continues so one failure doesn't hide later results
+    // or skip subsequent setVar calls.
     const assertFn = (condition: any, message?: string) => {
       const passed = Boolean(condition);
-      if (passed) {
-        const msg = (message && String(message)) || 'Assertion passed';
-        recordAssertion(true, msg);
-        return;
-      }
-      const msg = (message && String(message)) || 'Assertion failed';
-      recordAssertion(false, msg);
-      throw new AssertionError(msg);
+      const fallback = passed ? 'Assertion passed' : 'Assertion failed';
+      recordAssertion(passed, (message && String(message)) || fallback);
+      return passed;
     };
 
     const delayFn = (duration: any) => {
@@ -148,13 +141,9 @@ export async function runScript(script: string, context: any, stage: ScriptStage
       await result;
     }
   } catch (error: any) {
-    // Assertion failures already emitted a log line; don't duplicate as a generic runtime error.
-    if (!error?.isAssertionError) {
-      console.error('Script execution error:', error);
-      const message = error?.message || String(error);
-      const source = buildScriptSource(stage, context?.request as Request | undefined);
-      deps.recordConsole('error', source, `runtime error: ${message}`);
-    }
+    console.error('Script execution error:', error);
+    // A crashed script can't vouch for the response, so count it as a failure.
+    recordAssertion(false, `Script error: ${error?.message || String(error)}`);
   }
 
   return assertions;

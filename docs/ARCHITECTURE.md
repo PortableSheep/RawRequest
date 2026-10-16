@@ -214,7 +214,12 @@ Scripts have access to:
 * `response`: Response object with `{ status, statusText, headers, body,
   json, ... }`.
 * `setVar(key, value)`: Set a variable for use in subsequent requests.
-* `assert(condition, message)`: Assertion that fails the request if false.
+* `assert(condition, message)`: Records a pass/fail result (shown in the
+  response panel's Assertions section and logged to the console) and returns
+  the boolean. A failure does not stop the script, so later assertions and
+  `setVar()` calls still run. An uncaught script error is recorded as a failed
+  assertion. In the CLI, any failed assertion makes `rawrequest run` exit 1;
+  results are included as `assertions` in JSON/MCP output.
 * `console.log()`, `console.error()`: Log to the script log panel.
 * `response.<requestName>`: Access the response from a named request earlier
   in the chain.

@@ -50,7 +50,9 @@ export async function sendRequest(
   let bodyPlaceholder: string | undefined;
   const sensitiveHeaderKeys = detectSensitiveHeaderKeys(request.headers);
   const assertions: AssertionResult[] = [];
-  const scriptContext: any = { request, variables, assertions };
+  // Scripts get their own array; results are collected from runScript's return
+  // value so each assertion is recorded exactly once.
+  const scriptContext: any = { request, variables, assertions: [] };
 
   try {
     if (request.preScript) {

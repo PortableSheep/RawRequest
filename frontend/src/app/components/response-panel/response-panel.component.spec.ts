@@ -737,11 +737,7 @@ describe('ResponsePanelComponent', () => {
       expect(summary!.getAttribute('data-failed')).toBe('false');
     });
 
-    it('should expand assertions section to show individual results', () => {
-      const assertions: AssertionResult[] = [
-        { passed: true, message: 'Status is 200', stage: 'post' },
-        { passed: false, message: 'Body check' },
-      ];
+    const renderAssertions = (assertions: AssertionResult[]) => {
       const rd = makeResponseData({
         chainItems: [makeEntry({
           response: {
@@ -757,23 +753,40 @@ describe('ResponsePanelComponent', () => {
       mockWs.currentFileView.set({ requests: [{}], responseData: { 0: rd } });
       mockReqExec.lastExecutedRequestIndexSignal.set(0);
       fixture.detectChanges();
+      return fixture.nativeElement as HTMLElement;
+    };
 
-      // Assertions section defaults to collapsed
-      expect(component.isAssertionsCollapsed('entry-1')).toBe(true);
-      let el: HTMLElement = fixture.nativeElement;
+    it('keeps assertions collapsed when all passed, and expands on toggle', () => {
+      const assertions: AssertionResult[] = [{ passed: true, message: 'Status is 200', stage: 'post' }];
+      let el = renderAssertions(assertions);
+
+      expect(component.isAssertionsCollapsed('entry-1', assertions)).toBe(true);
       expect(el.querySelector('.response-entry__assertions')).toBeNull();
 
-      // Expand
-      component.toggleAssertionsSection('entry-1');
+      component.toggleAssertionsSection('entry-1', assertions);
       fixture.detectChanges();
-
       el = fixture.nativeElement;
+      expect(el.querySelectorAll('.response-entry__assertion').length).toBe(1);
+    });
+
+    it('auto-expands assertions when any failed, and can be collapsed', () => {
+      const assertions: AssertionResult[] = [
+        { passed: true, message: 'Status is 200', stage: 'post' },
+        { passed: false, message: 'Body check' },
+      ];
+      let el = renderAssertions(assertions);
+
       const items = el.querySelectorAll('.response-entry__assertion');
       expect(items.length).toBe(2);
       expect(items[0].textContent).toContain('PASS');
       expect(items[0].textContent).toContain('Status is 200');
       expect(items[1].textContent).toContain('FAIL');
       expect(items[1].textContent).toContain('Body check');
+
+      component.toggleAssertionsSection('entry-1', assertions);
+      fixture.detectChanges();
+      el = fixture.nativeElement;
+      expect(el.querySelector('.response-entry__assertions')).toBeNull();
     });
   });
 

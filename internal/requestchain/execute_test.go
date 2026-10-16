@@ -157,3 +157,32 @@ func TestExecute_ErrorStopsChain(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
+
+func TestExecute_AssertsLinePrecedesBody(t *testing.T) {
+	deps := Dependencies{
+		CancelledResponse: "__CANCELLED__",
+		ExecuteScript: func(_ string, ctx *sr.ExecutionContext, stage string) {
+			ctx.Assertions = append(ctx.Assertions, sr.AssertionResult{Passed: false, Message: "bad", Stage: stage})
+		},
+		PerformRequest: func(_ context.Context, _, _, _, _, _ string, _ int) string {
+			return "Status: 200 OK\nHeaders: {}\nBody: {\"a\":1}"
+		},
+		ParseResponse: func(_ string) map[string]interface{} { return map[string]interface{}{} },
+	}
+
+	got := Execute(context.Background(), []map[string]interface{}{
+		{"method": "GET", "url": "u", "postScript": "assert(false,'bad')"},
+	}, deps)
+
+	want := "Status: 200 OK\nHeaders: {}\nAsserts: [{\"passed\":false,\"message\":\"bad\",\"stage\":\"post\"}]\nBody: {\"a\":1}"
+	if got != want {
+		t.Fatalf("got %q\nwant %q", got, want)
+	}
+}
+
+func TestWithAssertions_NoBodyAppends(t *testing.T) {
+	got := withAssertions("Status: 200 OK", []sr.AssertionResult{{Passed: true, Message: "ok"}})
+	if got != "Status: 200 OK\nAsserts: [{\"passed\":true,\"message\":\"ok\",\"stage\":\"\"}]" {
+		t.Fatalf("got %q", got)
+	}
+}

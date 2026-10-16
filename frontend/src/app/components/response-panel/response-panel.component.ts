@@ -264,15 +264,15 @@ export class ResponsePanelComponent implements OnDestroy {
     }));
   }
 
-  isAssertionsCollapsed(entryId: string): boolean {
-    // Default to collapsed (true)
-    return this.assertionsCollapsed()[entryId] ?? true;
+  isAssertionsCollapsed(entryId: string, assertions?: AssertionResult[] | null): boolean {
+    // Collapsed by default, but open when something failed so it can't be missed.
+    return this.assertionsCollapsed()[entryId] ?? this.countAssertionsFailed(assertions) === 0;
   }
 
-  toggleAssertionsSection(entryId: string): void {
+  toggleAssertionsSection(entryId: string, assertions?: AssertionResult[] | null): void {
     this.assertionsCollapsed.update(current => ({
       ...current,
-      [entryId]: !this.isAssertionsCollapsed(entryId)
+      [entryId]: !this.isAssertionsCollapsed(entryId, assertions)
     }));
   }
 

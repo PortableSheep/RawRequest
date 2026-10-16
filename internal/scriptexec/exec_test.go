@@ -107,8 +107,14 @@ func TestExecute_AssertRecordsAndLogs(t *testing.T) {
 		},
 	})
 
-	if len(logs) != 0 {
-		t.Fatalf("logs=%d want 0", len(logs))
+	if len(logs) != 2 {
+		t.Fatalf("logs=%d want 2: %+v", len(logs), logs)
+	}
+	if logs[0].level != "info" || logs[0].message != "✓ ok" {
+		t.Fatalf("logs[0]=%+v", logs[0])
+	}
+	if logs[1].level != "error" || logs[1].message != "✗ nope" {
+		t.Fatalf("logs[1]=%+v", logs[1])
 	}
 
 	if len(ctx.Assertions) != 2 {
@@ -119,6 +125,37 @@ func TestExecute_AssertRecordsAndLogs(t *testing.T) {
 	}
 	if ctx.Assertions[1].Passed || ctx.Assertions[1].Message != "nope" {
 		t.Fatalf("assertion[1]=%+v", ctx.Assertions[1])
+	}
+}
+
+func TestExecute_FailedAssertDoesNotAbortScript(t *testing.T) {
+	ctx := &sr.ExecutionContext{}
+	vars := map[string]string{}
+
+	Execute("assert(false, 'first'); setVar('after', 'yes'); assert(true, 'second')", ctx, "post", Dependencies{
+		VariablesSnapshot: func() map[string]string { return map[string]string{} },
+		SetVar:            func(k, v string) { vars[k] = v },
+	})
+
+	if len(ctx.Assertions) != 2 || ctx.Assertions[0].Passed || !ctx.Assertions[1].Passed {
+		t.Fatalf("assertions=%+v", ctx.Assertions)
+	}
+	if vars["after"] != "yes" {
+		t.Fatalf("setVar after failed assert did not run: %+v", vars)
+	}
+}
+
+func TestExecute_RuntimeErrorRecordsFailedAssertion(t *testing.T) {
+	ctx := &sr.ExecutionContext{}
+
+	Execute("assert(true, 'ok'); response.missing.field", ctx, "post", Dependencies{})
+
+	if len(ctx.Assertions) != 2 {
+		t.Fatalf("assertions=%+v", ctx.Assertions)
+	}
+	got := ctx.Assertions[1]
+	if got.Passed || !strings.HasPrefix(got.Message, "Script error: runtime error") || got.Stage != "post" {
+		t.Fatalf("assertion[1]=%+v", got)
 	}
 }
 

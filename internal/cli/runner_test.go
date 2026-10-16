@@ -3,6 +3,8 @@ package cli
 import (
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -325,5 +327,66 @@ func TestCleanScript(t *testing.T) {
 				t.Errorf("cleanScript(%q) = %q, want %q", tt.input, got, tt.expected)
 			}
 		})
+	}
+}
+
+func TestExecuteRequest_CollectsAssertionsAcrossFailures(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":1}`))
+	}))
+	t.Cleanup(srv.Close)
+
+	runner := NewRunner(&Options{Variables: map[string]string{}}, "test")
+	result := runner.ExecuteRequest(Request{
+		Method: http.MethodGet,
+		URL:    srv.URL,
+		PostScript: `> {
+  assert(response.status === 201, 'created');
+  assert(response.json.id === 1, 'has id');
+}`,
+	})
+
+	if len(result.Assertions) != 2 {
+		t.Fatalf("assertions=%+v", result.Assertions)
+	}
+	if result.Assertions[0].Passed || !result.Assertions[1].Passed {
+		t.Fatalf("assertions=%+v", result.Assertions)
+	}
+	if result.FailedAssertions() != 1 {
+		t.Fatalf("FailedAssertions=%d want 1", result.FailedAssertions())
+	}
+}
+
+func TestRunRequests_FailedAssertionExitsNonZero(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(srv.Close)
+
+	write := func(script string) string {
+		path := filepath.Join(t.TempDir(), "a.http")
+		content := "GET " + srv.URL + "\n\n> {\n" + script + "\n}\n"
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+
+	run := func(path string) int {
+		return runRequests(&Options{
+			Command:     CommandRun,
+			File:        path,
+			Output:      OutputQuiet,
+			Environment: "default",
+			Variables:   map[string]string{},
+		}, "test")
+	}
+
+	if code := run(write("assert(response.status === 200, 'ok');")); code != 0 {
+		t.Fatalf("passing assertion exit=%d want 0", code)
+	}
+	if code := run(write("assert(response.status === 404, 'not found');")); code != 1 {
+		t.Fatalf("failing assertion exit=%d want 1", code)
 	}
 }

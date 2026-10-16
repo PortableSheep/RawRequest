@@ -198,4 +198,38 @@ describe('send-request', () => {
     expect(backend.sendRequest).not.toHaveBeenCalled();
     expect(backend.sendRequestWithID).not.toHaveBeenCalled();
   });
+
+  it('records each script assertion exactly once', async () => {
+    const executeScript = vi.fn(async (_script: string, ctx: any, stage: any) => {
+      const entry = { passed: stage === 'pre', message: stage, stage };
+      ctx.assertions.push(entry);
+      return [entry];
+    });
+    const ok = 'Status: 200 OK\nHeaders: {}\nBody: {}';
+
+    const result = await sendRequest(
+      { method: 'GET', url: 'u', headers: {}, preScript: 'p', postScript: 'q', options: {} } as any,
+      {},
+      undefined,
+      '',
+      {
+        backend: {
+          sendRequest: vi.fn(async () => ok),
+          sendRequestWithID: vi.fn(async () => ok),
+          sendRequestWithTimeout: vi.fn(async () => ok),
+        },
+        normalizeEnvName: (e) => e || '',
+        hydrateText: async (v) => v,
+        hydrateHeaders: async (h) => ({ ...(h || {}) }),
+        executeScript,
+        parseGoResponse: () => ({ status: 200, statusText: 'OK', headers: {}, body: '{}', responseTime: 0 }),
+        throwIfCancelled: () => {},
+      }
+    );
+
+    expect(result.assertions).toEqual([
+      { passed: true, message: 'pre', stage: 'pre' },
+      { passed: false, message: 'post', stage: 'post' },
+    ]);
+  });
 });

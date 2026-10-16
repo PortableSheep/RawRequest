@@ -35,21 +35,68 @@ describe('script-runner', () => {
     expect(assertions).toEqual([]);
   });
 
-  it('returns assertion failures without logging them', async () => {
+  const deps = (logs: Array<{ level: string; message: string }>, vars: Record<string, string> = {}) => ({
+    cleanScript: (s: string) => s,
+    recordConsole: (level: string, _source: string, message: string) => logs.push({ level, message }),
+    setVariable: async (k: string, v: string) => {
+      vars[k] = v;
+    }
+  });
+
+  it('logs every assertion result to the console', async () => {
     const logs: Array<{ level: string; message: string }> = [];
 
     const assertions = await runScript(
-      "assert(false, 'nope')",
+      "assert(true, 'ok'); assert(false, 'nope')",
       { request: { method: 'GET', url: 'x', headers: {} } },
       'post',
-      {
-        cleanScript: (s) => s,
-        recordConsole: (level, _source, message) => logs.push({ level, message }),
-        setVariable: async () => {}
-      }
+      deps(logs)
     );
 
-    expect(logs.length).toBe(0);
-    expect(assertions).toEqual([{ passed: false, message: 'nope', stage: 'post' }]);
+    expect(logs).toEqual([
+      { level: 'info', message: '✓ ok' },
+      { level: 'error', message: '✗ nope' }
+    ]);
+    expect(assertions).toEqual([
+      { passed: true, message: 'ok', stage: 'post' },
+      { passed: false, message: 'nope', stage: 'post' }
+    ]);
+  });
+
+  it('keeps running after a failed assertion', async () => {
+    const vars: Record<string, string> = {};
+
+    const assertions = await runScript(
+      "assert(false, 'first'); setVar('after', 'yes'); assert(true, 'second')",
+      { request: { headers: {} } },
+      'post',
+      deps([], vars)
+    );
+
+    expect(vars['after']).toBe('yes');
+    expect(assertions.map(a => a.passed)).toEqual([false, true]);
+  });
+
+  it('records a runtime error as a failed assertion', async () => {
+    const logs: Array<{ level: string; message: string }> = [];
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const assertions = await runScript(
+      "assert(true, 'ok'); response.missing.field",
+      { request: { headers: {} }, response: {} },
+      'post',
+      deps(logs)
+    );
+
+    errSpy.mockRestore();
+    expect(assertions.length).toBe(2);
+    expect(assertions[1].passed).toBe(false);
+    expect(assertions[1].message).toMatch(/^Script error: /);
+    expect(logs.at(-1)?.level).toBe('error');
+  });
+
+  it('records a failed assertion when assert is called without a condition', async () => {
+    const assertions = await runScript('assert()', { request: { headers: {} } }, 'pre', deps([]));
+    expect(assertions).toEqual([{ passed: false, message: 'Assertion failed', stage: 'pre' }]);
   });
 });

@@ -72,21 +72,22 @@ func NewRunner(opts *Options, version string) *Runner {
 
 // ResponseResult holds the result of an HTTP request
 type ResponseResult struct {
-	RequestName  string            `json:"requestName,omitempty"`
-	Method       string            `json:"method"`
-	URL          string            `json:"url"`
-	Status       int               `json:"status"`
-	StatusText   string            `json:"statusText"`
-	Headers      map[string]string `json:"headers"`
-	Body         string            `json:"body"`
-	ResponseTime int64             `json:"responseTime"`
-	Timing       TimingInfo        `json:"timing"`
-	Size         int64             `json:"size"`
-	Error        string            `json:"error,omitempty"`
-	ScriptLogs   []ScriptLogEntry  `json:"scriptLogs,omitempty"`
-	IsBinary     bool              `json:"isBinary,omitempty"`
-	ContentType  string            `json:"contentType,omitempty"`
-	rawBody      []byte            // raw bytes for binary responses (not serialised)
+	RequestName  string               `json:"requestName,omitempty"`
+	Method       string               `json:"method"`
+	URL          string               `json:"url"`
+	Status       int                  `json:"status"`
+	StatusText   string               `json:"statusText"`
+	Headers      map[string]string    `json:"headers"`
+	Body         string               `json:"body"`
+	ResponseTime int64                `json:"responseTime"`
+	Timing       TimingInfo           `json:"timing"`
+	Size         int64                `json:"size"`
+	Error        string               `json:"error,omitempty"`
+	ScriptLogs   []ScriptLogEntry     `json:"scriptLogs,omitempty"`
+	Assertions   []sr.AssertionResult `json:"assertions,omitempty"`
+	IsBinary     bool                 `json:"isBinary,omitempty"`
+	ContentType  string               `json:"contentType,omitempty"`
+	rawBody      []byte               // raw bytes for binary responses (not serialised)
 }
 
 // TimingInfo contains request timing breakdown
@@ -278,7 +279,7 @@ func runRequests(opts *Options, version string) int {
 
 	hasError := false
 	for _, result := range results {
-		if result.Error != "" || result.Status >= 400 {
+		if result.Error != "" || result.Status >= 400 || result.FailedAssertions() > 0 {
 			hasError = true
 		}
 	}
@@ -435,19 +436,23 @@ func (r *Runner) executeRequest(req Request, responseStore map[string]map[string
 			case hcl.StageCreateRequest:
 				result.Error = fmt.Sprintf("Error creating request: %s", execErr)
 				result.ScriptLogs = scriptLogs
+				result.Assertions = assertionsOf(scriptCtx)
 				return result
 			case hcl.StageReadBody:
 				result.Error = fmt.Sprintf("Error reading response: %s", execErr)
 				result.ScriptLogs = scriptLogs
+				result.Assertions = assertionsOf(scriptCtx)
 				return result
 			default:
 				result.Error = fmt.Sprintf("Request failed: %s", execErr)
 				result.ScriptLogs = scriptLogs
+				result.Assertions = assertionsOf(scriptCtx)
 				return result
 			}
 		}
 		result.Error = fmt.Sprintf("Request failed: %s", err)
 		result.ScriptLogs = scriptLogs
+		result.Assertions = assertionsOf(scriptCtx)
 		return result
 	}
 
@@ -516,7 +521,26 @@ func (r *Runner) executeRequest(req Request, responseStore map[string]map[string
 	}
 
 	result.ScriptLogs = scriptLogs
+	result.Assertions = assertionsOf(scriptCtx)
 	return result
+}
+
+func assertionsOf(ctx *sr.ExecutionContext) []sr.AssertionResult {
+	if ctx == nil || len(ctx.Assertions) == 0 {
+		return nil
+	}
+	return ctx.Assertions
+}
+
+// FailedAssertions returns how many script assertions did not pass.
+func (r ResponseResult) FailedAssertions() int {
+	failed := 0
+	for _, a := range r.Assertions {
+		if !a.Passed {
+			failed++
+		}
+	}
+	return failed
 }
 
 func (r *Runner) resolveVariables(input string) string {
@@ -751,6 +775,7 @@ func outputResults(results []ResponseResult, format OutputFormat) {
 			fmt.Printf("%s %s\n", r.Method, r.URL)
 			fmt.Printf("Status: %s\n", r.StatusText)
 			fmt.Printf("Time: %dms, Size: %d bytes\n", r.ResponseTime, r.Size)
+			printAssertions(r.Assertions)
 			fmt.Println()
 			if r.IsBinary {
 				fmt.Printf("[Binary response: %s, %s]\n",
@@ -766,6 +791,30 @@ func outputResults(results []ResponseResult, format OutputFormat) {
 					fmt.Println(r.Body)
 				}
 			}
+		}
+	}
+}
+
+func printAssertions(assertions []sr.AssertionResult) {
+	if len(assertions) == 0 {
+		return
+	}
+	passed := 0
+	for _, a := range assertions {
+		if a.Passed {
+			passed++
+		}
+	}
+	fmt.Printf("Assertions: %d passed, %d failed\n", passed, len(assertions)-passed)
+	for _, a := range assertions {
+		mark := "PASS"
+		if !a.Passed {
+			mark = "FAIL"
+		}
+		if a.Stage != "" {
+			fmt.Printf("  %s [%s] %s\n", mark, a.Stage, a.Message)
+		} else {
+			fmt.Printf("  %s %s\n", mark, a.Message)
 		}
 	}
 }
