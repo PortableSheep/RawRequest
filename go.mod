@@ -8,9 +8,9 @@ require (
 	github.com/mark3labs/mcp-go v1.1.1
 	github.com/wailsapp/wails/v2 v2.16.0
 	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/crypto v0.58.0
+	golang.org/x/sys v0.49.0
 	modernc.org/sqlite v1.59.0
-	golang.org/x/crypto v0.57.0
-	golang.org/x/sys v0.48.0
 )
 
 require (
@@ -63,6 +63,6 @@ require (
 	github.com/wailsapp/go-webview2 v1.0.22 // indirect
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/yosida95/uritemplate/v3 v3.0.2 // indirect
-	golang.org/x/net v0.58.0 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	golang.org/x/net v0.60.0 // indirect
+	golang.org/x/text v0.43.0 // indirect
 )
